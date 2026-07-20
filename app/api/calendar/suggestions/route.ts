@@ -1,7 +1,7 @@
-import { getServerSession } from "next-auth/next";
+import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { authOptions } from "@/lib/auth";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import type { MomentCategory, SuggestedAction } from "@/types";
 
@@ -64,13 +64,17 @@ function computeFreeSlots(busy: { start: string; end: string }[], from: Date, to
   );
 }
 
-export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+export async function POST(request: NextRequest) {
+  // getToken reads the JWT directly (cookie/header), independent of the
+  // session callback — this is how accessToken stays server-only while still
+  // being reachable here. See lib/auth.ts's session callback for why it's
+  // deliberately absent from getServerSession's return value.
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const accessToken = session.accessToken;
+  const accessToken = token.error ? undefined : token.accessToken;
   if (!accessToken) {
     return NextResponse.json({ connected: false, suggestions: [] });
   }
