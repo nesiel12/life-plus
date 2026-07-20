@@ -2,16 +2,17 @@ import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { authOptions } from "@/lib/auth";
+import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { categoryLabel } from "@/store/useAtlasStore";
-import type { LifeAreaKey } from "@/types";
 
 export const runtime = "nodejs";
 
-interface BreakdownRequestBody {
-  title: string;
-  category: LifeAreaKey;
-}
+const breakdownRequestSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  category: z.enum(["faith", "family", "knowledge", "health", "career"]),
+});
 
 function genericMilestones(title: string): string[] {
   return [
@@ -36,11 +37,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { title, category } = (await request.json()) as BreakdownRequestBody;
-
-  if (!title || typeof title !== "string") {
-    return NextResponse.json({ error: "title is required" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, breakdownRequestSchema);
+  if (parsed.error) return parsed.error;
+  const { title, category } = parsed.data;
 
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ milestones: genericMilestones(title) });

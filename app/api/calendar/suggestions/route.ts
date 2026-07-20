@@ -1,9 +1,23 @@
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { authOptions } from "@/lib/auth";
-import type { LifeArea, MomentCategory, SuggestedAction } from "@/types";
+import { parseJsonBody } from "@/lib/api/parseJsonBody";
+import type { MomentCategory, SuggestedAction } from "@/types";
 
 export const runtime = "nodejs";
+
+const lifeAreaSchema = z.object({
+  key: z.enum(["faith", "family", "knowledge", "health", "career"]),
+  label: z.string(),
+  score: z.number().min(0).max(100),
+  colorVar: z.string(),
+  lastTouched: z.string().optional(),
+});
+
+const suggestionsRequestSchema = z.object({
+  lifeAreas: z.array(lifeAreaSchema).max(20).default([]),
+});
 
 const ACTION_BY_CATEGORY: Record<MomentCategory, string> = {
   faith: "זמן לימוד תורה",
@@ -52,14 +66,18 @@ function computeFreeSlots(busy: { start: string; end: string }[], from: Date, to
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
-  const accessToken = session?.accessToken;
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  const accessToken = session.accessToken;
   if (!accessToken) {
     return NextResponse.json({ connected: false, suggestions: [] });
   }
 
-  const body = (await request.json()) as { lifeAreas?: LifeArea[] };
-  const lifeAreas = body.lifeAreas ?? [];
+  const parsed = await parseJsonBody(request, suggestionsRequestSchema);
+  if (parsed.error) return parsed.error;
+  const { lifeAreas } = parsed.data;
 
   const now = new Date();
   const endOfDay = new Date(now);
