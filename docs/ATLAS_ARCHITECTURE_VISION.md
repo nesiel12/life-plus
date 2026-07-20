@@ -42,9 +42,9 @@ This is a data-flow model, not a service-boundary model. It does **not** imply f
 | Knowledge memory | Books, shiurim, ideas, projects | `knowledge_entries` |
 | Life memory | Milestones, achievements, reflections | `moments`, `insights`, `goals` |
 
-**Current state:** every type above is already captured and durably stored per-user (Phase 1). What's missing is *retrieval* — today, memory is written but essentially never read back into a reasoning context. Chat sees the last ~50 raw turns and nothing else; nothing else reads memory at all. Storage exists; recall doesn't.
+**Current state — v1 (lexical retrieval) shipped and live in three of the four AI-backed routes.** `lib/memory/retrieveRelevantMemory(userId, query, limit)` ranks moments/knowledge_entries/insights by keyword overlap + recency and is called (via the Context Engine, §5) from chat, goal breakdown, and Torah extraction — each with a task-appropriate query (the chat message, the new goal's title, the extracted text). Calendar suggestions deliberately doesn't call it (no natural-language query to rank against). Storage existed since Phase 1; recall now does too.
 
-**Target:** a `retrieveMemory(userId, query, opts)` function that, given a task (a chat turn, a suggestion to generate, a summary to write), returns the small set of past moments/knowledge entries/insights actually relevant to it — not the full history. This is the single highest-leverage piece of unbuilt architecture in the product: it's the difference between "Atlas has a database" and "Atlas remembers you."
+**Target:** the function signature above already is the target for v1 — what's left is v2/v3 below, gated on real evidence they're needed, not built ahead of it.
 
 **Path, in order:**
 1. **v1 — lexical retrieval.** Rank existing rows (moments, knowledge_entries, insights) by simple keyword/recency scoring, entirely in application code, no schema change. Same technique already used by Torah Space's `findRelatedSessions`. Good enough at single-user, hundreds-of-rows scale, and ships a real "Atlas remembers" experience immediately.
@@ -100,11 +100,23 @@ This is a data-flow model, not a service-boundary model. It does **not** imply f
 
 **What it is:** the layer that decides, for a given moment (a chat message, a page load, a scheduled job), what subset of memory + personalDNA + recent activity is actually relevant to assemble into a prompt or a UI.
 
-**Current state:** doesn't exist as a named thing, but its job is already done ad hoc and correctly in each route — `/api/chat` assembles personalDNA + recent turns; `/api/calendar/suggestions` assembles life-area scores + free/busy; `/api/goals/breakdown` assembles the goal title + category. Each is small and correct for its one job.
+**Current state — shipped (Context Engine v1).** `lib/context/buildAtlasContext(userId, { query? })` is the one place that assembles personalDNA, active goals, life-area scores, upcoming events, relationship signals (stale-contact detection, reusing the same rule as the family page), and — when a query is given — Memory Engine (§2) retrieval, all in one parallelized fetch. It returns `AtlasContext`, a plain object of pre-formatted strings/rows that every AI-backed route now consumes instead of independently fetching and formatting its own slice:
 
-**Target:** once the Memory Engine (§2) exists, every one of these context-assembly call sites should also pull from it — and at that point, factoring the shared "assemble context for a request" logic into one module (`lib/context/buildContext.ts` or similar) stops being premature and starts being the obvious next step, the same way `lib/lifeAreas.ts` and `lib/chatSystemPrompt.ts` factored out duplication that had already appeared twice.
+| Route | Query passed | What changed |
+|---|---|---|
+| `/api/chat` | the user's message | Previously fetched personalDNA + memory inline; now one `buildAtlasContext` call feeds the whole system prompt (personalDNA, life-area balance, active goals, upcoming events, relationship signals, relevant memory). |
+| `/api/goals/breakdown` | the new goal's title | Previously had zero user context at all — a bare title+category prompt. Now sees the user's other active goals (avoid redundant milestones) and related past memory, and adapts to `learning_style` when set. |
+| `/api/torah/extract` | the extracted/transcribed text | Previously had zero user context. The summarization call now sees related past knowledge/moments, so a new shiur can be summarized with awareness of what he's studied before. |
+| `/api/calendar/suggestions` | — (no query; not memory-driven) | Previously trusted whatever life-area scores the *client* sent in the request body. Now fetches its own canonical scores server-side, and a family-category suggestion's rationale names a specific overdue contact when `relationshipSignals` has one. |
 
-**Trigger to build:** the moment a second route needs memory retrieval (i.e., right after §2 v1 ships for chat, the next consumer — likely calendar suggestions or goal breakdown — should reuse the same assembly function rather than re-implementing it).
+`lib/context/formatContext.ts` (`formatContextSection`/`joinContextSections`) is the one shared "turn a list of facts into a titled bullet block" helper — previously duplicated ad hoc inside `lib/chatSystemPrompt.ts`; now every route above uses it instead of hand-rolling prompt-section formatting.
+
+**What's still route-specific, deliberately:** each route decides *how* to fold `AtlasContext` into its own task-specific prompt — chat's system prompt looks nothing like the goal-breakdown system prompt, and shouldn't. The Context Engine unifies *gathering*, not the reasoning task built on top of it — that's the line that keeps this from becoming "one AI implementation forced to serve four features."
+
+**Target, next increment:** `buildAtlasContext` itself has no automated test yet (it's a thin composition of repo calls + the same formatting logic already tested elsewhere, but "thin" isn't a substitute for tested — see `docs/BACKLOG.md`). Beyond that, this module is the natural place a future Analytics/Notification agent (§4) would also read from, once one exists.
+
+**Trigger to build v1:** done, this session — see the commit history around this section.
+**Trigger for the next increment:** an integration-test setup that can exercise `buildAtlasContext` against a real or mocked Supabase client (currently blocked on the same "no integration test harness yet" gap as every other DB-backed route).
 
 ---
 
