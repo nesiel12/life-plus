@@ -1,6 +1,8 @@
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
+import { authOptions } from "@/lib/auth";
 import { categoryLabel } from "@/store/useAtlasStore";
 import type { LifeAreaKey } from "@/types";
 
@@ -29,6 +31,11 @@ function parseMilestoneLines(text: string): string[] {
 }
 
 export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { title, category } = (await request.json()) as BreakdownRequestBody;
 
   if (!title || typeof title !== "string") {

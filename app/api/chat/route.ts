@@ -1,6 +1,8 @@
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
+import { authOptions } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -22,6 +24,11 @@ function mockReply(message: string): string {
 }
 
 export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = (await request.json()) as ChatRequestBody;
   const { message, history = [] } = body;
 
