@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { UploadCloud, FileAudio, Sparkles, Plus, Link2 } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useApiCall } from "@/hooks/useApiCall";
 import type { KnowledgeEntry } from "@/types";
 
 interface ExtractedShiur {
@@ -12,6 +13,7 @@ interface ExtractedShiur {
   topic: string;
   source: string;
   summary: string;
+  durationMinutes?: number;
 }
 
 function findRelatedSessions(topic: string, entries: KnowledgeEntry[]): KnowledgeEntry[] {
@@ -22,34 +24,50 @@ function findRelatedSessions(topic: string, entries: KnowledgeEntry[]): Knowledg
 export default function TorahSpacePage() {
   const knowledgeEntries = useAtlasStore((s) => s.knowledgeEntries);
   const addKnowledgeEntry = useAtlasStore((s) => s.addKnowledgeEntry);
-  const [processing, setProcessing] = useState(false);
   const [extracted, setExtracted] = useState<ExtractedShiur | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const {
+    loading: processing,
+    error: extractError,
+    run: extract,
+  } = useApiCall(async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/torah/extract", { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "עיבוד הקובץ נכשל. נסה שוב.");
+    setExtracted({
+      fileName: file.name,
+      topic: data.topic,
+      source: data.source,
+      summary: data.summary,
+      durationMinutes: data.durationMinutes,
+    });
+  });
+
+  const { loading: saving, error: saveError, run: save } = useApiCall(addKnowledgeEntry);
+
   function handleFileSelected(file: File) {
     setExtracted(null);
-    setProcessing(true);
-    // Parsing pipeline not wired yet — this simulates the extraction step.
-    setTimeout(() => {
-      setProcessing(false);
-      setExtracted({
-        fileName: file.name,
-        topic: "הלכות תפילה בציבור",
-        source: "שיעור שבועי",
-        summary: "סיכום אוטומטי של השיעור יופיע כאן לאחר חיבור מנוע התמלול והניתוח.",
-      });
-    }, 1600);
+    extract(file).catch(() => {
+      // error is already captured in extractError for display below
+    });
   }
 
   function addExtractedToSeder() {
     if (!extracted) return;
-    addKnowledgeEntry({
+    save({
       date: new Date().toISOString().slice(0, 10),
       topic: extracted.topic,
       source: extracted.source,
       summary: extracted.summary,
-    });
-    setExtracted(null);
+      durationMinutes: extracted.durationMinutes,
+    })
+      .then(() => setExtracted(null))
+      .catch(() => {
+        // error is already captured in saveError for display below
+      });
   }
 
   const relatedSessions = extracted ? findRelatedSessions(extracted.topic, knowledgeEntries) : [];
@@ -95,11 +113,14 @@ export default function TorahSpacePage() {
 
           <button
             onClick={() => inputRef.current?.click()}
-            className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-glass-border py-8 text-muted transition-colors hover:text-foreground"
+            disabled={processing}
+            className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-glass-border py-8 text-muted transition-colors hover:text-foreground disabled:opacity-40"
           >
             <UploadCloud size={24} />
             <span className="text-sm">גרור קובץ או לחץ לבחירה</span>
           </button>
+
+          {extractError && <p className="mt-3 text-xs text-accent-family">{extractError}</p>}
 
           {processing && (
             <motion.div
@@ -130,7 +151,10 @@ export default function TorahSpacePage() {
                 <span className="text-muted">מקור: </span>
                 {extracted.source}
               </p>
-              <p className="mb-3 text-foreground/70">{extracted.summary}</p>
+              <p className="mb-3 text-foreground/70">
+                {extracted.summary}
+                {extracted.durationMinutes ? ` · ${extracted.durationMinutes} דק'` : ""}
+              </p>
 
               {relatedSessions.length > 0 && (
                 <div className="mb-3 rounded-lg bg-white/5 p-3">
@@ -148,11 +172,13 @@ export default function TorahSpacePage() {
 
               <button
                 onClick={addExtractedToSeder}
-                className="flex items-center gap-1 rounded-lg bg-accent-faith/20 px-3 py-1.5 text-xs text-accent-faith"
+                disabled={saving}
+                className="flex items-center gap-1 rounded-lg bg-accent-faith/20 px-3 py-1.5 text-xs text-accent-faith disabled:opacity-40"
               >
                 <Plus size={14} />
-                הוסף לסדר
+                {saving ? "שומר…" : "הוסף לסדר"}
               </button>
+              {saveError && <p className="mt-2 text-xs text-accent-family">{saveError}</p>}
             </motion.div>
           )}
         </GlassCard>
