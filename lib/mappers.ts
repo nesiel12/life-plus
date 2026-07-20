@@ -76,6 +76,7 @@ export function toUpcomingEvent(row: UpcomingEventRow): UpcomingEvent {
     title: row.title,
     date: row.event_date,
     category: row.category,
+    googleEventId: row.google_event_id ?? undefined,
   };
 }
 

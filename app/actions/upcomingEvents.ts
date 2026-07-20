@@ -9,6 +9,7 @@ export async function addUpcomingEventAction(input: {
   title: string;
   date: string;
   category: MomentCategory;
+  googleEventId?: string;
 }) {
   const userId = await getCurrentUserId();
   const row = await upcomingEventsRepo.insert({
@@ -16,6 +17,7 @@ export async function addUpcomingEventAction(input: {
     title: input.title,
     event_date: input.date,
     category: input.category,
+    google_event_id: input.googleEventId ?? null,
   });
   return toUpcomingEvent(row);
 }

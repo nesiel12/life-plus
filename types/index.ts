@@ -64,6 +64,7 @@ export interface UpcomingEvent {
   title: string;
   date: string; // ISO date
   category: MomentCategory;
+  googleEventId?: string; // set when this row is backed by a real Google Calendar event
 }
 
 export interface PersonalDNA {

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Check, X, CalendarClock } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useApiCall } from "@/hooks/useApiCall";
 
 function formatTimeRange(startISO: string, endISO: string): string {
   const fmt = (d: Date) => d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
@@ -18,6 +19,15 @@ export function ScheduleSuggestions() {
   const acceptSuggestion = useAtlasStore((s) => s.acceptSuggestion);
   const dismissSuggestion = useAtlasStore((s) => s.dismissSuggestion);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const { loading: accepting, error: acceptError, run: accept } = useApiCall(acceptSuggestion);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+
+  function handleAccept(id: string) {
+    setAcceptingId(id);
+    accept(id).catch(() => {
+      // error is already captured in acceptError for display below
+    });
+  }
 
   // This fetch is deliberately mount-only — suggestions are computed once
   // per page load, not re-fetched on every score change. A ref (rather than
@@ -88,21 +98,26 @@ export function ScheduleSuggestions() {
               <span className="text-xs text-muted">{categoryLabel(s.category)}</span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => acceptSuggestion(s.id)}
-                  className="flex items-center gap-1 rounded-lg bg-accent-health/15 px-2 py-1 text-xs text-accent-health"
+                  onClick={() => handleAccept(s.id)}
+                  disabled={accepting}
+                  className="flex items-center gap-1 rounded-lg bg-accent-health/15 px-2 py-1 text-xs text-accent-health disabled:opacity-40"
                 >
                   <Check size={12} />
-                  אשר
+                  {accepting && acceptingId === s.id ? "יוצר ביומן…" : "אשר"}
                 </button>
                 <button
                   onClick={() => dismissSuggestion(s.id)}
-                  className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs text-muted"
+                  disabled={accepting}
+                  className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs text-muted disabled:opacity-40"
                 >
                   <X size={12} />
                   התעלם
                 </button>
               </div>
             </div>
+            {acceptError && acceptingId === s.id && (
+              <p className="mt-2 text-xs text-accent-family">{acceptError}</p>
+            )}
           </motion.li>
         ))}
       </ul>

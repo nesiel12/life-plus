@@ -136,6 +136,7 @@ export interface Database {
           title: string;
           category: MomentCategoryDb;
           event_date: string;
+          google_event_id: string | null;
           created_at: string;
         },
         {
@@ -144,6 +145,7 @@ export interface Database {
           title: string;
           category: MomentCategoryDb;
           event_date: string;
+          google_event_id?: string | null;
         },
         {
           id?: string;
@@ -151,6 +153,7 @@ export interface Database {
           title?: string;
           category?: MomentCategoryDb;
           event_date?: string;
+          google_event_id?: string | null;
         }
       >;
       knowledge_entries: TableDef<

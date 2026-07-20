@@ -5,12 +5,19 @@ import { getOrCreateUserByEmail } from "@/lib/db/users";
 import { lifeAreaScoresRepo } from "@/lib/db/lifeAreaScores";
 import { personalDnaRepo } from "@/lib/db/personalDna";
 
+// calendar.events (not calendar.readonly) — accepting a schedule suggestion
+// now creates a real event via the Calendar API (see app/api/calendar/events),
+// which needs write access; calendar.events also covers the freeBusy reads
+// calendar.readonly used to provide. gmail.readonly was requested but never
+// used by any feature — dropped per docs/BACKLOG.md (an unused scope is a
+// trust and OAuth-verification liability with nothing behind it). Anyone
+// already signed in under the old scopes will be re-prompted to consent on
+// next sign-in.
 const GOOGLE_SCOPES = [
   "openid",
   "profile",
   "email",
-  "https://www.googleapis.com/auth/calendar.readonly",
-  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/calendar.events",
 ].join(" ");
 
 // Fail closed: until real multi-tenancy exists (see docs/ROADMAP_V2.md Phase 1/6),

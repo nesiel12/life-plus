@@ -84,7 +84,7 @@ const EMPTY_STATE: HydratedState = {
   todayIntention: "",
 };
 
-export const useAtlasStore = create<AtlasState>((set) => ({
+export const useAtlasStore = create<AtlasState>((set, get) => ({
   ...EMPTY_STATE,
   hydrated: false,
   suggestedActions: [],
@@ -175,20 +175,37 @@ export const useAtlasStore = create<AtlasState>((set) => ({
 
   setSuggestedActions: (actions) => set({ suggestedActions: actions }),
 
+  // Deliberately does NOT optimistically remove the suggestion up front:
+  // "accept" now means a real Google Calendar event gets created (see
+  // app/api/calendar/events), and if that write fails the suggestion should
+  // stay put so the user can retry, rather than silently vanishing while
+  // nothing landed on their actual calendar (docs/BACKLOG.md).
   acceptSuggestion: async (id) => {
-    let accepted: SuggestedAction | undefined;
-    set((state) => {
-      accepted = state.suggestedActions.find((s) => s.id === id);
-      return { suggestedActions: state.suggestedActions.filter((s) => s.id !== id) };
-    });
+    const accepted = get().suggestedActions.find((s) => s.id === id);
     if (!accepted) return;
+
+    const res = await fetch("/api/calendar/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: accepted.title, start: accepted.start, end: accepted.end }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ?? "לא הצלחנו ליצור את האירוע ביומן Google.");
+    }
+    const { id: googleEventId } = (await res.json()) as { id: string };
 
     const created = await addUpcomingEventAction({
       title: accepted.title,
       date: accepted.start,
       category: accepted.category,
+      googleEventId,
     });
-    set((state) => ({ upcomingEvents: [created, ...state.upcomingEvents] }));
+
+    set((state) => ({
+      suggestedActions: state.suggestedActions.filter((s) => s.id !== id),
+      upcomingEvents: [created, ...state.upcomingEvents],
+    }));
   },
 
   dismissSuggestion: (id) =>
