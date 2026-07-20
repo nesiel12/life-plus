@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Sparkles, Trash2, Target } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useApiCall } from "@/hooks/useApiCall";
 import { cn } from "@/lib/utils";
 import type { LifeAreaKey } from "@/types";
 
@@ -18,24 +19,29 @@ export function GoalsPanel() {
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<LifeAreaKey>("knowledge");
-  const [breaking, setBreaking] = useState(false);
 
-  async function handleCreateGoal() {
+  const {
+    loading: breaking,
+    error: breakdownError,
+    run: createGoal,
+  } = useApiCall(async (trimmedTitle: string, selectedCategory: LifeAreaKey) => {
+    const res = await fetch("/api/goals/breakdown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: trimmedTitle, category: selectedCategory }),
+    });
+    if (!res.ok) throw new Error("לא הצלחנו לפרק את היעד. נסה שוב.");
+    const data = await res.json();
+    addGoal(trimmedTitle, selectedCategory, data.milestones ?? []);
+    setTitle("");
+  });
+
+  function handleCreateGoal() {
     const trimmed = title.trim();
     if (!trimmed) return;
-    setBreaking(true);
-    try {
-      const res = await fetch("/api/goals/breakdown", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: trimmed, category }),
-      });
-      const data = await res.json();
-      addGoal(trimmed, category, data.milestones ?? []);
-      setTitle("");
-    } finally {
-      setBreaking(false);
-    }
+    createGoal(trimmed, category).catch(() => {
+      // error is already captured in breakdownError for display below
+    });
   }
 
   return (
@@ -73,6 +79,8 @@ export function GoalsPanel() {
           {breaking ? "מפרק ליעדים…" : "פרק ליעדים"}
         </button>
       </div>
+
+      {breakdownError && <p className="mb-4 text-xs text-accent-family">{breakdownError}</p>}
 
       <ul className="flex flex-col gap-4">
         {goals.map((goal, gi) => {

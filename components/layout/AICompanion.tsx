@@ -1,24 +1,37 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import { Sparkles, X, Send } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { Logo } from "@/components/ui/Logo";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
+import { useApiCall } from "@/hooks/useApiCall";
 import { cn } from "@/lib/utils";
 
 export function AICompanion() {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const user = useAtlasStore((s) => s.user);
   const chatHistory = useAtlasStore((s) => s.chatHistory);
   const addChatMessage = useAtlasStore((s) => s.addChatMessage);
   const scrollRef = useRef<HTMLDivElement>(null);
   const displayName = session?.user?.name ?? user.hebrewName;
+
+  const { loading, run: sendMessage } = useApiCall(
+    async (message: string, history: { role: string; content: string }[]) => {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, history }),
+      });
+      if (!res.ok) throw new Error("chat request failed");
+      const data = await res.json();
+      addChatMessage({ role: "assistant", content: data.reply ?? "…" });
+    }
+  );
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -26,31 +39,20 @@ export function AICompanion() {
     }
   }, [chatHistory, open]);
 
-  async function handleSend() {
+  function handleSend() {
     const message = input.trim();
     if (!message || loading) return;
 
     addChatMessage({ role: "user", content: message });
     setInput("");
-    setLoading(true);
 
-    try {
-      const history = chatHistory.map((m) => ({ role: m.role, content: m.content }));
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history }),
-      });
-      const data = await res.json();
-      addChatMessage({ role: "assistant", content: data.reply ?? "…" });
-    } catch {
+    const history = chatHistory.map((m) => ({ role: m.role, content: m.content }));
+    sendMessage(message, history).catch(() => {
       addChatMessage({
         role: "assistant",
         content: "לא הצלחתי להתחבר כרגע. נסה שוב עוד רגע.",
       });
-    } finally {
-      setLoading(false);
-    }
+    });
   }
 
   return (
