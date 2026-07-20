@@ -1,6 +1,6 @@
 # Atlas — Engineering Backlog
 
-This is the living, continuously-maintained list of everything known to need doing that isn't part of the *current* roadmap phase's objectives. `docs/ARCHITECTURE_AUDIT.md`, `docs/TECH_DEBT.md`, and `docs/FEATURE_GAP_ANALYSIS.md` are the point-in-time audit that started this process — they stay as-written, a historical snapshot. This document supersedes them going forward as the place new findings get filed and old ones get closed.
+This is the living, continuously-maintained list of everything known to need doing that isn't part of the *current* roadmap phase's objectives. `docs/ARCHITECTURE_AUDIT.md`, `docs/TECH_DEBT.md`, and `docs/FEATURE_GAP_ANALYSIS.md` are the point-in-time audit that started this process — they stay as-written, a historical snapshot. This document supersedes them going forward as the place new findings get filed and old ones get closed. `docs/ATLAS_ARCHITECTURE_VISION.md` is the long-term target architecture this backlog's items get checked against — read it for *why* something here is sequenced the way it is.
 
 **Rule:** discovering something while working on a phase does not interrupt the phase unless it makes the app unstable, insecure, or fundamentally incorrect *right now*. Otherwise, it gets a row here and gets picked up when its priority comes due.
 
@@ -28,6 +28,7 @@ Each entry: what it is, why it's at that priority, where it lives, and what it d
 - **Test coverage is currently just the pure-logic core.** Vitest + CI (lint/typecheck/test on every PR) are live (`.github/workflows/ci.yml`), covering `lib/utils.ts`'s date math and the calendar route's `computeFreeSlots`. Still open: integration tests for the API routes (auth-required, validation-rejects-bad-input, mock-fallback-when-no-key), component tests, and error tracking/structured logging — the rest of Phase 5's exit criterion.
 - **Torah Space extraction's AI-summarized path is untested against `OPENAI_API_KEY` being live** (it's currently blank — see `docs/PROJECT_ANALYSIS.md`). The pipeline (`app/api/torah/extract`) genuinely extracts PDF text (`unpdf`) and transcribes audio (Whisper) now instead of returning fixed fake content, and was smoke-tested standalone: real PDF text extraction confirmed working, and the `generateObject` summarization call confirmed reachable (fails only on the placeholder empty key, as expected). The honest-fallback path (no key → real extracted text/snippet instead of an AI summary) is what actually runs today. Revisit once a real key is set.
 - **`personalDNA` still doesn't influence calendar-suggestion ranking.** `peakFocusHours`/`learningStyle`/`habitNotes` now shape the chat system prompt (`lib/chatSystemPrompt.ts`), and `familyCheckInIntervalDays` now drives the family page's stale-contact threshold instead of a hardcoded 7 — but `/api/calendar/suggestions` still ranks purely by weakest life-area score. `peakFocusHours` is free text from onboarding (not structured hours), so using it to filter/prefer time slots would need either a parsing step or folding scheduling through an LLM call — deliberately not done yet to avoid guessing at a data shape the user never actually committed to. *Files: `app/api/calendar/suggestions/route.ts`.*
+- **Memory Engine v1 (lexical retrieval) covers chat only.** `lib/memory/retrieveMemory.ts` ranks moments/knowledge_entries/insights by keyword overlap + recency and feeds the top matches into `/api/chat`'s system prompt — the first real "Atlas remembers" behavior (`docs/ATLAS_ARCHITECTURE_VISION.md` §2). Not yet wired into any other AI-facing surface (calendar suggestions, goal breakdown, Torah related-sessions still uses its own separate naive matcher). Per the architecture doc, the next consumer should reuse `retrieveRelevantMemory` rather than re-implementing matching, and a Context Engine module becomes worth factoring out once it does.
 
 ## Low Priority
 *Minor polish, cleanup, optimization.*
@@ -47,7 +48,6 @@ Each entry: what it is, why it's at that priority, where it lives, and what it d
 ## Future Vision
 *Large ideas, experimental features, long-term concepts.*
 
-- Real memory/RAG layer for chat: retrieve relevant past moments/knowledge entries instead of only passing recent raw turns.
 - A genuine unprompted "background AI" behavior — a scheduled job generating the daily insight, rather than the one hand-seeded example that exists today.
 - Voice input for Quick Capture and Torah Space.
 - Native mobile app, if usage data ever justifies it.

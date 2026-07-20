@@ -9,6 +9,7 @@ import { personalDnaRepo } from "@/lib/db/personalDna";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { buildSystemPrompt } from "@/lib/chatSystemPrompt";
+import { retrieveRelevantMemory } from "@/lib/memory/retrieveMemory";
 
 export const runtime = "nodejs";
 
@@ -50,11 +51,14 @@ export async function POST(request: Request) {
 
   try {
     const user = await getUserByEmail(session.user.email);
-    const dna = user ? await personalDnaRepo.get(user.id) : null;
+    const [dna, memoryContext] = await Promise.all([
+      user ? personalDnaRepo.get(user.id) : Promise.resolve(null),
+      user ? retrieveRelevantMemory(user.id, message) : Promise.resolve([]),
+    ]);
 
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
-      system: buildSystemPrompt(dna),
+      system: buildSystemPrompt(dna, memoryContext),
       messages: [...history, { role: "user", content: message }],
     });
 

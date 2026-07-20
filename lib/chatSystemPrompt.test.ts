@@ -39,4 +39,21 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("בהאזנה");
     expect(prompt).toContain("שותה קפה לפני לימוד");
   });
+
+  it("omits the memory section when no memory context is passed", () => {
+    const prompt = buildSystemPrompt(null, []);
+    expect(prompt).not.toContain("Things he's shared before");
+  });
+
+  it("includes retrieved memory context when present", () => {
+    const prompt = buildSystemPrompt(null, ["רגע (משפחה, 2026-07-01): שיחה עם אבא"]);
+    expect(prompt).toContain("Things he's shared before");
+    expect(prompt).toContain("שיחה עם אבא");
+  });
+
+  it("includes both personalDNA and memory context together", () => {
+    const prompt = buildSystemPrompt(dnaRow({ learning_style: "בהאזנה" }), ["תובנה: משהו חשוב"]);
+    expect(prompt).toContain("בהאזנה");
+    expect(prompt).toContain("משהו חשוב");
+  });
 });
