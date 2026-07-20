@@ -2,10 +2,14 @@ import "server-only";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { getUserByEmail } from "@/lib/db/users";
+import type { Database } from "@/types/database";
 
-// Every Server Action goes through this rather than trusting a client-passed
-// user id — the DB id is always resolved fresh from the session's email.
-export async function getCurrentUserId(): Promise<string> {
+type UserRow = Database["public"]["Tables"]["users"]["Row"];
+
+// Every Server Action goes through one of these rather than trusting a
+// client-passed user id — the DB row is always resolved fresh from the
+// session's email.
+export async function getCurrentUser(): Promise<UserRow> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
     throw new Error("Not authenticated");
@@ -18,5 +22,9 @@ export async function getCurrentUserId(): Promise<string> {
     throw new Error("User record not found for authenticated session");
   }
 
-  return user.id;
+  return user;
+}
+
+export async function getCurrentUserId(): Promise<string> {
+  return (await getCurrentUser()).id;
 }
