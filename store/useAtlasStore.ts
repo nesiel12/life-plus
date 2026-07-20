@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { LIFE_AREAS, momentCategoryLabel } from "@/lib/lifeAreas";
 import type {
   ChatMessage,
   Goal,
@@ -6,7 +7,6 @@ import type {
   KnowledgeEntry,
   LifeArea,
   Moment,
-  MomentCategory,
   PersonalDNA,
   Person,
   SuggestedAction,
@@ -54,13 +54,20 @@ function makeId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-const initialLifeAreas: LifeArea[] = [
-  { key: "faith", label: "אמונה", score: 78, colorVar: "--accent-faith", lastTouched: "2026-07-19" },
-  { key: "family", label: "משפחה", score: 82, colorVar: "--accent-family", lastTouched: "2026-07-18" },
-  { key: "knowledge", label: "ידע", score: 70, colorVar: "--accent-knowledge", lastTouched: "2026-07-17" },
-  { key: "health", label: "בריאות", score: 60, colorVar: "--accent-health", lastTouched: "2026-07-15" },
-  { key: "career", label: "קריירה", score: 65, colorVar: "--accent-career", lastTouched: "2026-07-16" },
-];
+const INITIAL_SCORES: Record<LifeArea["key"], { score: number; lastTouched: string }> = {
+  faith: { score: 78, lastTouched: "2026-07-19" },
+  family: { score: 82, lastTouched: "2026-07-18" },
+  knowledge: { score: 70, lastTouched: "2026-07-17" },
+  health: { score: 60, lastTouched: "2026-07-15" },
+  career: { score: 65, lastTouched: "2026-07-16" },
+};
+
+const initialLifeAreas: LifeArea[] = Object.values(LIFE_AREAS).map((meta) => ({
+  key: meta.key,
+  label: meta.label,
+  colorVar: meta.colorVar,
+  ...INITIAL_SCORES[meta.key],
+}));
 
 const initialPeople: Person[] = [
   {
@@ -302,14 +309,6 @@ export const useAtlasStore = create<AtlasState>((set) => ({
     })),
 }));
 
-export function categoryLabel(category: MomentCategory): string {
-  const labels: Record<MomentCategory, string> = {
-    faith: "אמונה",
-    family: "משפחה",
-    knowledge: "ידע",
-    health: "בריאות",
-    career: "קריירה",
-    general: "כללי",
-  };
-  return labels[category];
-}
+// Re-exported for backward compatibility with existing call sites; the
+// canonical mapping lives in lib/lifeAreas.ts (see docs/TECH_DEBT.md #11).
+export const categoryLabel = momentCategoryLabel;

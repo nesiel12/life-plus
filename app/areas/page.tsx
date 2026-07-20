@@ -2,18 +2,9 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { BookOpen, HeartHandshake, Lightbulb, HeartPulse, Briefcase } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
-import type { LifeAreaKey } from "@/types";
-
-const AREA_META: Record<LifeAreaKey, { slug: string; title: string; icon: typeof BookOpen }> = {
-  faith: { slug: "torah", title: "מרחב תורה", icon: BookOpen },
-  family: { slug: "family", title: "לוח משפחה", icon: HeartHandshake },
-  knowledge: { slug: "learning", title: "למידה", icon: Lightbulb },
-  health: { slug: "health", title: "בריאות", icon: HeartPulse },
-  career: { slug: "career", title: "קריירה", icon: Briefcase },
-};
+import { LIFE_AREAS } from "@/lib/lifeAreas";
 
 export default function AreasPage() {
   const lifeAreas = useAtlasStore((s) => s.lifeAreas);
@@ -25,7 +16,7 @@ export default function AreasPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {lifeAreas.map((area, i) => {
-          const meta = AREA_META[area.key];
+          const meta = LIFE_AREAS[area.key];
           const Icon = meta.icon;
           return (
             <motion.div
@@ -45,7 +36,7 @@ export default function AreasPage() {
                     </div>
                     <span className="text-sm text-muted">{area.score}%</span>
                   </div>
-                  <p className="font-medium text-foreground">{meta.title}</p>
+                  <p className="font-medium text-foreground">{meta.pageTitle}</p>
                   <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
                     <div
                       className="h-full rounded-full"

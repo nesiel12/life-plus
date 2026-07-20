@@ -3,16 +3,9 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAtlasStore } from "@/store/useAtlasStore";
+import { LIFE_AREA_LIST } from "@/lib/lifeAreas";
 import type { MomentCategory } from "@/types";
 import { cn } from "@/lib/utils";
-
-const CATEGORIES: { key: MomentCategory; label: string; colorVar: string }[] = [
-  { key: "faith", label: "אמונה", colorVar: "--accent-faith" },
-  { key: "family", label: "משפחה", colorVar: "--accent-family" },
-  { key: "knowledge", label: "ידע", colorVar: "--accent-knowledge" },
-  { key: "health", label: "בריאות", colorVar: "--accent-health" },
-  { key: "career", label: "קריירה", colorVar: "--accent-career" },
-];
 
 export function QuickCapture() {
   const [open, setOpen] = useState(false);
@@ -69,19 +62,19 @@ export function QuickCapture() {
             <p className="mb-4 text-sm font-medium text-muted">לכידה מהירה של רגע</p>
 
             <div className="mb-3 flex flex-wrap gap-2">
-              {CATEGORIES.map((c) => (
+              {LIFE_AREA_LIST.map((area) => (
                 <button
-                  key={c.key}
-                  onClick={() => setCategory(c.key)}
+                  key={area.key}
+                  onClick={() => setCategory(area.key)}
                   className={cn(
                     "rounded-full border px-3 py-1 text-xs transition-colors",
-                    category === c.key
+                    category === area.key
                       ? "border-transparent text-background"
                       : "border-glass-border text-muted hover:text-foreground"
                   )}
-                  style={category === c.key ? { backgroundColor: `var(${c.colorVar})` } : undefined}
+                  style={category === area.key ? { backgroundColor: `var(${area.colorVar})` } : undefined}
                 >
-                  {c.label}
+                  {area.label}
                 </button>
               ))}
             </div>

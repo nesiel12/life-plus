@@ -1,17 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
-import type { LifeAreaKey } from "@/types";
-
-const CATEGORY_COLOR: Record<LifeAreaKey | "general", string> = {
-  faith: "var(--accent-faith)",
-  family: "var(--accent-family)",
-  knowledge: "var(--accent-knowledge)",
-  health: "var(--accent-health)",
-  career: "var(--accent-career)",
-  general: "var(--muted)",
-};
+import { useAtlasStore } from "@/store/useAtlasStore";
+import { momentCategoryLabel, momentCategoryColorVar } from "@/lib/lifeAreas";
 
 export default function TimelinePage() {
   const moments = useAtlasStore((s) => s.moments);
@@ -34,7 +25,7 @@ export default function TimelinePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: Math.min(i * 0.06, 0.6) }}
             className="glass-card rounded-2xl p-4"
-            style={{ borderInlineStart: `3px solid ${CATEGORY_COLOR[moment.category]}` }}
+            style={{ borderInlineStart: `3px solid var(${momentCategoryColorVar(moment.category)})` }}
           >
             <div className="mb-1 flex items-center justify-between">
               <h2 className="text-sm font-medium text-foreground">{moment.title}</h2>
@@ -46,7 +37,7 @@ export default function TimelinePage() {
               </span>
             </div>
             <p className="mb-2 text-sm leading-relaxed text-foreground/80">{moment.content}</p>
-            <span className="text-xs text-muted">{categoryLabel(moment.category)}</span>
+            <span className="text-xs text-muted">{momentCategoryLabel(moment.category)}</span>
           </motion.li>
         ))}
 
