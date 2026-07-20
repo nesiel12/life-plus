@@ -1,26 +1,15 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { z } from "zod";
-import { parseJsonBody } from "@/lib/api/parseJsonBody";
+import { getUserByEmail } from "@/lib/db/users";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
+import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
+import { computeFreeSlots } from "@/lib/calendarFreeSlots";
 import type { MomentCategory, SuggestedAction } from "@/types";
 
 export const runtime = "nodejs";
 
 const RATE_LIMIT = { limit: 10, windowMs: 5 * 60 * 1000 }; // 10 requests / 5 min
-
-const lifeAreaSchema = z.object({
-  key: z.enum(["faith", "family", "knowledge", "health", "career"]),
-  label: z.string(),
-  score: z.number().min(0).max(100),
-  colorVar: z.string(),
-  lastTouched: z.string().optional(),
-});
-
-const suggestionsRequestSchema = z.object({
-  lifeAreas: z.array(lifeAreaSchema).max(20).default([]),
-});
 
 const ACTION_BY_CATEGORY: Record<MomentCategory, string> = {
   faith: "זמן לימוד תורה",
@@ -31,7 +20,6 @@ const ACTION_BY_CATEGORY: Record<MomentCategory, string> = {
   general: "זמן פנוי",
 };
 
-const MIN_SLOT_MINUTES = 30;
 const MAX_SUGGESTIONS = 3;
 
 interface FreeBusyResponse {
@@ -40,31 +28,6 @@ interface FreeBusyResponse {
       busy?: { start: string; end: string }[];
     };
   };
-}
-
-export function computeFreeSlots(busy: { start: string; end: string }[], from: Date, to: Date) {
-  const sorted = [...busy]
-    .map((b) => ({ start: new Date(b.start), end: new Date(b.end) }))
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
-
-  const slots: { start: Date; end: Date }[] = [];
-  let cursor = from;
-
-  for (const period of sorted) {
-    if (period.start.getTime() > cursor.getTime()) {
-      slots.push({ start: cursor, end: period.start });
-    }
-    if (period.end.getTime() > cursor.getTime()) {
-      cursor = period.end;
-    }
-  }
-  if (cursor.getTime() < to.getTime()) {
-    slots.push({ start: cursor, end: to });
-  }
-
-  return slots.filter(
-    (s) => (s.end.getTime() - s.start.getTime()) / 60_000 >= MIN_SLOT_MINUTES
-  );
 }
 
 export async function POST(request: NextRequest) {
@@ -85,9 +48,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ connected: false, suggestions: [] });
   }
 
-  const parsed = await parseJsonBody(request, suggestionsRequestSchema);
-  if (parsed.error) return parsed.error;
-  const { lifeAreas } = parsed.data;
+  const user = await getUserByEmail(token.email);
+  if (!user) {
+    return NextResponse.json({ connected: true, suggestions: [] });
+  }
+
+  // Life-area scores now come from the Context Engine (server-authoritative)
+  // instead of whatever the client's local store happened to have cached —
+  // previously the request body carried them, which meant ranking could run
+  // against stale or (in principle) client-supplied values instead of the
+  // real thing (docs/BACKLOG.md).
+  const { lifeAreas, relationshipSignals } = await buildAtlasContext(user.id);
 
   const now = new Date();
   const endOfDay = new Date(now);
@@ -123,13 +94,18 @@ export async function POST(request: NextRequest) {
 
     const suggestions: SuggestedAction[] = freeSlots.slice(0, weakestAreas.length).map((slot, i) => {
       const area = weakestAreas[i];
+      // Relationship Intelligence feeding scheduling, not just chat: a
+      // family-category suggestion names the specific person Atlas already
+      // knows is overdue for contact, instead of a generic prompt.
+      const relationshipNote =
+        area.key === "family" && relationshipSignals.length > 0 ? ` ${relationshipSignals[0]}.` : "";
       return {
         id: Math.random().toString(36).slice(2, 10),
         title: ACTION_BY_CATEGORY[area.key],
         category: area.key,
         start: slot.start.toISOString(),
         end: slot.end.toISOString(),
-        rationale: `זה התחום עם המדד הכי נמוך כרגע (${area.score}%), ומצאתי לו חלון פנוי ביומן.`,
+        rationale: `זה התחום עם המדד הכי נמוך כרגע (${area.score}%), ומצאתי לו חלון פנוי ביומן.${relationshipNote}`,
       };
     });
 

@@ -5,7 +5,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDocumentProxy, extractText } from "unpdf";
 import { authOptions } from "@/lib/auth";
+import { getUserByEmail } from "@/lib/db/users";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
+import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
+import { formatContextSection, joinContextSections } from "@/lib/context/formatContext";
+import type { AtlasContext } from "@/lib/context/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -57,7 +61,11 @@ function honestFallback(fileName: string, rawText: string): ExtractionResult {
   };
 }
 
-async function summarize(rawText: string, fileName: string): Promise<ExtractionResult> {
+async function summarize(
+  rawText: string,
+  fileName: string,
+  context: AtlasContext | undefined
+): Promise<ExtractionResult> {
   if (!rawText) {
     return {
       topic: fileName,
@@ -70,13 +78,19 @@ async function summarize(rawText: string, fileName: string): Promise<ExtractionR
     return honestFallback(fileName, rawText);
   }
 
+  const relatedSessionsBlock = context
+    ? formatContextSection("שיעורים ורגעים קודמים שעשויים להיות קשורים", context.relevantMemory)
+    : "";
+
   try {
     const { object } = await generateObject({
       model: openai("gpt-4o-mini"),
       schema: extractedShiurSchema,
-      system:
+      system: joinContextSections([
         "אתה עוזר שמנתח תמלול או טקסט של שיעור תורני ומחלץ ממנו נושא, מקור וסיכום תמציתי. " +
-        "ענה אך ורק על סמך התוכן שסופק, ללא המצאות.",
+          "ענה אך ורק על סמך התוכן שסופק, ללא המצאות.",
+        relatedSessionsBlock,
+      ]),
       prompt: rawText.slice(0, MAX_TEXT_CHARS_FOR_LLM),
     });
     return object;
@@ -104,10 +118,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "הקובץ גדול מדי (מקסימום 25MB)." }, { status: 413 });
   }
 
+  const user = await getUserByEmail(session.user.email);
+
   try {
     if (file.type === "application/pdf") {
       const rawText = await extractPdfText(file);
-      const result = await summarize(rawText, file.name);
+      const context = user ? await buildAtlasContext(user.id, { query: rawText.slice(0, 2000) }) : undefined;
+      const result = await summarize(rawText, file.name, context);
       return NextResponse.json(result);
     }
 
@@ -119,7 +136,8 @@ export async function POST(request: Request) {
         );
       }
       const { text: rawText, durationMinutes } = await transcribeAudio(file);
-      const result = await summarize(rawText, file.name);
+      const context = user ? await buildAtlasContext(user.id, { query: rawText.slice(0, 2000) }) : undefined;
+      const result = await summarize(rawText, file.name, context);
       return NextResponse.json({ ...result, durationMinutes });
     }
 

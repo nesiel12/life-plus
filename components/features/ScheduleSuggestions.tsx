@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, X, CalendarClock } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
@@ -13,7 +13,6 @@ function formatTimeRange(startISO: string, endISO: string): string {
 }
 
 export function ScheduleSuggestions() {
-  const lifeAreas = useAtlasStore((s) => s.lifeAreas);
   const suggestions = useAtlasStore((s) => s.suggestedActions);
   const setSuggestedActions = useAtlasStore((s) => s.setSuggestedActions);
   const acceptSuggestion = useAtlasStore((s) => s.acceptSuggestion);
@@ -29,21 +28,14 @@ export function ScheduleSuggestions() {
     });
   }
 
-  // This fetch is deliberately mount-only — suggestions are computed once
-  // per page load, not re-fetched on every score change. A ref (rather than
-  // a `lifeAreas` dependency + eslint-disable, as before — see
-  // docs/TECH_DEBT.md #16) keeps the effect honest about that intent while
-  // still sending current scores, not a stale snapshot from first render.
-  const lifeAreasRef = useRef(lifeAreas);
-  lifeAreasRef.current = lifeAreas;
-
+  // Mount-only — suggestions are computed once per page load. Life-area
+  // scores used to come from the client's store (needing a ref workaround
+  // to avoid re-fetching on every score change, see docs/TECH_DEBT.md #16);
+  // the server now fetches its own canonical scores via the Context Engine
+  // (docs/ATLAS_ARCHITECTURE_VISION.md §5), so there's nothing left to send.
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/calendar/suggestions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lifeAreas: lifeAreasRef.current }),
-    })
+    fetch("/api/calendar/suggestions", { method: "POST" })
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;

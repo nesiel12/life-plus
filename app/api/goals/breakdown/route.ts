@@ -4,8 +4,11 @@ import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
+import { getUserByEmail } from "@/lib/db/users";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
+import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
+import { formatContextSection, joinContextSections } from "@/lib/context/formatContext";
 import { categoryLabel } from "@/store/useAtlasStore";
 
 export const runtime = "nodejs";
@@ -52,10 +55,24 @@ export async function POST(request: Request) {
   }
 
   try {
+    const user = await getUserByEmail(session.user.email);
+    const context = user ? await buildAtlasContext(user.id, { query: title }) : undefined;
+
+    const baseSystem =
+      "You break down personal goals into 4-6 concrete, actionable milestones. Respond only with a numbered list in Hebrew, one milestone per line, no extra commentary.";
+    const dnaNote = context?.personalDNA?.learning_style
+      ? `Tailor the milestones to his preferred learning style: ${context.personalDNA.learning_style}.`
+      : "";
+    const contextBlock = context
+      ? joinContextSections([
+          formatContextSection("His other active goals — avoid redundant milestones", context.activeGoals),
+          formatContextSection("Related things he's shared before", context.relevantMemory),
+        ])
+      : "";
+
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
-      system:
-        "You break down personal goals into 4-6 concrete, actionable milestones. Respond only with a numbered list in Hebrew, one milestone per line, no extra commentary.",
+      system: joinContextSections([baseSystem, dnaNote, contextBlock]),
       prompt: `היעד: "${title}" (תחום: ${categoryLabel(category)}). פרק אותו לרשימת אבני דרך.`,
     });
 

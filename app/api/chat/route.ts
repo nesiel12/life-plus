@@ -5,11 +5,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { getUserByEmail } from "@/lib/db/users";
-import { personalDnaRepo } from "@/lib/db/personalDna";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { buildSystemPrompt } from "@/lib/chatSystemPrompt";
-import { retrieveRelevantMemory } from "@/lib/memory/retrieveMemory";
+import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
 
 export const runtime = "nodejs";
 
@@ -51,14 +50,11 @@ export async function POST(request: Request) {
 
   try {
     const user = await getUserByEmail(session.user.email);
-    const [dna, memoryContext] = await Promise.all([
-      user ? personalDnaRepo.get(user.id) : Promise.resolve(null),
-      user ? retrieveRelevantMemory(user.id, message) : Promise.resolve([]),
-    ]);
+    const context = user ? await buildAtlasContext(user.id, { query: message }) : undefined;
 
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
-      system: buildSystemPrompt(dna, memoryContext),
+      system: buildSystemPrompt(context),
       messages: [...history, { role: "user", content: message }],
     });
 
