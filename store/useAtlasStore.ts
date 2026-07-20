@@ -1,5 +1,15 @@
 import { create } from "zustand";
-import { LIFE_AREAS, momentCategoryLabel } from "@/lib/lifeAreas";
+import { momentCategoryLabel } from "@/lib/lifeAreas";
+import { addMomentAction } from "@/app/actions/moments";
+import { logPersonInteractionAction, setPersonBirthdayAction } from "@/app/actions/people";
+import { addChatMessageAction } from "@/app/actions/chat";
+import { addInsightAction } from "@/app/actions/insights";
+import { addKnowledgeEntryAction } from "@/app/actions/knowledge";
+import { updateLifeAreaScoreAction } from "@/app/actions/lifeAreas";
+import { updatePersonalDNAAction, completeOnboardingAction } from "@/app/actions/personalDna";
+import { addGoalAction, toggleMilestoneAction, removeGoalAction } from "@/app/actions/goals";
+import { addUpcomingEventAction } from "@/app/actions/upcomingEvents";
+import { setTodayIntentionAction } from "@/app/actions/dailyIntention";
 import type {
   ChatMessage,
   Goal,
@@ -7,6 +17,7 @@ import type {
   KnowledgeEntry,
   LifeArea,
   Moment,
+  MomentCategory,
   PersonalDNA,
   Person,
   SuggestedAction,
@@ -14,7 +25,9 @@ import type {
   UserContext,
 } from "@/types";
 
-interface AtlasState {
+// Everything hydrate() accepts — the shape getInitialState() (app/actions/
+// bootstrap.ts) returns. Real data now; see docs/ROADMAP_V2.md Phase 1.
+export interface HydratedState {
   user: UserContext;
   lifeAreas: LifeArea[];
   people: Person[];
@@ -23,250 +36,123 @@ interface AtlasState {
   knowledgeEntries: KnowledgeEntry[];
   chatHistory: ChatMessage[];
   insights: Insight[];
-  todayIntention: string;
   personalDNA: PersonalDNA;
   onboardingComplete: boolean;
   goals: Goal[];
+  todayIntention: string;
+}
+
+interface AtlasState extends HydratedState {
+  hydrated: boolean;
   suggestedActions: SuggestedAction[];
 
-  setTodayIntention: (intention: string) => void;
-  addMoment: (moment: Omit<Moment, "id" | "timestamp"> & { timestamp?: string }) => void;
-  logPersonInteraction: (personId: string, note?: string) => void;
-  setPersonBirthday: (personId: string, birthday: string) => void;
-  addChatMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => void;
-  addInsight: (content: string) => void;
-  addKnowledgeEntry: (entry: Omit<KnowledgeEntry, "id">) => void;
-  updateLifeAreaScore: (key: LifeArea["key"], score: number) => void;
+  hydrate: (state: HydratedState) => void;
 
-  updatePersonalDNA: (patch: Partial<PersonalDNA>) => void;
-  completeOnboarding: () => void;
+  setTodayIntention: (intention: string) => Promise<void>;
+  addMoment: (moment: { category: MomentCategory; title: string; content: string }) => Promise<void>;
+  logPersonInteraction: (personId: string, note?: string) => Promise<void>;
+  setPersonBirthday: (personId: string, birthday: string) => Promise<void>;
+  addChatMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => Promise<void>;
+  addInsight: (content: string) => Promise<void>;
+  addKnowledgeEntry: (entry: Omit<KnowledgeEntry, "id">) => Promise<void>;
+  updateLifeAreaScore: (key: LifeArea["key"], score: number) => Promise<void>;
 
-  addGoal: (title: string, category: Goal["category"], milestoneTitles: string[]) => void;
-  toggleMilestone: (goalId: string, milestoneId: string) => void;
-  removeGoal: (goalId: string) => void;
+  updatePersonalDNA: (patch: Partial<PersonalDNA>) => Promise<void>;
+  completeOnboarding: () => Promise<void>;
+
+  addGoal: (title: string, category: Goal["category"], milestoneTitles: string[]) => Promise<void>;
+  toggleMilestone: (goalId: string, milestoneId: string) => Promise<void>;
+  removeGoal: (goalId: string) => Promise<void>;
 
   setSuggestedActions: (actions: SuggestedAction[]) => void;
-  acceptSuggestion: (id: string) => void;
+  acceptSuggestion: (id: string) => Promise<void>;
   dismissSuggestion: (id: string) => void;
 }
 
-function makeId(): string {
-  return Math.random().toString(36).slice(2, 10);
-}
-
-const INITIAL_SCORES: Record<LifeArea["key"], { score: number; lastTouched: string }> = {
-  faith: { score: 78, lastTouched: "2026-07-19" },
-  family: { score: 82, lastTouched: "2026-07-18" },
-  knowledge: { score: 70, lastTouched: "2026-07-17" },
-  health: { score: 60, lastTouched: "2026-07-15" },
-  career: { score: 65, lastTouched: "2026-07-16" },
-};
-
-const initialLifeAreas: LifeArea[] = Object.values(LIFE_AREAS).map((meta) => ({
-  key: meta.key,
-  label: meta.label,
-  colorVar: meta.colorVar,
-  ...INITIAL_SCORES[meta.key],
-}));
-
-const initialPeople: Person[] = [
-  {
-    id: "hedva",
-    name: "Hedva",
-    hebrewName: "חדוה",
-    relation: "אמא",
-    lastMeaningfulInteraction: "2026-07-14",
-  },
-  {
-    id: "oded",
-    name: "Oded",
-    hebrewName: "עודד",
-    relation: "אבא",
-    lastMeaningfulInteraction: "2026-07-14",
-  },
-  {
-    id: "elyasaf",
-    name: "Elyasaf",
-    hebrewName: "אליסף",
-    relation: "אח/אחות",
-    lastMeaningfulInteraction: "2026-07-12",
-  },
-  {
-    id: "anael",
-    name: "Anael",
-    hebrewName: "ענאל",
-    relation: "אח/אחות",
-    lastMeaningfulInteraction: "2026-07-10",
-  },
-  {
-    id: "adir-michael",
-    name: "Adir Michael",
-    hebrewName: "אדיר מיכאל",
-    relation: "אח/אחות",
-    lastMeaningfulInteraction: "2026-07-09",
-  },
-  {
-    id: "odaya",
-    name: "Odaya",
-    hebrewName: "אודיה",
-    relation: "אח/אחות",
-    lastMeaningfulInteraction: "2026-07-08",
-  },
-  {
-    id: "roniya",
-    name: "Roniya",
-    hebrewName: "רוניה",
-    relation: "אח/אחות",
-    lastMeaningfulInteraction: "2026-07-08",
-  },
-  {
-    id: "young-cousin",
-    name: "Young Cousin",
-    hebrewName: "בן דוד צעיר",
-    relation: "משפחה מורחבת",
-    lastMeaningfulInteraction: "2026-07-05",
-  },
-];
-
-const initialMoments: Moment[] = [
-  {
-    id: makeId(),
-    timestamp: "2026-07-19T06:30:00",
-    category: "faith",
-    title: "סדר בוקר",
-    content: "למדתי פרק בגמרא לפני התורנות היום, הרגשתי מחובר ורגוע.",
-  },
-  {
-    id: makeId(),
-    timestamp: "2026-07-18T20:15:00",
-    category: "family",
-    title: "שיחה עם חדוה ועודד",
-    content: "התעדכנו איך עובר השבוע, שיחה חמה ורגועה.",
-  },
-  {
-    id: makeId(),
-    timestamp: "2026-07-17T21:00:00",
-    category: "knowledge",
-    title: "פרויקט פייתון",
-    content: "התחלתי לבנות סוכן AI קטן לניהול לוז יומי.",
-  },
-];
-
-const initialUpcomingEvents: UpcomingEvent[] = [
-  {
-    id: makeId(),
-    title: "להתקשר לחדוה ולעודד",
-    date: "2026-07-21",
-    category: "family",
-  },
-];
-
-const initialKnowledgeEntries: KnowledgeEntry[] = [
-  {
-    id: makeId(),
-    date: "2026-07-19",
-    topic: "הלכות שבת",
-    source: "משנה ברורה",
-    summary: "סקירה של דיני הוצאה מרשות לרשות.",
-    durationMinutes: 40,
-  },
-];
-
-export const useAtlasStore = create<AtlasState>((set) => ({
-  user: {
-    name: "Nesiel",
-    hebrewName: "נסיאל",
-    email: "nesiel12388@gmail.com",
-    lifeStage: "בונה את אטלס ומנהל דרכו את החיים האישיים",
-  },
-  lifeAreas: initialLifeAreas,
-  people: initialPeople,
-  moments: initialMoments,
-  upcomingEvents: initialUpcomingEvents,
-  knowledgeEntries: initialKnowledgeEntries,
+const EMPTY_STATE: HydratedState = {
+  user: { name: "", hebrewName: "", email: "", lifeStage: "" },
+  lifeAreas: [],
+  people: [],
+  moments: [],
+  upcomingEvents: [],
+  knowledgeEntries: [],
   chatHistory: [],
-  insights: [
-    {
-      id: makeId(),
-      content: "שמת לב שברוב הימים שבהם אתה לומד סדר בוקר, גם השיחה עם המשפחה יוצאת יותר טובה.",
-      timestamp: "2026-07-19T07:00:00",
-    },
-  ],
-  todayIntention: "",
-  personalDNA: {
-    habitNotes: [],
-  },
+  insights: [],
+  personalDNA: { habitNotes: [] },
   onboardingComplete: false,
   goals: [],
+  todayIntention: "",
+};
+
+export const useAtlasStore = create<AtlasState>((set) => ({
+  ...EMPTY_STATE,
+  hydrated: false,
   suggestedActions: [],
 
-  setTodayIntention: (intention) => set({ todayIntention: intention }),
+  hydrate: (state) => set({ ...state, hydrated: true }),
 
-  addMoment: (moment) =>
+  setTodayIntention: async (intention) => {
+    set({ todayIntention: intention });
+    await setTodayIntentionAction(intention);
+  },
+
+  addMoment: async (moment) => {
+    const created = await addMomentAction(moment);
+    set((state) => ({ moments: [created, ...state.moments] }));
+  },
+
+  logPersonInteraction: async (personId, note) => {
+    const updated = await logPersonInteractionAction(personId, note);
     set((state) => ({
-      moments: [
-        { ...moment, id: makeId(), timestamp: moment.timestamp ?? new Date().toISOString() },
-        ...state.moments,
-      ],
-    })),
+      people: state.people.map((p) => (p.id === personId ? updated : p)),
+    }));
+  },
 
-  logPersonInteraction: (personId, note) =>
+  setPersonBirthday: async (personId, birthday) => {
+    const updated = await setPersonBirthdayAction(personId, birthday);
     set((state) => ({
-      people: state.people.map((p) =>
-        p.id === personId
-          ? { ...p, lastMeaningfulInteraction: new Date().toISOString(), note: note ?? p.note }
-          : p
-      ),
-    })),
+      people: state.people.map((p) => (p.id === personId ? updated : p)),
+    }));
+  },
 
-  setPersonBirthday: (personId, birthday) =>
+  addChatMessage: async (message) => {
+    const created = await addChatMessageAction(message.role, message.content);
+    set((state) => ({ chatHistory: [...state.chatHistory, created] }));
+  },
+
+  addInsight: async (content) => {
+    const created = await addInsightAction(content);
+    set((state) => ({ insights: [created, ...state.insights] }));
+  },
+
+  addKnowledgeEntry: async (entry) => {
+    const created = await addKnowledgeEntryAction(entry);
+    set((state) => ({ knowledgeEntries: [created, ...state.knowledgeEntries] }));
+  },
+
+  updateLifeAreaScore: async (key, score) => {
+    const updated = await updateLifeAreaScoreAction(key, score);
     set((state) => ({
-      people: state.people.map((p) => (p.id === personId ? { ...p, birthday } : p)),
-    })),
+      lifeAreas: state.lifeAreas.map((a) => (a.key === key ? updated : a)),
+    }));
+  },
 
-  addChatMessage: (message) =>
-    set((state) => ({
-      chatHistory: [
-        ...state.chatHistory,
-        { ...message, id: makeId(), timestamp: new Date().toISOString() },
-      ],
-    })),
+  updatePersonalDNA: async (patch) => {
+    const updated = await updatePersonalDNAAction(patch);
+    set({ personalDNA: updated });
+  },
 
-  addInsight: (content) =>
-    set((state) => ({
-      insights: [{ id: makeId(), content, timestamp: new Date().toISOString() }, ...state.insights],
-    })),
+  completeOnboarding: async () => {
+    set({ onboardingComplete: true });
+    await completeOnboardingAction();
+  },
 
-  addKnowledgeEntry: (entry) =>
-    set((state) => ({
-      knowledgeEntries: [{ ...entry, id: makeId() }, ...state.knowledgeEntries],
-    })),
+  addGoal: async (title, category, milestoneTitles) => {
+    const created = await addGoalAction(title, category, milestoneTitles);
+    set((state) => ({ goals: [created, ...state.goals] }));
+  },
 
-  updateLifeAreaScore: (key, score) =>
-    set((state) => ({
-      lifeAreas: state.lifeAreas.map((a) => (a.key === key ? { ...a, score } : a)),
-    })),
-
-  updatePersonalDNA: (patch) =>
-    set((state) => ({ personalDNA: { ...state.personalDNA, ...patch } })),
-
-  completeOnboarding: () => set({ onboardingComplete: true }),
-
-  addGoal: (title, category, milestoneTitles) =>
-    set((state) => ({
-      goals: [
-        {
-          id: makeId(),
-          title,
-          category,
-          createdAt: new Date().toISOString(),
-          milestones: milestoneTitles.map((m) => ({ id: makeId(), title: m, done: false })),
-        },
-        ...state.goals,
-      ],
-    })),
-
-  toggleMilestone: (goalId, milestoneId) =>
+  toggleMilestone: async (goalId, milestoneId) => {
     set((state) => ({
       goals: state.goals.map((g) =>
         g.id === goalId
@@ -278,30 +164,32 @@ export const useAtlasStore = create<AtlasState>((set) => ({
             }
           : g
       ),
-    })),
+    }));
+    await toggleMilestoneAction(goalId, milestoneId);
+  },
 
-  removeGoal: (goalId) =>
-    set((state) => ({ goals: state.goals.filter((g) => g.id !== goalId) })),
+  removeGoal: async (goalId) => {
+    set((state) => ({ goals: state.goals.filter((g) => g.id !== goalId) }));
+    await removeGoalAction(goalId);
+  },
 
   setSuggestedActions: (actions) => set({ suggestedActions: actions }),
 
-  acceptSuggestion: (id) =>
+  acceptSuggestion: async (id) => {
+    let accepted: SuggestedAction | undefined;
     set((state) => {
-      const suggestion = state.suggestedActions.find((s) => s.id === id);
-      if (!suggestion) return state;
-      return {
-        suggestedActions: state.suggestedActions.filter((s) => s.id !== id),
-        upcomingEvents: [
-          {
-            id: makeId(),
-            title: suggestion.title,
-            date: suggestion.start,
-            category: suggestion.category,
-          },
-          ...state.upcomingEvents,
-        ],
-      };
-    }),
+      accepted = state.suggestedActions.find((s) => s.id === id);
+      return { suggestedActions: state.suggestedActions.filter((s) => s.id !== id) };
+    });
+    if (!accepted) return;
+
+    const created = await addUpcomingEventAction({
+      title: accepted.title,
+      date: accepted.start,
+      category: accepted.category,
+    });
+    set((state) => ({ upcomingEvents: [created, ...state.upcomingEvents] }));
+  },
 
   dismissSuggestion: (id) =>
     set((state) => ({

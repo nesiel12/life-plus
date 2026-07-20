@@ -32,7 +32,7 @@ export function GoalsPanel() {
     });
     if (!res.ok) throw new Error("לא הצלחנו לפרק את היעד. נסה שוב.");
     const data = await res.json();
-    addGoal(trimmedTitle, selectedCategory, data.milestones ?? []);
+    await addGoal(trimmedTitle, selectedCategory, data.milestones ?? []);
     setTitle("");
   });
 
