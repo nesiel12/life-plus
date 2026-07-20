@@ -58,18 +58,63 @@ This is a data-flow model, not a service-boundary model. It does **not** imply f
 
 ## 3. Personal DNA Engine
 
-**What it is:** the durable behavioral/preference profile — not facts about the person, but *patterns* in how they operate.
+**What it is:** the durable behavioral/preference profile — not facts about the person, but *patterns* in how they operate. This now has two distinct layers, and the naming is deliberately kept separate because they're epistemically different:
 
-**Current state:** the `personal_dna` table and onboarding flow already capture `peak_focus_hours`, `learning_style`, `family_check_in_interval_days`, and free-form `habit_notes`. As of this session, this data has its first two real consumers: it shapes the chat system prompt (`lib/chatSystemPrompt.ts`) and the family page's stale-contact threshold. It does **not** yet influence calendar-suggestion ranking, goal planning, or learning recommendations.
+| Layer | What it holds | Where | Origin |
+|---|---|---|---|
+| **Stated** (`personalDNA`) | `peak_focus_hours`, `learning_style`, `family_check_in_interval_days`, `habit_notes` | `personal_dna` table, one row/user | The user said so, at onboarding |
+| **Inferred** (`personalPatterns` — the Personal DNA *Engine*) | Behavioral patterns with a confidence score | `personal_patterns` table, many rows/user | Atlas noticed it, from his actual data |
 
-**Target:** every AI-facing surface (chat, calendar suggestions, goal breakdown, learning/Torah summarization) reads personalDNA as ambient context, the same way it now does for chat. The profile itself should also grow richer over time — not just onboarding answers, but *inferred* patterns (e.g., "moments tagged `career` cluster in the evening" derived from `moments.occurred_at`), once there's enough data for an inference to be trustworthy rather than a guess dressed up as a fact.
+The stated layer shipped in Phase 1 and got its first real consumers earlier this session (chat system prompt, family page's stale-contact threshold). This section is about the inferred layer — **v1 is shipped.**
 
-**Path:**
-1. Wire existing structured fields (`family_check_in_interval_days` — done) into every feature that has an obvious structured use, before touching the free-text fields.
-2. For free-text fields (`peak_focus_hours`, `learning_style`), keep passing them as LLM context (cheap, honest, already correct) rather than trying to parse them into rigid structures — parsing "בבוקר מוקדם" into a time range is a lossy, fragile translation an LLM handles better than a regex.
-3. Only once (1) and (2) are exhausted does *inferred* DNA (patterns mined from behavior rather than stated in onboarding) become the next increment — and it should ship as a visible, explainable insight ("You tend to log career moments in the evening — want suggestions timed around that?"), never a silent hidden variable the user can't see or correct.
+**Current state — v1 shipped.** `lib/intelligence/personalDNA/` is a self-contained module: every analyzer is a pure function (raw rows in, `PatternCandidate[]` out — no DB access, fully unit-tested), and exactly one server-only file (`analyze.ts`) does the fetching and writing. Four categories, all backed by real, already-collected data — nothing invented to fill a category that had no signal:
 
-**Trigger to build inferred DNA:** enough real usage history exists (weeks, not days) that a mined pattern would be signal, not noise from n=3.
+- **Focus** (`analyzers/focus.ts`) — per life-area category, the time-of-day window (`moments.occurred_at`, converted to Asia/Jerusalem local time — see below) where the user logs the most moments. *"הרגעים בתחום ידע מתועדים בעיקר בין 18:00–22:00."*
+- **Learning** (`analyzers/learning.ts`) — recurring topic words across `knowledge_entries` (reuses `lib/memory/rankRelevance.ts`'s `tokenize`), and study-session cadence (entries/week over the observed span).
+- **Goals** (`analyzers/goals.ts`) — task-size preference (does he finish more when goals are broken into many small milestones or few large ones — a real correlation across his own goal history, not a guess), goal momentum/stagnation (share of open goals untouched 14+ days), and milestone completion pace (needs `milestones.completed_at`, added in migration `20260720000003` — **only populates going forward**; milestones marked done before that migration have no pace evidence, deliberately left `null` rather than backfilled with a guessed timestamp).
+- **Routine** (`analyzers/routine.ts`) — most-active weekday, and a 30-day activity-consistency score, both across the union of moments + knowledge entries.
+
+**Health is explicitly not a category yet** — `health_logs` exists as a table (migration `20260720000001`) but has no write path anywhere in the app (the Health area page is just `AreaMomentsView`, generic moments UI). Building a health pattern today would mean analyzing zero rows and either producing nothing (fine, but pointless code) or being tempted to fabricate signal from `moments` tagged `health` (a much weaker proxy). Left out until the Health area gets a real logging flow.
+
+**Confidence model** (`confidence.ts`) — deterministic, no ML:
+- `calculatePatternConfidence(evidenceCount, strength)`: `strength` (0–1, how concentrated/clear the signal is) times an evidence-saturation curve (`evidenceCount / (evidenceCount + 5)`, so ~5 data points ≈ half-trust) times `MAX_CONFIDENCE` (0.95 — Atlas never claims certainty about a person). A brand-new, single-evidence assumption lands around 0.15–0.2; it climbs as more evidence accumulates, asymptotically, never touching 1.0.
+- `resolvePatternUpdate(existing, fresh)`: the actual "DNA update" step. Recomputing a pattern that agrees with what's already stored uses the fresh (larger) evidence count as-is — confidence climbs naturally because there's more data behind the same belief. Recomputing a pattern whose *value* flipped (a genuine contradiction) applies a 0.7× discount to the fresh confidence — the new belief isn't instantly trusted, it has to earn that back over subsequent runs.
+- `rankPatterns`: filters to `MIN_CONFIDENCE_TO_SURFACE` (0.3) and sorts by confidence — the one place "which beliefs are trustworthy enough to act on" is decided, so nothing downstream re-implements its own threshold.
+
+**Data flow (the self-learning loop, concretely):**
+```
+User acts (logs a moment, completes a milestone, studies a shiur)
+        ↓
+app/actions/bootstrap.ts's getInitialState() runs (every app open)
+        ↓  (after() — doesn't block the response)
+analyzePersonalDNA(userId): fetch raw data -> run 4 analyzers -> get PatternCandidate[]
+        ↓
+For each candidate: resolvePatternUpdate(existing stored pattern, fresh candidate)
+        ↓
+personalPatternsRepo.upsert (one row per category+patternType+subject)
+        ↓
+Read path: getPersonalPatternDescriptions(userId) -> rankPatterns -> top 5 confident descriptions
+        ↓
+lib/context/buildAtlasContext.ts includes them as AtlasContext.personalPatterns
+        ↓
+Chat / goal breakdown / calendar suggestions fold them into their prompts/rationale
+        ↓
+(Not yet closed): user accepts/rejects/acts differently -> feeds back into future evidence
+```
+The trigger is deliberately simple — re-analyze once per app open, not per-mutation and not on a schedule (both would be over-engineering ahead of evidence they're needed; see §4's Notification Agent note for where a real scheduler eventually belongs). `next/server`'s `after()` runs it post-response so the user never waits for it.
+
+**Integration, this session:**
+- **Context Engine** — `AtlasContext.personalPatterns: string[]`, fetched alongside everything else in `buildAtlasContext`.
+- **Chat** — a new system-prompt section, explicitly labeled as inferred-not-stated so the model doesn't present it as something the user said.
+- **Goal breakdown** — patterns fold into the same context block active goals and memory already use, so a `taskSizePreference` belief can actually shape milestone count/size.
+- **Calendar suggestions** — foundation only, as scoped: ranking (which area/slot wins) is untouched; a matching focus-window pattern for the suggested area now enriches the *rationale* text. No energy/focus-window-based re-ranking yet — that's the next increment, not this one.
+
+**What's still open, honestly:**
+- The feedback half of the loop (accept/reject/modify → confidence adjustment) isn't wired — `docs/ATLAS_ARCHITECTURE_VISION.md` §7 (self-improvement loop / `recommendation_events`) is the natural place this lands, once that table exists.
+- `analyzePersonalDNA` and `lib/db/personalPatterns.ts` have no automated test (DB-dependent, same gap as `buildAtlasContext` — see §5). Every *analyzer* it calls is fully unit-tested; the orchestration wiring itself isn't yet.
+- Calendar suggestions doesn't rank by focus window — deliberately deferred per this milestone's scope.
+
+**Trigger for v2:** real usage accumulates (weeks, not days) such that patterns currently sitting below `MIN_CONFIDENCE_TO_SURFACE` start crossing it, or a concrete feature need justifies calendar re-ranking by energy/focus windows.
 
 ---
 
