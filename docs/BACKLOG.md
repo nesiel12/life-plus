@@ -26,7 +26,6 @@ Each entry: what it is, why it's at that priority, where it lives, and what it d
 ## Medium Priority
 *Quality, refactors, UX consistency, maintainability.*
 
-- **Most mutation call sites don't surface Server Action failures to the user.** `QuickCapture`, `AreaMomentsView`, `app/areas/family/page.tsx`, and `OnboardingFlow` all call store actions fire-and-forget with no `.catch()` — a network blip or DB error now fails silently (console-only) instead of telling the user their moment/goal/birthday didn't save. `GoalsPanel` and `AICompanion` already handle this correctly via `useApiCall`; the rest should follow the same pattern. *Files: `components/features/QuickCapture.tsx`, `components/features/AreaMomentsView.tsx`, `app/areas/family/page.tsx`, `components/features/OnboardingFlow.tsx`.*
 - **`personalDNA` is collected at onboarding and then never read anywhere.** `peakFocusHours`/`learningStyle` don't influence chat tone or scheduling yet — onboarding currently produces data with no effect. *Files: `store/useAtlasStore.ts`, `components/features/OnboardingFlow.tsx`. Natural fit for Phase 4 ("make the AI actually central").*
 - **No pagination anywhere a list renders** (`moments`, `goals`, `people`). Fine at current usage levels, won't scale indefinitely.
 - **No `loading.tsx` / `error.tsx` / `not-found.tsx` anywhere in `app/`.** Failures fall through to the default Next.js overlay instead of an on-brand state — more important now that real network/DB calls can actually fail mid-render.

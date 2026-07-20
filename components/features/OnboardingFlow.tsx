@@ -6,6 +6,7 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { ONBOARDING_QUESTIONS } from "@/lib/constants";
 import { Logo } from "@/components/ui/Logo";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
+import { useApiCall } from "@/hooks/useApiCall";
 import type { PersonalDNA } from "@/types";
 
 function parseAnswer(fieldId: keyof PersonalDNA, raw: string): Partial<PersonalDNA> {
@@ -27,15 +28,23 @@ export function OnboardingFlow() {
   const question = ONBOARDING_QUESTIONS[step];
   const isLast = step === ONBOARDING_QUESTIONS.length - 1;
 
-  function handleNext() {
-    if (!answer.trim()) return;
-    updatePersonalDNA(parseAnswer(question.id, answer.trim()));
-    setAnswer("");
-    if (isLast) {
-      completeOnboarding();
-    } else {
-      setStep((s) => s + 1);
+  const { loading: saving, error: saveError, run: submitAnswer } = useApiCall(
+    async (patch: Partial<PersonalDNA>, finish: boolean) => {
+      await updatePersonalDNA(patch);
+      if (finish) await completeOnboarding();
     }
+  );
+
+  function handleNext() {
+    if (!answer.trim() || saving) return;
+    submitAnswer(parseAnswer(question.id, answer.trim()), isLast)
+      .then(() => {
+        setAnswer("");
+        if (!isLast) setStep((s) => s + 1);
+      })
+      .catch(() => {
+        // error is already captured in saveError for display below
+      });
   }
 
   return (
@@ -76,12 +85,14 @@ export function OnboardingFlow() {
         className="w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
       />
 
+      {saveError && <p className="text-xs text-accent-family">{saveError}</p>}
+
       <button
         onClick={handleNext}
-        disabled={!answer.trim()}
+        disabled={!answer.trim() || saving}
         className="self-end rounded-lg bg-accent-faith/20 px-4 py-2 text-sm text-accent-faith transition-opacity disabled:opacity-40"
       >
-        {isLast ? "סיים" : "המשך"}
+        {saving ? "שומר…" : isLast ? "סיים" : "המשך"}
       </button>
     </Modal>
   );

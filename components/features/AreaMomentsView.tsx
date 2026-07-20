@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useApiCall } from "@/hooks/useApiCall";
 import type { LifeAreaKey } from "@/types";
 
 interface AreaMomentsViewProps {
@@ -22,6 +23,7 @@ export function AreaMomentsView({ title, description, areaKey }: AreaMomentsView
   // mounted area page (docs/TECH_DEBT.md #15).
   const allMoments = useAtlasStore((s) => s.moments);
   const addMoment = useAtlasStore((s) => s.addMoment);
+  const { loading: saving, error: saveError, run: save } = useApiCall(addMoment);
   const [draft, setDraft] = useState("");
 
   const moments = useMemo(
@@ -31,8 +33,11 @@ export function AreaMomentsView({ title, description, areaKey }: AreaMomentsView
 
   function handleAdd() {
     if (!draft.trim()) return;
-    addMoment({ category: areaKey, title: "רגע חדש", content: draft.trim() });
-    setDraft("");
+    save({ category: areaKey, title: "רגע חדש", content: draft.trim() })
+      .then(() => setDraft(""))
+      .catch(() => {
+        // error is already captured in saveError for display below
+      });
   }
 
   return (
@@ -68,11 +73,12 @@ export function AreaMomentsView({ title, description, areaKey }: AreaMomentsView
           />
           <button
             onClick={handleAdd}
-            disabled={!draft.trim()}
+            disabled={!draft.trim() || saving}
             className="rounded-lg bg-white/5 px-4 py-2 text-sm text-foreground transition-opacity disabled:opacity-40"
           >
-            שמור
+            {saving ? "שומר…" : "שמור"}
           </button>
+          {saveError && <p className="mt-2 text-xs text-accent-family">{saveError}</p>}
         </GlassCard>
 
         <GlassCard delay={0.15}>

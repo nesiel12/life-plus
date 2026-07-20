@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { LIFE_AREA_LIST } from "@/lib/lifeAreas";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
+import { useApiCall } from "@/hooks/useApiCall";
 import type { MomentCategory } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ export function QuickCapture() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const addMoment = useAtlasStore((s) => s.addMoment);
+  const { loading: saving, error: saveError, run: save } = useApiCall(addMoment);
 
   // Ctrl/Cmd+K is a trigger, not a dismiss — stays separate from Modal's
   // built-in Escape-to-close handling.
@@ -29,15 +31,20 @@ export function QuickCapture() {
 
   function handleSave() {
     if (!content.trim()) return;
-    addMoment({
+    save({
       category,
       title: title.trim() || "רגע חדש",
       content: content.trim(),
-    });
-    setTitle("");
-    setContent("");
-    setCategory("general");
-    setOpen(false);
+    })
+      .then(() => {
+        setTitle("");
+        setContent("");
+        setCategory("general");
+        setOpen(false);
+      })
+      .catch(() => {
+        // error is already captured in saveError for display below
+      });
   }
 
   return (
@@ -77,14 +84,16 @@ export function QuickCapture() {
         className="mb-4 w-full resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
       />
 
+      {saveError && <p className="mb-2 text-xs text-accent-family">{saveError}</p>}
+
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted">Esc לביטול · ⌘K לפתיחה/סגירה</span>
         <button
           onClick={handleSave}
-          disabled={!content.trim()}
+          disabled={!content.trim() || saving}
           className="rounded-lg bg-accent-faith/20 px-4 py-2 text-sm text-accent-faith transition-opacity disabled:opacity-40"
         >
-          שמור רגע
+          {saving ? "שומר…" : "שמור רגע"}
         </button>
       </div>
     </Modal>

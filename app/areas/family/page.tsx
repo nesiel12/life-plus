@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { HeartHandshake, Cake } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useApiCall } from "@/hooks/useApiCall";
 import { daysSince, daysUntilNextBirthday } from "@/lib/utils";
 
 const STALE_THRESHOLD_DAYS = 7;
@@ -17,14 +18,25 @@ export default function FamilyCarePage() {
   const [editingBirthdayFor, setEditingBirthdayFor] = useState<string | null>(null);
   const [birthdayDraft, setBirthdayDraft] = useState("");
 
+  const { error: logError, run: logInteraction } = useApiCall(
+    async (personId: string, name: string) => {
+      await logPersonInteraction(personId);
+      await addMoment({ category: "family", title: `רגע עם ${name}`, content: `תיעוד רגע משמעותי עם ${name}.` });
+    }
+  );
+  const { error: birthdayError, run: submitBirthday } = useApiCall(setPersonBirthday);
+
   function handleLog(personId: string, name: string) {
-    logPersonInteraction(personId);
-    addMoment({ category: "family", title: `רגע עם ${name}`, content: `תיעוד רגע משמעותי עם ${name}.` });
+    logInteraction(personId, name).catch(() => {
+      // error is already captured in logError for display below
+    });
   }
 
   function saveBirthday(personId: string) {
     if (/^\d{2}-\d{2}$/.test(birthdayDraft)) {
-      setPersonBirthday(personId, birthdayDraft);
+      submitBirthday(personId, birthdayDraft).catch(() => {
+        // error is already captured in birthdayError for display below
+      });
     }
     setEditingBirthdayFor(null);
     setBirthdayDraft("");
@@ -34,6 +46,9 @@ export default function FamilyCarePage() {
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
       <h1 className="mb-1 text-2xl font-medium tracking-tight">לוח הקשבה משפחתי</h1>
       <p className="mb-10 text-sm text-muted">לא CRM — פשוט מקום לזכור את מי שחשוב.</p>
+      {(logError || birthdayError) && (
+        <p className="-mt-6 mb-10 text-xs text-accent-family">{logError ?? birthdayError}</p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {people.map((person, i) => {
