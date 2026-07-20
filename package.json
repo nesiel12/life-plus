@@ -7,6 +7,8 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "db:migrate": "node --env-file=.env.local scripts/apply-migrations.mjs"
   },
   "dependencies": {
@@ -35,6 +37,7 @@
     "eslint-config-next": "15.5.20",
     "pg": "^8.22.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

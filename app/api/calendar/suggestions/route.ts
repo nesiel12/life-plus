@@ -42,7 +42,7 @@ interface FreeBusyResponse {
   };
 }
 
-function computeFreeSlots(busy: { start: string; end: string }[], from: Date, to: Date) {
+export function computeFreeSlots(busy: { start: string; end: string }[], from: Date, to: Date) {
   const sorted = [...busy]
     .map((b) => ({ start: new Date(b.start), end: new Date(b.end) }))
     .sort((a, b) => a.start.getTime() - b.start.getTime());

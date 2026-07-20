@@ -21,7 +21,6 @@ Each entry: what it is, why it's at that priority, where it lives, and what it d
 - **"Accept" a calendar suggestion doesn't write to the user's actual Google Calendar.** It only appends to local state (now persisted to `upcoming_events`, but still not synced back to Google). Phase 1's dependency is cleared — this is now actionable. *Files: `components/features/ScheduleSuggestions.tsx`, `app/actions/upcomingEvents.ts`.*
 - **`gmail.readonly` scope requested, never used anywhere.** Either build the feature it implies or drop the scope — asking for unused access is a trust and OAuth-verification liability. *Files: `lib/auth.ts`.*
 - **In-memory rate limiter won't survive horizontal scaling.** `lib/api/rateLimit.ts` is correct for a single process; needs a shared store (Redis/Upstash) before Atlas ever runs more than one instance. *Files: `lib/api/rateLimit.ts`.*
-- **No tests, no CI.** Not a line item — its own roadmap phase (Phase 5). Listed here only so it isn't forgotten between now and then.
 - **Full end-to-end verification still pending a real browser session.** Phase 1's CRUD/isolation checks were run directly against the database (`scripts/verify-phase1.mjs`) since a real Google sign-in can't be driven from here — that proves the data layer is correct, but the actual click-through (sign in → hydrate → mutate → see it persist) hasn't been observed in a live browser yet.
 
 ## Medium Priority
@@ -33,6 +32,7 @@ Each entry: what it is, why it's at that priority, where it lives, and what it d
 - **No `loading.tsx` / `error.tsx` / `not-found.tsx` anywhere in `app/`.** Failures fall through to the default Next.js overlay instead of an on-brand state — more important now that real network/DB calls can actually fail mid-render.
 - **Form inputs rely on `placeholder` as their only label** across `QuickCapture`, `OnboardingFlow`, `GoalsPanel`, and the dashboard intention textarea — a known accessibility anti-pattern.
 - **Rate-limit thresholds are unvalidated guesses** (20/10/10 per 5 min) — reasonable defaults, not tuned against real usage. Revisit once there's real traffic to look at.
+- **Test coverage is currently just the pure-logic core.** Vitest + CI (lint/typecheck/test on every PR) are live (`.github/workflows/ci.yml`), covering `lib/utils.ts`'s date math and the calendar route's `computeFreeSlots`. Still open: integration tests for the API routes (auth-required, validation-rejects-bad-input, mock-fallback-when-no-key), component tests, and error tracking/structured logging — the rest of Phase 5's exit criterion.
 
 ## Low Priority
 *Minor polish, cleanup, optimization.*
