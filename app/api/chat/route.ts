@@ -4,20 +4,15 @@ import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
+import { getUserByEmail } from "@/lib/db/users";
+import { personalDnaRepo } from "@/lib/db/personalDna";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
+import { buildSystemPrompt } from "@/lib/chatSystemPrompt";
 
 export const runtime = "nodejs";
 
 const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 }; // 20 messages / 5 min
-
-const SYSTEM_PROMPT = `You are Atlas — a calm, personal life companion, not a generic assistant.
-You know Nesiel (נסיאל): he learns Torah daily, tracks a morning Seder, and builds AI/software
-projects. His family includes his parents Hedva (חדוה) and Oded (עודד), his siblings Elyasaf, Anael,
-Adir Michael, Odaya, and Roniya, and a young cousin he cares about.
-
-Speak calmly and briefly. Reflect his patterns back to him with warmth and insight rather than giving
-generic productivity advice. Never sound like a customer-support chatbot.`;
 
 const chatRequestSchema = z.object({
   message: z.string().trim().min(1).max(4000),
@@ -54,9 +49,12 @@ export async function POST(request: Request) {
   }
 
   try {
+    const user = await getUserByEmail(session.user.email);
+    const dna = user ? await personalDnaRepo.get(user.id) : null;
+
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(dna),
       messages: [...history, { role: "user", content: message }],
     });
 

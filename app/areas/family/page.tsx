@@ -8,10 +8,15 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { useApiCall } from "@/hooks/useApiCall";
 import { daysSince, daysUntilNextBirthday } from "@/lib/utils";
 
-const STALE_THRESHOLD_DAYS = 7;
+const DEFAULT_STALE_THRESHOLD_DAYS = 7;
 
 export default function FamilyCarePage() {
   const people = useAtlasStore((s) => s.people);
+  // personalDNA.familyCheckInIntervalDays is collected at onboarding and
+  // previously never read anywhere (docs/BACKLOG.md) — this is what makes
+  // that answer actually change behavior, instead of a hardcoded constant.
+  const staleThresholdDays =
+    useAtlasStore((s) => s.personalDNA.familyCheckInIntervalDays) ?? DEFAULT_STALE_THRESHOLD_DAYS;
   const logPersonInteraction = useAtlasStore((s) => s.logPersonInteraction);
   const addMoment = useAtlasStore((s) => s.addMoment);
   const setPersonBirthday = useAtlasStore((s) => s.setPersonBirthday);
@@ -55,7 +60,7 @@ export default function FamilyCarePage() {
           const since = person.lastMeaningfulInteraction
             ? daysSince(person.lastMeaningfulInteraction)
             : null;
-          const isStale = since !== null && since >= STALE_THRESHOLD_DAYS;
+          const isStale = since !== null && since >= staleThresholdDays;
           const untilBirthday = person.birthday ? daysUntilNextBirthday(person.birthday) : null;
 
           return (
