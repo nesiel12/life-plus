@@ -16,7 +16,10 @@ export interface RankedMemory extends MemoryCandidate {
 
 const RECENCY_HALF_LIFE_DAYS = 30;
 
-function tokenize(text: string): Set<string> {
+// Exported for lib/intelligence/personalDNA/analyzers/learning.ts, which
+// reuses the same tokenization for topic-frequency analysis rather than
+// re-implementing it.
+export function tokenize(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()

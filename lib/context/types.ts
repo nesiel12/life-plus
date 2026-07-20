@@ -21,6 +21,12 @@ export interface AtlasContext {
   upcomingEvents: string[];
   relevantMemory: string[];
   relationshipSignals: string[];
+  // Confident, explainable beliefs about the user's behavioral patterns —
+  // Personal DNA Engine v1 (docs/ATLAS_ARCHITECTURE_VISION.md §3), already
+  // filtered to MIN_CONFIDENCE_TO_SURFACE. Distinct from personalDNA above:
+  // that's what the user told Atlas at onboarding; this is what Atlas has
+  // inferred from watching his actual behavior since.
+  personalPatterns: string[];
 }
 
 export interface BuildContextOptions {

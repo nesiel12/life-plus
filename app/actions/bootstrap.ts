@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { getCurrentUser } from "@/lib/currentUser";
 import { lifeAreaScoresRepo } from "@/lib/db/lifeAreaScores";
 import { peopleRepo } from "@/lib/db/people";
@@ -11,6 +12,7 @@ import { insightsRepo } from "@/lib/db/insights";
 import { personalDnaRepo } from "@/lib/db/personalDna";
 import { goalsRepo } from "@/lib/db/goals";
 import { dailyIntentionsRepo } from "@/lib/db/dailyIntentions";
+import { analyzePersonalDNA } from "@/lib/intelligence/personalDNA";
 import {
   toUserContext,
   toLifeArea,
@@ -53,6 +55,18 @@ export async function getInitialState() {
     goalsRepo.listWithMilestones(userId),
     dailyIntentionsRepo.getForToday(userId),
   ]);
+
+  // Self-learning loop trigger, v1 (docs/ATLAS_ARCHITECTURE_VISION.md §3):
+  // re-analyze once per app open, after the response is sent — `after()`
+  // keeps the function alive for this without making the user wait for it,
+  // unlike a bare unawaited promise which serverless platforms can kill
+  // before it finishes. Deliberately not per-mutation or scheduled yet;
+  // see the architecture doc for the trigger to move beyond this.
+  after(() => {
+    analyzePersonalDNA(userId).catch((err) => {
+      console.error("Personal DNA analysis failed:", err);
+    });
+  });
 
   return {
     user: toUserContext(user),

@@ -262,6 +262,7 @@ export interface Database {
           title: string;
           done: boolean;
           position: number;
+          completed_at: string | null;
           created_at: string;
         },
         {
@@ -270,6 +271,7 @@ export interface Database {
           title: string;
           done?: boolean;
           position?: number;
+          completed_at?: string | null;
         },
         {
           id?: string;
@@ -277,6 +279,7 @@ export interface Database {
           title?: string;
           done?: boolean;
           position?: number;
+          completed_at?: string | null;
         }
       >;
       chat_messages: TableDef<
@@ -316,6 +319,46 @@ export interface Database {
           id?: string;
           user_id?: string;
           content?: string;
+        }
+      >;
+      personal_patterns: TableDef<
+        {
+          id: string;
+          user_id: string;
+          category: string;
+          pattern_type: string;
+          subject: string;
+          description: string;
+          value: string;
+          confidence: number;
+          evidence_count: number;
+          source: string;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          category: string;
+          pattern_type: string;
+          subject?: string;
+          description: string;
+          value: string;
+          confidence: number;
+          evidence_count?: number;
+          source: string;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          category?: string;
+          pattern_type?: string;
+          subject?: string;
+          description?: string;
+          value?: string;
+          confidence?: number;
+          evidence_count?: number;
+          source?: string;
         }
       >;
     };

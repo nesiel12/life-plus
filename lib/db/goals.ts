@@ -84,9 +84,13 @@ export const goalsRepo = {
       .single();
     if (readError) throw readError;
 
+    const nowDone = !current.done;
+    // completed_at feeds the Personal DNA goal-behavior analyzer's pace
+    // signal (docs/ATLAS_ARCHITECTURE_VISION.md §3) — set when a milestone
+    // is checked off, cleared if it's un-checked, never guessed/backfilled.
     const { data: updated, error: updateError } = await client
       .from("milestones")
-      .update({ done: !current.done })
+      .update({ done: nowDone, completed_at: nowDone ? new Date().toISOString() : null })
       .eq("id", milestoneId)
       .eq("goal_id", goalId)
       .select()

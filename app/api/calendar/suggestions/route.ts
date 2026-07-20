@@ -5,6 +5,7 @@ import { getUserByEmail } from "@/lib/db/users";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
 import { computeFreeSlots } from "@/lib/calendarFreeSlots";
+import { momentCategoryLabel } from "@/lib/lifeAreas";
 import type { MomentCategory, SuggestedAction } from "@/types";
 
 export const runtime = "nodejs";
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
   // previously the request body carried them, which meant ranking could run
   // against stale or (in principle) client-supplied values instead of the
   // real thing (docs/BACKLOG.md).
-  const { lifeAreas, relationshipSignals } = await buildAtlasContext(user.id);
+  const { lifeAreas, relationshipSignals, personalPatterns } = await buildAtlasContext(user.id);
 
   const now = new Date();
   const endOfDay = new Date(now);
@@ -99,13 +100,22 @@ export async function POST(request: NextRequest) {
       // knows is overdue for contact, instead of a generic prompt.
       const relationshipNote =
         area.key === "family" && relationshipSignals.length > 0 ? ` ${relationshipSignals[0]}.` : "";
+      // Personal DNA Engine v1's foundation for scheduling (docs/ATLAS_
+      // ARCHITECTURE_VISION.md §3/§5): if a confident focus-window pattern
+      // exists for this area, surface it in the rationale. Ranking itself
+      // (which area/slot gets suggested) is untouched — this only makes the
+      // *explanation* smarter, deliberately short of rebuilding scheduling
+      // around energy/focus windows yet.
+      const areaLabel = momentCategoryLabel(area.key);
+      const focusPattern = personalPatterns.find((pattern) => pattern.includes(areaLabel));
+      const focusNote = focusPattern ? ` ${focusPattern}` : "";
       return {
         id: Math.random().toString(36).slice(2, 10),
         title: ACTION_BY_CATEGORY[area.key],
         category: area.key,
         start: slot.start.toISOString(),
         end: slot.end.toISOString(),
-        rationale: `זה התחום עם המדד הכי נמוך כרגע (${area.score}%), ומצאתי לו חלון פנוי ביומן.${relationshipNote}`,
+        rationale: `זה התחום עם המדד הכי נמוך כרגע (${area.score}%), ומצאתי לו חלון פנוי ביומן.${relationshipNote}${focusNote}`,
       };
     });
 

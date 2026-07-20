@@ -6,11 +6,13 @@ import { upcomingEventsRepo } from "@/lib/db/upcomingEvents";
 import { peopleRepo } from "@/lib/db/people";
 import { toGoal, toLifeArea, toUpcomingEvent, toPerson } from "@/lib/mappers";
 import { retrieveRelevantMemory } from "@/lib/memory/retrieveMemory";
+import { getPersonalPatternDescriptions } from "@/lib/intelligence/personalDNA";
 import { daysSince } from "@/lib/utils";
 import type { AtlasContext, BuildContextOptions } from "@/lib/context/types";
 
 const DEFAULT_STALE_THRESHOLD_DAYS = 7;
 const MAX_UPCOMING_EVENTS = 5;
+const MAX_PERSONAL_PATTERNS = 5;
 
 // The Context Engine (docs/ATLAS_ARCHITECTURE_VISION.md §5): the one place
 // that assembles "what does Atlas actually know that's relevant right now."
@@ -23,7 +25,7 @@ export async function buildAtlasContext(
   userId: string,
   options: BuildContextOptions = {}
 ): Promise<AtlasContext> {
-  const [personalDNA, goalRows, lifeAreaRows, upcomingEventRows, peopleRows, relevantMemory] =
+  const [personalDNA, goalRows, lifeAreaRows, upcomingEventRows, peopleRows, relevantMemory, personalPatterns] =
     await Promise.all([
       personalDnaRepo.get(userId),
       goalsRepo.listWithMilestones(userId),
@@ -33,6 +35,7 @@ export async function buildAtlasContext(
       options.query
         ? retrieveRelevantMemory(userId, options.query, options.memoryLimit)
         : Promise.resolve([]),
+      getPersonalPatternDescriptions(userId, MAX_PERSONAL_PATTERNS),
     ]);
 
   // Same rule the family page uses for its own stale-contact threshold
@@ -63,5 +66,6 @@ export async function buildAtlasContext(
         return `לא יצרת קשר עם ${person.hebrewName ?? person.name} כבר ${since} ימים`;
       })
       .filter((signal): signal is string => signal !== null),
+    personalPatterns,
   };
 }

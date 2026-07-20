@@ -16,6 +16,7 @@ const EMPTY_CONTEXT: AtlasContext = {
   upcomingEvents: [],
   relevantMemory: [],
   relationshipSignals: [],
+  personalPatterns: [],
 };
 
 // Chat's system prompt is the first (and richest) consumer of the Context
@@ -24,7 +25,8 @@ const EMPTY_CONTEXT: AtlasContext = {
 // personalDNA. Kept out of route.ts (which imports server-only DB modules
 // transitively via buildAtlasContext) so it stays unit-testable on its own.
 export function buildSystemPrompt(context: AtlasContext = EMPTY_CONTEXT): string {
-  const { personalDNA, activeGoals, lifeAreas, upcomingEvents, relevantMemory, relationshipSignals } = context;
+  const { personalDNA, activeGoals, lifeAreas, upcomingEvents, relevantMemory, relationshipSignals, personalPatterns } =
+    context;
 
   const dnaNotes: string[] = [];
   if (personalDNA?.peak_focus_hours) {
@@ -41,6 +43,10 @@ export function buildSystemPrompt(context: AtlasContext = EMPTY_CONTEXT): string
 
   const extra = joinContextSections([
     formatContextSection("What you know about him personally", dnaNotes),
+    formatContextSection(
+      "Patterns Atlas has noticed about how he actually works (inferred from his behavior, not something he stated — mention only if it naturally fits)",
+      personalPatterns
+    ),
     formatContextSection("His current life-area balance", lifeAreaLines),
     formatContextSection("His active goals right now", activeGoals),
     formatContextSection("Upcoming events on his calendar", upcomingEvents),

@@ -65,6 +65,10 @@ export async function POST(request: Request) {
       : "";
     const contextBlock = context
       ? joinContextSections([
+          formatContextSection(
+            "Known patterns in how he actually completes goals — shape milestone count/size accordingly",
+            context.personalPatterns
+          ),
           formatContextSection("His other active goals — avoid redundant milestones", context.activeGoals),
           formatContextSection("Related things he's shared before", context.relevantMemory),
         ])

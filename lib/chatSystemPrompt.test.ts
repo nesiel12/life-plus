@@ -24,6 +24,7 @@ function context(patch: Partial<AtlasContext>): AtlasContext {
     upcomingEvents: [],
     relevantMemory: [],
     relationshipSignals: [],
+    personalPatterns: [],
     ...patch,
   };
 }
@@ -72,6 +73,14 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("אמונה: 30%");
     expect(prompt).toContain("יום הולדת לאמא");
     expect(prompt).toContain("דניאל");
+  });
+
+  it("includes inferred personal patterns when present", () => {
+    const prompt = buildSystemPrompt(
+      context({ personalPatterns: ["הרגעים בתחום ידע מתועדים בעיקר בין 18:00–22:00."] })
+    );
+    expect(prompt).toContain("Patterns Atlas has noticed");
+    expect(prompt).toContain("18:00–22:00");
   });
 
   it("combines personalDNA and every context section together", () => {
