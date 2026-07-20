@@ -3,9 +3,12 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
+import { rateLimitResponse } from "@/lib/api/rateLimit";
 import type { MomentCategory, SuggestedAction } from "@/types";
 
 export const runtime = "nodejs";
+
+const RATE_LIMIT = { limit: 10, windowMs: 5 * 60 * 1000 }; // 10 requests / 5 min
 
 const lifeAreaSchema = z.object({
   key: z.enum(["faith", "family", "knowledge", "health", "career"]),
@@ -70,9 +73,12 @@ export async function POST(request: NextRequest) {
   // being reachable here. See lib/auth.ts's session callback for why it's
   // deliberately absent from getServerSession's return value.
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) {
+  if (!token?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const limited = rateLimitResponse(`calendar:${token.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
+  if (limited) return limited;
 
   const accessToken = token.error ? undefined : token.accessToken;
   if (!accessToken) {

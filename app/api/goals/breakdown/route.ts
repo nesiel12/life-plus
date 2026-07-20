@@ -5,9 +5,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
+import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { categoryLabel } from "@/store/useAtlasStore";
 
 export const runtime = "nodejs";
+
+const RATE_LIMIT = { limit: 10, windowMs: 5 * 60 * 1000 }; // 10 breakdowns / 5 min
 
 const breakdownRequestSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -33,9 +36,12 @@ function parseMilestoneLines(text: string): string[] {
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const limited = rateLimitResponse(`goals:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
+  if (limited) return limited;
 
   const parsed = await parseJsonBody(request, breakdownRequestSchema);
   if (parsed.error) return parsed.error;

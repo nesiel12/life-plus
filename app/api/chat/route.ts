@@ -5,8 +5,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
+import { rateLimitResponse } from "@/lib/api/rateLimit";
 
 export const runtime = "nodejs";
+
+const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 }; // 20 messages / 5 min
 
 const SYSTEM_PROMPT = `You are Atlas — a calm, personal life companion, not a generic assistant.
 You know Nesiel (נסיאל): he learns Torah daily, tracks a morning Seder, and builds AI/software
@@ -35,9 +38,12 @@ function mockReply(message: string): string {
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const limited = rateLimitResponse(`chat:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
+  if (limited) return limited;
 
   const parsed = await parseJsonBody(request, chatRequestSchema);
   if (parsed.error) return parsed.error;
