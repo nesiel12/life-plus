@@ -24,7 +24,6 @@ Each entry: what it is, why it's at that priority, where it lives, and what it d
 *Quality, refactors, UX consistency, maintainability.*
 
 - **No pagination anywhere a list renders** (`moments`, `goals`, `people`). Fine at current usage levels, won't scale indefinitely.
-- **No `loading.tsx` / `error.tsx` / `not-found.tsx` anywhere in `app/`.** Failures fall through to the default Next.js overlay instead of an on-brand state — more important now that real network/DB calls can actually fail mid-render.
 - **Form inputs rely on `placeholder` as their only label** across `QuickCapture`, `OnboardingFlow`, `GoalsPanel`, and the dashboard intention textarea — a known accessibility anti-pattern.
 - **Rate-limit thresholds are unvalidated guesses** (20/10/10 per 5 min) — reasonable defaults, not tuned against real usage. Revisit once there's real traffic to look at.
 - **Test coverage is currently just the pure-logic core.** Vitest + CI (lint/typecheck/test on every PR) are live (`.github/workflows/ci.yml`), covering `lib/utils.ts`'s date math and the calendar route's `computeFreeSlots`. Still open: integration tests for the API routes (auth-required, validation-rejects-bad-input, mock-fallback-when-no-key), component tests, and error tracking/structured logging — the rest of Phase 5's exit criterion.
