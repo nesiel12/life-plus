@@ -68,6 +68,7 @@ export function AreaMomentsView({ title, description, areaKey }: AreaMomentsView
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleAdd())}
             placeholder="מה קרה בתחום הזה?"
+            aria-label="תוכן הרגע"
             rows={2}
             className="mb-3 w-full resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
           />

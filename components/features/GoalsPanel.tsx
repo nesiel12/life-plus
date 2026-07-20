@@ -57,11 +57,13 @@ export function GoalsPanel() {
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleCreateGoal()}
           placeholder="יעד חדש, למשל: ללמוד מסכת חדשה"
+          aria-label="כותרת היעד החדש"
           className="flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
         />
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value as LifeAreaKey)}
+          aria-label="תחום החיים של היעד"
           className="rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground focus:outline-none"
         >
           {CATEGORY_OPTIONS.map((c) => (

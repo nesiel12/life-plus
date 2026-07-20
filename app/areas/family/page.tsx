@@ -117,6 +117,7 @@ export default function FamilyCarePage() {
                         onChange={(e) => setBirthdayDraft(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && saveBirthday(person.id)}
                         placeholder="MM-DD"
+                        aria-label={`תאריך יום הולדת של ${person.hebrewName ?? person.name} (חודש-יום)`}
                         className="ltr w-20 rounded-lg bg-white/5 px-2 py-1.5 text-xs text-foreground placeholder:text-muted focus:outline-none"
                         autoFocus
                       />

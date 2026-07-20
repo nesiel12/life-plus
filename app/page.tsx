@@ -59,6 +59,7 @@ export default function Home() {
             onChange={(e) => setDraft(e.target.value)}
             onBlur={() => setTodayIntention(draft)}
             placeholder="על מה תרצה להתמקד היום?"
+            aria-label="הכוונה של היום"
             rows={2}
             className="w-full resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
           />
