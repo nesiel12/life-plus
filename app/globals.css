@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0a0b;
+  --foreground: #f2f2f0;
+  --muted: #a1a1aa;
+
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.1);
+
+  /* Life-area accents */
+  --accent-faith: #d4af7a; /* soft gold / sand */
+  --accent-family: #e0a7ac; /* gentle rose */
+  --accent-knowledge: #7ba7d4; /* calm blue */
+  --accent-health: #8fbf9f; /* muted sage green */
+  --accent-career: #a89bd4; /* soft indigo */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-glass-bg: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+  --color-accent-faith: var(--accent-faith);
+  --color-accent-family: var(--accent-family);
+  --color-accent-knowledge: var(--accent-knowledge);
+  --color-accent-health: var(--accent-health);
+  --color-accent-career: var(--accent-career);
+  --font-sans: var(--font-heebo);
+}
+
+html {
+  direction: rtl;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Escape hatch for embedding LTR content (numbers, English, code) inside RTL layout */
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
