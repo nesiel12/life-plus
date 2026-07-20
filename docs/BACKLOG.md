@@ -11,32 +11,33 @@ Each entry: what it is, why it's at that priority, where it lives, and what it d
 ## Critical
 *Threatens security, data integrity, scalability, or production readiness.*
 
-- **No live database connection yet.** The schema and data-access layer exist (`supabase/migrations/`, `lib/db/`) but nothing has run against a real Postgres instance — the app still reads/writes only the in-memory Zustand store. Blocked on a live Supabase project's credentials. *Depends on: user creating a Supabase project.*
+*(none open)*
 
 ## High Priority
 *Architectural improvements that should land before any real user besides the current one touches this.*
 
-- **RLS policies are fail-closed placeholders, not active protection for the current access path.** Every table has RLS enabled with zero policies, which blocks the anon/authenticated keys entirely — but the app talks to Postgres via the service-role key, which bypasses RLS by design. The actual tenant-isolation boundary today is disciplined `user_id` filtering in `lib/db/*.ts`, not RLS. This is documented in the migration file; flagged here so it doesn't get mistaken for protection it doesn't provide if a future feature ever queries Supabase directly from the client. *Files: `supabase/migrations/20260720000000_init.sql`.*
+- **RLS policies are fail-closed placeholders, not active protection for the current access path.** Every table has RLS enabled with zero policies, which blocks the anon/authenticated keys entirely — but the app talks to Postgres via the service-role key, which bypasses RLS by design. The actual tenant-isolation boundary today is disciplined `user_id` filtering in `lib/db/*.ts` (verified live — see `scripts/verify-phase1.mjs`), not RLS. This is documented in the migration file; flagged here so it doesn't get mistaken for protection it doesn't provide if a future feature ever queries Supabase directly from the client. *Files: `supabase/migrations/20260720000000_init.sql`.*
 - **Torah Space file upload is fully mocked.** `handleFileSelected` ignores the uploaded file's actual content and returns an identical hardcoded summary every time. This is the single biggest gap between how a feature looks finished and how not-started it is. *Files: `app/areas/torah/page.tsx`. Depends on: a real transcription/summarization pipeline — Phase 4 territory.*
-- **"Accept" a calendar suggestion doesn't write to the user's actual Google Calendar.** It only appends to local state. *Files: `components/features/ScheduleSuggestions.tsx`, `store/useAtlasStore.ts` (`acceptSuggestion`). Depends on: Phase 1 completing (need somewhere durable to reconcile against) before this is worth doing properly.*
+- **"Accept" a calendar suggestion doesn't write to the user's actual Google Calendar.** It only appends to local state (now persisted to `upcoming_events`, but still not synced back to Google). Phase 1's dependency is cleared — this is now actionable. *Files: `components/features/ScheduleSuggestions.tsx`, `app/actions/upcomingEvents.ts`.*
 - **`gmail.readonly` scope requested, never used anywhere.** Either build the feature it implies or drop the scope — asking for unused access is a trust and OAuth-verification liability. *Files: `lib/auth.ts`.*
 - **In-memory rate limiter won't survive horizontal scaling.** `lib/api/rateLimit.ts` is correct for a single process; needs a shared store (Redis/Upstash) before Atlas ever runs more than one instance. *Files: `lib/api/rateLimit.ts`.*
 - **No tests, no CI.** Not a line item — its own roadmap phase (Phase 5). Listed here only so it isn't forgotten between now and then.
+- **Full end-to-end verification still pending a real browser session.** Phase 1's CRUD/isolation checks were run directly against the database (`scripts/verify-phase1.mjs`) since a real Google sign-in can't be driven from here — that proves the data layer is correct, but the actual click-through (sign in → hydrate → mutate → see it persist) hasn't been observed in a live browser yet.
 
 ## Medium Priority
 *Quality, refactors, UX consistency, maintainability.*
 
+- **Most mutation call sites don't surface Server Action failures to the user.** `QuickCapture`, `AreaMomentsView`, `app/areas/family/page.tsx`, and `OnboardingFlow` all call store actions fire-and-forget with no `.catch()` — a network blip or DB error now fails silently (console-only) instead of telling the user their moment/goal/birthday didn't save. `GoalsPanel` and `AICompanion` already handle this correctly via `useApiCall`; the rest should follow the same pattern. *Files: `components/features/QuickCapture.tsx`, `components/features/AreaMomentsView.tsx`, `app/areas/family/page.tsx`, `components/features/OnboardingFlow.tsx`.*
 - **`personalDNA` is collected at onboarding and then never read anywhere.** `peakFocusHours`/`learningStyle` don't influence chat tone or scheduling yet — onboarding currently produces data with no effect. *Files: `store/useAtlasStore.ts`, `components/features/OnboardingFlow.tsx`. Natural fit for Phase 4 ("make the AI actually central").*
-- **No pagination anywhere a list renders** (`moments`, `goals`, `people`). Fine at fixture-data scale, won't scale with real usage.
-- **No `loading.tsx` / `error.tsx` / `not-found.tsx` anywhere in `app/`.** Failures fall through to the default Next.js overlay instead of an on-brand state.
+- **No pagination anywhere a list renders** (`moments`, `goals`, `people`). Fine at current usage levels, won't scale indefinitely.
+- **No `loading.tsx` / `error.tsx` / `not-found.tsx` anywhere in `app/`.** Failures fall through to the default Next.js overlay instead of an on-brand state — more important now that real network/DB calls can actually fail mid-render.
 - **Form inputs rely on `placeholder` as their only label** across `QuickCapture`, `OnboardingFlow`, `GoalsPanel`, and the dashboard intention textarea — a known accessibility anti-pattern.
 - **Rate-limit thresholds are unvalidated guesses** (20/10/10 per 5 min) — reasonable defaults, not tuned against real usage. Revisit once there's real traffic to look at.
 
 ## Low Priority
 *Minor polish, cleanup, optimization.*
 
-- **`README.md` needs a real rewrite** — still close to `create-next-app` boilerplate despite the project having moved far past that. Worth doing once Phase 1's setup steps (Supabase env vars, migration command) are stable, so the README doesn't need a second rewrite immediately after.
-- **Seed/fixture data lives inside `store/useAtlasStore.ts`** rather than a separate fixtures module. Low cost now; should simply be deleted (not relocated) once Phase 1's persistence migration replaces the store's fixtures with real data.
+- **`README.md` needs a real rewrite** — still close to `create-next-app` boilerplate despite the project having moved far past that, and now needs the Supabase setup steps (env vars, `npm run db:migrate`) documented too.
 - **Dark-only theme, `color-scheme: dark` forced.** Recorded as a deliberate decision, not a defect — listed for visibility, not action.
 - **Bundle size** (~199KB shared First Load JS) is on the higher side for a "calm, fast" app. Not a problem yet; worth watching as more features land, especially once real Server Component data-fetching (Phase 1 follow-through) can claw some of it back.
 
