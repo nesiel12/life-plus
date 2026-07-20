@@ -1,6 +1,9 @@
 import type { NextAuthOptions } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
+import { getOrCreateUserByEmail } from "@/lib/db/users";
+import { lifeAreaScoresRepo } from "@/lib/db/lifeAreaScores";
+import { personalDnaRepo } from "@/lib/db/personalDna";
 
 const GOOGLE_SCOPES = [
   "openid",
@@ -110,6 +113,22 @@ export const authOptions: NextAuthOptions = {
         session.error = token.error;
       }
       return session;
+    },
+  },
+  events: {
+    // Runs after a sign-in the `signIn` callback already approved. Ensures a
+    // `users` row (and its dependent per-user rows) exists before any page
+    // tries to read/write data for this identity.
+    async signIn({ user }) {
+      if (!user.email) return;
+      const dbUser = await getOrCreateUserByEmail(user.email, {
+        name: user.name ?? user.email,
+        image: user.image,
+      });
+      await Promise.all([
+        lifeAreaScoresRepo.ensureDefaultsForUser(dbUser.id),
+        personalDnaRepo.upsert(dbUser.id, {}),
+      ]);
     },
   },
 };
