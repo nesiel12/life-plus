@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -14,9 +14,20 @@ interface AreaMomentsViewProps {
 
 export function AreaMomentsView({ title, description, areaKey }: AreaMomentsViewProps) {
   const area = useAtlasStore((s) => s.lifeAreas.find((a) => a.key === areaKey));
-  const moments = useAtlasStore((s) => s.moments.filter((m) => m.category === areaKey));
+  // Select the raw array (stable reference unless moments actually change) and
+  // derive the filtered list via useMemo, rather than filtering inside the
+  // Zustand selector itself — a selector that returns `.filter(...)` builds a
+  // new array on every call, so any store update (even one touching a
+  // completely different slice) looked like a change and re-rendered every
+  // mounted area page (docs/TECH_DEBT.md #15).
+  const allMoments = useAtlasStore((s) => s.moments);
   const addMoment = useAtlasStore((s) => s.addMoment);
   const [draft, setDraft] = useState("");
+
+  const moments = useMemo(
+    () => allMoments.filter((m) => m.category === areaKey),
+    [allMoments, areaKey]
+  );
 
   function handleAdd() {
     if (!draft.trim()) return;

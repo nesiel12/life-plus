@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, X, CalendarClock } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
@@ -19,12 +19,20 @@ export function ScheduleSuggestions() {
   const dismissSuggestion = useAtlasStore((s) => s.dismissSuggestion);
   const [connected, setConnected] = useState<boolean | null>(null);
 
+  // This fetch is deliberately mount-only — suggestions are computed once
+  // per page load, not re-fetched on every score change. A ref (rather than
+  // a `lifeAreas` dependency + eslint-disable, as before — see
+  // docs/TECH_DEBT.md #16) keeps the effect honest about that intent while
+  // still sending current scores, not a stale snapshot from first render.
+  const lifeAreasRef = useRef(lifeAreas);
+  lifeAreasRef.current = lifeAreas;
+
   useEffect(() => {
     let cancelled = false;
     fetch("/api/calendar/suggestions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lifeAreas }),
+      body: JSON.stringify({ lifeAreas: lifeAreasRef.current }),
     })
       .then((res) => res.json())
       .then((data) => {
@@ -38,8 +46,7 @@ export function ScheduleSuggestions() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setSuggestedActions]);
 
   if (connected === false) {
     return (
