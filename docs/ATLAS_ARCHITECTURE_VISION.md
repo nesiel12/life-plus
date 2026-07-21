@@ -282,6 +282,33 @@ Plain text, ready to drop into a system prompt or rationale string
 
 ---
 
-## 10. What this document is not
+## 10. Experience Layer — making the intelligence visible
 
-It is not a rewrite plan. Nothing in `app/`, `components/`, `lib/`, or `store/` needs to change shape to support §1–§9 — every "target" above is additive to what exists, and most of it (§2 v1, the personalDNA wiring in §3, the agent-shaped routes in §4, the Intelligence Engine in §9) either already works or is a small, bounded next step. Re-read `docs/BACKLOG.md` and `docs/ROADMAP_V2.md` for what's actually being worked on next; treat this document as the map those decisions get checked against, not a new backlog to work through top-to-bottom.
+**What it is:** the product-experience discipline that governs how everything §1–§9 built actually reaches the user. Every prior section was backend: memory, context, inferred patterns, feedback, ranking. None of it was visible anywhere except folded into LLM prompts. This section is about exposure, not new capability — no new engine, no new AI architecture, explicitly out of scope per this milestone's own constraints.
+
+**Interaction philosophy.** Atlas should never read as a dashboard, a spreadsheet, a form, an admin panel, or a database viewer — every screen answers *"what matters right now"*, not *"here is all your data."* Concretely, that means: a screen leads with synthesis (a ranked, prioritized view) before it lists raw records; empty states are quiet, not gamified ("no data yet, keep going!" is a dopamine loop, not calm design — an empty `AIBriefing` simply doesn't render, the same way `ScheduleSuggestions` already did nothing rather than show a fake "you're all caught up!" card); and nothing is invented to fill a section that has no real signal behind it yet.
+
+**UI principles, applied this milestone:**
+- **Reuse before inventing.** `AIBriefing`'s confidence-adjacent styling reuses the exact thin-progress-bar primitive `GoalsPanel` and the areas hub already use for score/progress — a new visual language for "here's a number 0–100" would have been an inconsistency, not an improvement. Every new component (`AIBriefing`, the redesigned `ScheduleSuggestions` cards) is built from `GlassCard`, the existing accent-color tokens, and the existing spacing scale — no new design tokens introduced.
+- **No fabricated personalization.** The dynamic greeting (`lib/greeting.ts`) is real — computed from the browser's actual clock, not a canned rotation of phrases. Calendar suggestions' new confidence indicator (`lib/suggestionConfidence.ts`) is a real, deterministic function of how far a life area lags the average of all areas — not an invented "AI confidence" number with no basis. Where a genuinely real signal wasn't cheaply available (a "you completed two milestones yesterday" achievement line would have needed exposing `milestones.completed_at` further up the stack than this milestone touches), the section was left out rather than faked — see `docs/BACKLOG.md`.
+- **Explainability made concrete, not just theoretical.** §9 already gave every ranked signal a `reason` and a confidence-based hedge; `AIBriefing` is the first surface where a person, not a model, reads that hedge (`ביטחון נמוך`) directly.
+
+**Motion philosophy.** Nothing new was introduced — the existing conventions (`framer-motion`, 0.25–0.5s durations, `easeOut`, `y`-offset fades, no spring/bounce physics, staggered `delay` per list item) were already correct and are what every new component (`AIBriefing`'s skeleton-to-content transition, the redesigned suggestion cards) follows. Motion communicates arrival order and hierarchy (later `delay` = lower priority on the page), never decoration.
+
+**Decision transparency.** Every number shown to the user in this milestone traces to a named, documented, testable function: `computeSuggestionConfidence` (suggestion confidence), `rankSignals`'s `score`/`reason` (briefing ordering and its `ביטחון נמוך` hedge), `detectPriorityConflicts` (the gentle "competing priorities" note). Nothing in the Experience Layer is a black box the backend can't already explain — this section exposes §9's explainability model, it doesn't add a second one.
+
+**What shipped this milestone (Experience Layer v1) — audited, prioritized, and scoped from the full brief, not attempted wholesale:**
+- Dynamic, real time-of-day greeting (`app/page.tsx`, `lib/greeting.ts`).
+- `AIBriefing` — the flagship "what matters right now" card, `app/api/briefing/route.ts` + `components/features/AIBriefing.tsx`, the first non-LLM consumer of the Intelligence Engine (§9).
+- Upgraded recommendation cards (`ScheduleSuggestions.tsx`): real effort (slot duration), real confidence (a progress bar, reusing the existing primitive), clearer accept/dismiss actions. "Modify" was deliberately not added as a UI action — no real modify flow exists anywhere in the app yet (`recommendation_events.status` supports `modified`, but nothing produces it), and a button with no real behavior behind it would be exactly the fabricated interaction this layer exists to avoid.
+- Today page reassembled around the briefing as the hero, without touching any underlying business logic — every existing store action, Server Action, and data flow is untouched.
+
+**Explicitly deferred to Experience Layer v2** (audited, not forgotten — see `docs/BACKLOG.md` for the full list): Timeline/Goals/Learning/Torah/Relationships experience redesigns (each currently functional and calm, but plain — task lists and logs, not journeys); a full cross-app motion and design-consistency audit; a full accessibility audit beyond what new components got individually (keyboard, ARIA, focus management, contrast, reduced-motion, touch targets); visual-intelligence indicators (pattern/momentum/streak badges) beyond `AIBriefing`'s category icons; and any UI for the recommendation-feedback `modified` status, which needs a real edit flow to exist first.
+
+**Trigger for the next increment:** the same audit discipline applied to Today gets applied to one more screen — Timeline is the natural next candidate (`docs/BACKLOG.md` already flags it as moments-only when it could span goals/knowledge/health) — once there's real usage data suggesting which of the deferred screens actually needs it most, rather than working the list top-to-bottom by assumption.
+
+---
+
+## 11. What this document is not
+
+It is not a rewrite plan. Nothing in `app/`, `components/`, `lib/`, or `store/` needs to change shape to support §1–§10 — every "target" above is additive to what exists, and most of it (§2 v1, the personalDNA wiring in §3, the agent-shaped routes in §4, the Intelligence Engine in §9, the Experience Layer in §10) either already works or is a small, bounded next step. Re-read `docs/BACKLOG.md` and `docs/ROADMAP_V2.md` for what's actually being worked on next; treat this document as the map those decisions get checked against, not a new backlog to work through top-to-bottom.
