@@ -83,6 +83,7 @@ export interface Milestone {
   id: string;
   title: string;
   done: boolean;
+  completedAt?: string; // ISO date; set only going forward (see migration 20260720000003)
 }
 
 export interface Goal {

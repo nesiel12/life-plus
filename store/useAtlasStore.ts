@@ -160,7 +160,16 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
           ? {
               ...g,
               milestones: g.milestones.map((m) =>
-                m.id === milestoneId ? { ...m, done: !m.done } : m
+                m.id === milestoneId
+                  ? {
+                      ...m,
+                      done: !m.done,
+                      // Mirrors the server's completed_at write (lib/db/goals.ts)
+                      // optimistically, so the Timeline reflects a real
+                      // completion moment immediately rather than after a refetch.
+                      completedAt: !m.done ? new Date().toISOString() : undefined,
+                    }
+                  : m
               ),
             }
           : g

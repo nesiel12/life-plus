@@ -124,6 +124,11 @@ export function toGoal(row: GoalWithMilestones): Goal {
     category: row.category,
     createdAt: row.created_at,
     targetDate: row.target_date ?? undefined,
-    milestones: row.milestones.map((m) => ({ id: m.id, title: m.title, done: m.done })),
+    milestones: row.milestones.map((m) => ({
+      id: m.id,
+      title: m.title,
+      done: m.done,
+      completedAt: m.completed_at ?? undefined,
+    })),
   };
 }
