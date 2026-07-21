@@ -177,26 +177,53 @@ The trigger is deliberately simple — re-analyze once per app open, not per-mut
 
 ---
 
-## 7. Intelligence Layer / Self-Improvement Loop
+## 7. Intelligence Layer / Self-Improvement Loop — Recommendation Intelligence & Feedback Loop v1
 
-**What it is:** tracking which AI recommendations get accepted, rejected, or modified, and feeding that back into future suggestions.
+**What it is:** tracking which AI recommendations get accepted, rejected, or modified, and feeding that back into future suggestions. This is the missing half of the loop the rest of this document describes: §3 (Personal DNA) infers patterns from what the user *does*; this layer records what Atlas *suggested* and what the user did about it — the ingredient §3's own "What's still open" section flagged as not yet wired.
 
-**Current state:** does not exist. `acceptSuggestion`/`dismissSuggestion` change local+DB state but nothing records *that a recommendation was made and what happened to it* as its own fact.
+**Current state — v1 shipped.** `recommendation_events` (migration `20260720000005`) is a durable log, one row per suggestion Atlas ever surfaces: `type`, `source`, `recommendation_payload` (jsonb — the suggestion's actual content, so later analysis never needs to reconstruct it from a join), `status`, `metadata` (jsonb, deliberately unused today beyond `{}` — headroom for whatever a future consumer needs without a schema change), `created_at`, `responded_at`.
 
-**Target:** a lightweight `recommendation_events` table (`user_id`, `kind`, `payload`, `outcome` [`accepted`/`dismissed`/`modified`], `created_at`) that every "Atlas suggested X" surface writes to. This is cheap to add and valuable early (even before there's enough volume to actually learn from it, it's the historical record that later analysis depends on — the mistake to avoid is *not* logging it now and having no data once it's wanted).
+**Status model** — five states, but only one has any valid outgoing transition:
+```
+pending → accepted | rejected | modified | expired
+```
+Once a user has responded (or a suggestion times out unanswered), that's final for v1 — there's no "un-reject" flow. Enforced twice, deliberately redundantly: atomically in `lib/db/recommendationEvents.ts`'s `recordOutcome` (a conditional `UPDATE ... WHERE status = 'pending'`, not a read-then-write — race-safe by construction), and explainably in `lib/intelligence/recommendations/feedback.ts`'s `isValidStatusTransition` (pure, unit-tested, the human-readable statement of the same rule).
 
-**Trigger to build:** the next time a new suggestion-surfacing feature ships (calendar suggestions already exist and could be retrofitted cheaply; a second surface — e.g. a Torah "related session" suggestion — makes the pattern worth generalizing rather than one-off).
+**Feedback weighting** (`feedback.ts`, deterministic, -1..1):
+| Status | Weight | Why |
+|---|---|---|
+| accepted | 1.0 | Reinforces future suggestions like this one |
+| modified | 0.3 | Soft positive — the user engaged and adapted it rather than rejecting it outright; the shape was roughly right |
+| rejected | -1.0 | Discourages future suggestions like this one |
+| expired | -0.2 | Atlas's operational meaning of "ignored" — per explicit instruction, silence is never treated as a strong rejection |
+| pending | 0.0 | No signal yet |
+
+`calculateFeedbackConfidenceAdjustment` averages weight across a group of events into one signal; `summarizeRecommendationOutcomes` groups by `type` and only reports a group once it has ≥3 responses (noise floor, same reasoning as Personal DNA's evidence thresholds). Both are pure and fully unit-tested — no ML, every number traceable to actual accept/reject counts.
+
+**Integration, this session — tracking added to the two surfaces that generate real suggestions today:**
+- **Calendar suggestions** — each suggestion becomes a `pending` `recommendation_event` *before* it reaches the client; its real database id (not a client-random one, as before) becomes `SuggestedAction.id`. `acceptSuggestion`/`dismissSuggestion` in `store/useAtlasStore.ts` now also call `recordRecommendationOutcomeAction` (a thin Server Action) after the real action completes — accept records `accepted`, the explicit "ignore" button records `rejected` (it's an active user choice, not passive silence, so the stronger weight is correct).
+- **Goal breakdown** — recorded as `accepted` at generation time, not `pending`: `GoalsPanel` has no review step (the returned milestones are applied to a new goal the instant they arrive), so a `pending` event here would be one nothing could ever transition out of. Payload includes `usedAI: boolean` so the real-AI and generic-fallback paths (`/api/goals/breakdown`'s existing honest-fallback behavior) are distinguishable in later analysis.
+- **Chat and Torah — deliberately not touched.** Chat doesn't currently generate a structured, actionable suggestion a user can accept/reject (just conversation) — there's nothing to track yet. Torah extraction's interface (`createRecommendationEvent`'s `type`/`source` are free strings, no schema change needed) is ready for it, per this milestone's explicit "prepare the interface, don't build speculative flows" instruction — no Torah-specific code was added.
+
+**Read path — `getRecommendationInsights(userId)`:** feeds `AtlasContext.recommendationInsights` (Context Engine, §5) with the highest-signal summaries (`"הצעות ליומן: מתקבלות בכ-80% מהמקרים (4 מתוך 5)."`), surfaced in chat's system prompt alongside personalPatterns. Starts empty — like every other inference layer in this document, it organically populates as real accept/reject events accumulate, rather than being seeded with anything invented.
+
+**Deliberately not built this session** (per explicit scope and "clean interfaces, no tight coupling"):
+- **Personal DNA does not consume recommendation feedback yet.** `resolvePatternUpdate` (§3) and `calculateFeedbackConfidenceAdjustment` (this section) are two separate, independently-testable confidence mechanisms — the former reconciles a pattern against its own history, the latter aggregates suggestion outcomes. Wiring feedback *into* pattern confidence (e.g., a rejected `family`-category calendar suggestion nudging that life area's `peakActivityWindow` pattern down) is real future value, but doing it now would mean designing a coupling contract ahead of evidence for what it should actually look like.
+- **No active `expired` sweep.** The status exists and is fully handled by the feedback model, but nothing yet marks a long-pending suggestion `expired` — that needs a scheduled job, which is Notification Agent (§4) territory and equally deferred there.
+- **Calendar suggestion ranking still doesn't consult `recommendationInsights`** — same "foundation, not rebuild" scope as §3's calendar integration.
+
+**Trigger for the next increment:** enough `accepted`/`rejected` volume exists that a concrete surface (most likely calendar suggestions, since it already has the richest signal) would visibly benefit from feedback-adjusted ranking — at that point, design the Personal DNA coupling deliberately rather than reactively.
 
 ---
 
 ## 8. Database evolution
 
-Current schema (`supabase/migrations/`) — 13 tables, all user-scoped, all applied and verified live: `users`, `life_area_scores`, `people`, `moments`, `upcoming_events`, `knowledge_entries`, `daily_intentions`, `personal_dna`, `goals`, `milestones`, `chat_messages`, `insights`, `health_logs`.
+Current schema (`supabase/migrations/`) — 15 tables, all user-scoped (directly or via a foreign key), all applied and verified live: `users`, `life_area_scores`, `people`, `moments`, `upcoming_events`, `knowledge_entries`, `daily_intentions`, `personal_dna`, `goals`, `milestones` (now with `completed_at`), `chat_messages`, `insights`, `health_logs`, `personal_patterns`, `recommendation_events`.
 
-This schema already *is* the Memory Engine's storage layer (§2) and the Personal DNA Engine's storage layer (§3) — nothing about "adding memory" requires new tables today. The near-term database work implied by this document, in priority order:
+This schema already *is* the Memory Engine's storage layer (§2), the Personal DNA Engine's storage layer (§3), and — as of this session — the Recommendation Intelligence layer's storage (§7). The near-term database work implied by this document, in priority order:
 
-1. **Nothing, for Memory Engine v1** — it reads existing tables.
-2. **`recommendation_events`** (§7) — small, additive, no dependencies.
+1. **Nothing, for Memory Engine v1** — it reads existing tables. *(done)*
+2. **`recommendation_events`** (§7) — small, additive, no dependencies. *(done, migration `20260720000005`)*
 3. **`tsvector` + GIN index columns** on `moments`, `knowledge_entries`, `insights` — for Memory Engine v2, once v1 shows the need.
 4. **`pgvector` extension + `embedding` columns** — for Memory Engine v3, gated as described in §2.
 
