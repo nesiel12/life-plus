@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Sparkles, Trash2, Target } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Sparkles, Target } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { GoalJourneyCard } from "@/components/features/GoalJourneyCard";
 import { useApiCall } from "@/hooks/useApiCall";
+import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import { cn } from "@/lib/utils";
+import { LIFE_AREA_LIST } from "@/lib/lifeAreas";
 import type { LifeAreaKey } from "@/types";
-
-const CATEGORY_OPTIONS: LifeAreaKey[] = ["faith", "family", "knowledge", "health", "career"];
+import type { GoalInsight } from "@/lib/goals/types";
 
 export function GoalsPanel() {
   const goals = useAtlasStore((s) => s.goals);
@@ -19,6 +20,36 @@ export function GoalsPanel() {
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<LifeAreaKey>("knowledge");
+
+  // Goals Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §4): the "smart"
+  // per-goal layer — stage, estimated completion, next recommended action,
+  // related memory — fetched from app/api/goals/insights the same
+  // client-side-on-mount way AIBriefing/ScheduleSuggestions already
+  // established. Keyed by goalId so a card can render instantly from the
+  // live store and layer the insight in once it arrives.
+  const [insights, setInsights] = useState<Record<string, GoalInsight>>({});
+  // Bumped after any mutation that changes stage/progress/next-action
+  // (toggle, accept, create, remove) — same "bump a counter to re-run an
+  // effect" idiom app/layout's AppShell already uses for its retry button.
+  const [refreshToken, setRefreshToken] = useState(0);
+  const refreshInsights = () => setRefreshToken((t) => t + 1);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/goals/insights")
+      .then((res) => (res.ok ? res.json() : { goals: [] }))
+      .then((data: { goals: GoalInsight[] }) => {
+        if (cancelled) return;
+        setInsights(Object.fromEntries(data.goals.map((insight) => [insight.goalId, insight])));
+      })
+      .catch(() => {
+        // Insights are a progressive enhancement — a failed fetch just means
+        // cards stay in their base (store-only) form, not an error state.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshToken, goals.length]);
 
   const {
     loading: breaking,
@@ -44,6 +75,37 @@ export function GoalsPanel() {
     });
   }
 
+  function handleToggleMilestone(goalId: string, milestoneId: string) {
+    toggleMilestone(goalId, milestoneId).then(refreshInsights);
+  }
+
+  function handleRemove(goalId: string) {
+    removeGoal(goalId).then(refreshInsights);
+  }
+
+  // "Accept" the recommended next action is, concretely, completing that
+  // milestone — there's no separate "I intend to" state, the same way
+  // checking a milestone off already works everywhere else in the app.
+  // Recording the outcome (Recommendation Intelligence's feedback loop,
+  // docs/ATLAS_ARCHITECTURE_VISION.md §7) reuses the exact Server Action
+  // store/useAtlasStore.ts's acceptSuggestion/dismissSuggestion already call
+  // for calendar suggestions — no new tracking mechanism for this surface.
+  function handleAcceptNextAction(goalId: string, milestoneId: string, recommendationEventId: string) {
+    toggleMilestone(goalId, milestoneId).then(refreshInsights);
+    recordRecommendationOutcomeAction(recommendationEventId, "accepted").catch((err) => {
+      console.error("Failed to record recommendation outcome:", err);
+    });
+  }
+
+  function handleDismissNextAction(goalId: string, recommendationEventId: string) {
+    setInsights((prev) =>
+      prev[goalId] ? { ...prev, [goalId]: { ...prev[goalId], nextAction: null } } : prev
+    );
+    recordRecommendationOutcomeAction(recommendationEventId, "rejected").catch((err) => {
+      console.error("Failed to record recommendation outcome:", err);
+    });
+  }
+
   return (
     <GlassCard delay={0.25}>
       <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
@@ -66,9 +128,9 @@ export function GoalsPanel() {
           aria-label="תחום החיים של היעד"
           className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
         >
-          {CATEGORY_OPTIONS.map((c) => (
-            <option key={c} value={c} className="bg-background">
-              {categoryLabel(c)}
+          {LIFE_AREA_LIST.map((area) => (
+            <option key={area.key} value={area.key} className="bg-background">
+              {categoryLabel(area.key)}
             </option>
           ))}
         </select>
@@ -84,59 +146,23 @@ export function GoalsPanel() {
 
       {breakdownError && <p className="mb-4 text-xs text-accent-family">{breakdownError}</p>}
 
-      <ul className="flex flex-col gap-4">
-        {goals.map((goal, gi) => {
-          const doneCount = goal.milestones.filter((m) => m.done).length;
-          const progress = goal.milestones.length
-            ? Math.round((doneCount / goal.milestones.length) * 100)
-            : 0;
-          return (
-            <motion.li
-              key={goal.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: gi * 0.05, ease: "easeOut" }}
-              className="rounded-xl bg-white/5 p-3"
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{goal.title}</p>
-                  <span className="text-xs text-muted">{categoryLabel(goal.category)}</span>
-                </div>
-                <button
-                  onClick={() => removeGoal(goal.id)}
-                  className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
-                  aria-label="מחק יעד"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-
-              <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
-                <div
-                  className="h-full rounded-full bg-accent-faith"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-
-              <ul className="flex flex-col gap-1.5">
-                {goal.milestones.map((m) => (
-                  <li key={m.id} className="flex items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={m.done}
-                      onChange={() => toggleMilestone(goal.id, m.id)}
-                      className="accent-current"
-                    />
-                    <span className={cn(m.done && "text-muted line-through")}>{m.title}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.li>
-          );
-        })}
+      <div className="flex flex-col gap-4">
+        {goals.map((goal, gi) => (
+          <GoalJourneyCard
+            key={goal.id}
+            goal={goal}
+            insight={insights[goal.id]}
+            delay={gi * 0.05}
+            onToggleMilestone={(milestoneId) => handleToggleMilestone(goal.id, milestoneId)}
+            onRemove={() => handleRemove(goal.id)}
+            onAcceptNextAction={(milestoneId, recommendationEventId) =>
+              handleAcceptNextAction(goal.id, milestoneId, recommendationEventId)
+            }
+            onDismissNextAction={(recommendationEventId) => handleDismissNextAction(goal.id, recommendationEventId)}
+          />
+        ))}
         {goals.length === 0 && <p className="text-sm text-muted">אין עדיין יעדים פעילים.</p>}
-      </ul>
+      </div>
     </GlassCard>
   );
 }

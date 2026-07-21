@@ -3,7 +3,11 @@ import type { PatternCandidate } from "@/lib/intelligence/personalDNA/types";
 const MIN_GOALS_FOR_TASK_SIZE = 3;
 const MIN_COMPLETION_RATE_DIFF = 0.15; // groups must differ by at least this much to count as a real signal
 const MIN_OPEN_GOALS_FOR_MOMENTUM = 2;
-const STAGNATION_DAYS = 14;
+// Exported for lib/goals/deriveGoalStage.ts (Goals Experience v2) — a
+// single goal's "stuck" stage should mean exactly the same 14-day threshold
+// this analyzer already uses to flag stagnation across goals in aggregate,
+// not a second number that could drift from it.
+export const STAGNATION_DAYS = 14;
 const MIN_STAGNANT_SHARE = 0.4; // at least 40% of open goals stalled to call it a pattern
 const MIN_COMPLETED_MILESTONES_FOR_PACE = 3;
 const PACE_CONFIDENT_COUNT = 10; // evidence count at which pace strength saturates

@@ -27,8 +27,11 @@ const CATEGORY_DEFAULTS: Record<SignalCategory, { importance: number; confidence
 // A life area sitting well below balance matters more to surface than one
 // that's fine — the same "weakest area wins" rule calendar suggestions
 // already ranks by (lib/api/calendar/suggestions/route.ts), expressed here
-// as an importance boost instead of a bespoke sort.
-const WEAK_LIFE_AREA_SCORE_THRESHOLD = 40;
+// as an importance boost instead of a bespoke sort. Exported so Goals
+// Experience v2 (app/api/goals/insights) can flag a goal sitting in a weak
+// life area using the exact same threshold, rather than picking a second
+// number that means the same thing.
+export const WEAK_LIFE_AREA_SCORE_THRESHOLD = 40;
 const WEAK_LIFE_AREA_IMPORTANCE = 0.75;
 
 interface SignalOverrides {
