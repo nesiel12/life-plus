@@ -231,6 +231,57 @@ RLS stays exactly as documented in `docs/BACKLOG.md`: enabled fail-closed on eve
 
 ---
 
-## 9. What this document is not
+## 9. Atlas Intelligence Engine — the unified decision pipeline
 
-It is not a rewrite plan. Nothing in `app/`, `components/`, `lib/`, or `store/` needs to change shape to support §1–§8 — every "target" above is additive to what exists, and most of it (§2 v1, the personalDNA wiring in §3, the agent-shaped routes in §4) either already works or is a small, bounded next step. Re-read `docs/BACKLOG.md` and `docs/ROADMAP_V2.md` for what's actually being worked on next; treat this document as the map those decisions get checked against, not a new backlog to work through top-to-bottom.
+**What it is:** the layer that turns four independent intelligence sources (Memory §2, Context Engine §5, Personal DNA §3, Recommendation feedback §7) into one deterministic, explainable, ranked signal every AI-backed route consumes — instead of each route independently deciding, by hand, which facts to mention and in what order.
+
+**This is explicitly not an agent, an orchestrator, or a workflow engine.** There's no event bus, no autonomous decision-making, no ML, no embeddings beyond what Memory Engine v1 already uses (plain keyword ranking), no prediction. It's a pure, synchronous transformation of data the Context Engine already fetched — `AtlasContext in, ranked signals out` — that happens to live in its own module because the transformation itself (normalize → rank → check for competing priorities → render) is now genuinely shared across four call sites, not because it needed a grander name.
+
+**Why now, not before — the audit that justified it:** before this milestone, `lib/chatSystemPrompt.ts`, `/api/goals/breakdown`, and `/api/torah/extract` each independently called `joinContextSections([formatContextSection(...), ...])` with an author-picked, hardcoded section order and category subset — the same "assemble text from AtlasContext" pattern written three times, differing only in which sections and what order. `/api/calendar/suggestions` had a lighter version of the same problem: `relationshipSignals[0]` and `personalPatterns.find(...)` — "pick whichever matters most," decided by array position rather than any actual comparison. That's real, demonstrated duplication (not a hypothetical one), which is what justified building this rather than leaving each route to hand-roll its own ordering indefinitely.
+
+**Signal lifecycle — the five stages:**
+
+```
+AtlasContext (already fetched by the Context Engine, §5)
+        ↓  Stage 1: Collect — nothing to do here; §5 already did it
+AtlasContext's 8 fields (personalDNA, activeGoals, lifeAreas, upcomingEvents,
+relevantMemory, relationshipSignals, personalPatterns, recommendationInsights)
+        ↓  Stage 2: Normalize — buildIntelligenceSignals()
+IntelligenceSignal[] — every item classified into one of 8 categories, with
+category-level importance/confidence and (currently flat) recency
+        ↓  Stage 3: Rank — rankSignals()
+RankedSignal[] — score = 0.5·importance + 0.3·confidence + 0.2·recency,
+sorted descending, deterministic category-priority tie-break
+        ↓  Stage 4: Conflict detection — detectPriorityConflicts()
+PriorityConflict[] — competing high-ranked categories flagged, not resolved
+        ↓  Stage 5: Prompt assembly — formatSignalsForPrompt()
+Plain text, ready to drop into a system prompt or rationale string
+```
+
+**Stage 2 — normalize** (`lib/intelligence/core/normalize.ts`). `buildIntelligenceSignals(context: AtlasContext)` maps every field to a `SignalCategory` (`personalDNA`, `personalPattern`, `goal`, `lifeArea`, `upcomingEvent`, `relationship`, `memory`, `recommendation`). A documented, deliberate simplification: AtlasContext's fields arrive as **already-formatted strings** (§5's own design — "callers don't need to know the underlying entity shapes"), which means the original per-item numeric confidence some of these came from (a personalPattern's real confidence score, a memory item's real recency) was already discarded before reaching this boundary. Recovering it would mean widening AtlasContext's contract for every existing consumer just to serve this one new one — not justified by real duplication, so it wasn't done. Instead, normalization applies **category-level** defaults (a stated preference is more certain than an inferred pattern; a dated commitment is more certain than a possibly-stale memory) — every default is a named constant in `CATEGORY_DEFAULTS`, not a magic number. One real per-item signal *is* computed here: a life area scoring below 40 gets an importance boost, the same "weakest area matters most" rule calendar suggestions already ranked by, now expressed once instead of reimplemented.
+
+**Stage 3 — rank** (`lib/intelligence/core/rank.ts`). `score = 0.5·importance + 0.3·confidence + 0.2·recency` — importance weighted highest (it's the category-level "does this matter" judgment), confidence next (so a low-certainty inference can't outrank a well-evidenced one just by being tagged important), recency smallest. **Honest limitation, stated plainly:** recency is flat at 1.0 for every signal in v1, because real per-item recency isn't recoverable at the AtlasContext boundary either (same reasoning as Stage 2) — the term stays in the formula, not hardcoded away, so a future signal source that does carry real timestamps slots in without changing the scoring contract. Ties break on an explicit, documented category-priority order (dated commitments → active commitments → relationships → what Atlas knows about the person → retrieved history → ambient state → aggregate feedback), then on input order via `Array.prototype.sort`'s guaranteed stability (ES2019+) — fully deterministic, verified by a dedicated stable-ordering test.
+
+**Stage 4 — conflict detection** (`lib/intelligence/core/conflicts.ts`), scoped honestly. True temporal conflict detection ("this suggestion collides with a real calendar slot," the kind of reasoning in this milestone's own illustrative example) would need structured start/end times on every signal type — most (goals, relationships, memory, personalDNA) don't carry one, for the same reason recency doesn't. What v1 actually detects: **priority competition** — among the top 5 ranked signals, category pairs that routinely compete for the same attention (`goal`↔`relationship`, `goal`↔`upcomingEvent`, `relationship`↔`upcomingEvent`) get flagged with a plain-language note. This is real and useful — it tells a caller "you're choosing between two genuine priorities" — without pretending to a scheduling-collision capability the data doesn't support. Checked against the *top of the ranking* rather than an absolute score threshold: an absolute cutoff turned out to be miscalibrated against `CATEGORY_DEFAULTS` during development (most categories clear a naive 0.7 threshold by construction, regardless of content) — using rank position instead sidesteps re-tuning a threshold against defaults that live in a different file.
+
+**Stage 5 — explainability & rendering** (`lib/intelligence/core/format.ts`). Every `RankedSignal` carries a `reason` string (e.g., "חשיבות גבוהה, ביטחון גבוה") — Atlas can always answer "why is this here" for any signal, even though `formatSignalsForPrompt` doesn't inline the full reason into every prompt line (would bloat the prompt for no benefit the LLM needs). What it *does* inline: a `(ביטחון נמוך)` hedge on any signal below 0.5 confidence, so a weak inference is never rendered with the same authority as a certain fact — literally "if confidence is low, say so," as instructed.
+
+**Integration — four surfaces, functionally-identical behavior, infrastructure-only change:**
+| Route | Categories considered | What changed |
+|---|---|---|
+| `/api/chat` (`lib/chatSystemPrompt.ts`) | all 8 | Previously 8 hardcoded titled sections in a fixed order; now one ranked list, competing-priority notes surfaced when relevant. |
+| `/api/goals/breakdown` | personalDNA, personalPattern, goal, memory | Previously a hand-picked 3-section block plus a separately-special-cased `learning_style` note; now personalDNA is a normal signal like everything else, one call replaces both. |
+| `/api/torah/extract` | memory | Scope unchanged (it only ever used `relevantMemory`) — same information, now ranked instead of dumped in arrival order. |
+| `/api/calendar/suggestions` | relationship, personalPattern | Not an LLM prompt — enriches rationale text. `relationshipSignals[0]` → top-ranked relationship signal; `personalPatterns.find(...)` → top-ranked matching personalPattern signal. Suggestion *ranking* (which life area, which slot) is untouched. |
+
+**Performance:** the engine adds zero DB queries — it's a pure, synchronous transform over data `buildAtlasContext` already fetched in one parallelized `Promise.all` (§5, unchanged). Normalizing and ranking a few dozen signals is a single `O(n log n)` sort; each route calls it exactly once per request. No new allocation pattern beyond mapping small arrays. The engine is not on a hot path different from where `buildAtlasContext` already was.
+
+**What's deliberately not built:** literal calendar-collision conflict detection (§ above); real per-signal recency (needs AtlasContext's contract to widen, not justified by current duplication); feeding `detectPriorityConflicts`' output into anything beyond a chat-prompt note (e.g., actually re-ranking calendar suggestions around a detected conflict); any structured coupling to Personal DNA confidence (`resolvePatternUpdate`, §3) or recommendation feedback (`calculateFeedbackConfidenceAdjustment`, §7) beyond both already being inputs to the *same* signals this engine ranks — genuinely a v2 concern, once real usage shows what the coupling should look like.
+
+**Trigger for the next increment:** a fifth AI-backed surface ships (validates the abstraction generalizes past four hand-picked call sites), or real per-item recency becomes available at the AtlasContext boundary for a concrete reason (e.g., Memory Engine v2's full-text search naturally exposing it) — at that point recency stops being a constant and the scoring formula's weights are worth re-examining against real data instead of the initial, reasoned-but-untested 0.5/0.3/0.2 split.
+
+---
+
+## 10. What this document is not
+
+It is not a rewrite plan. Nothing in `app/`, `components/`, `lib/`, or `store/` needs to change shape to support §1–§9 — every "target" above is additive to what exists, and most of it (§2 v1, the personalDNA wiring in §3, the agent-shaped routes in §4, the Intelligence Engine in §9) either already works or is a small, bounded next step. Re-read `docs/BACKLOG.md` and `docs/ROADMAP_V2.md` for what's actually being worked on next; treat this document as the map those decisions get checked against, not a new backlog to work through top-to-bottom.
