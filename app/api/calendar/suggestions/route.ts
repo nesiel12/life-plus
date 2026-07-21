@@ -6,6 +6,7 @@ import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
 import { computeFreeSlots } from "@/lib/calendarFreeSlots";
 import { momentCategoryLabel } from "@/lib/lifeAreas";
+import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
 import type { MomentCategory, SuggestedAction } from "@/types";
 
 export const runtime = "nodejs";
@@ -93,31 +94,43 @@ export async function POST(request: NextRequest) {
 
     const weakestAreas = [...lifeAreas].sort((a, b) => a.score - b.score).slice(0, MAX_SUGGESTIONS);
 
-    const suggestions: SuggestedAction[] = freeSlots.slice(0, weakestAreas.length).map((slot, i) => {
-      const area = weakestAreas[i];
-      // Relationship Intelligence feeding scheduling, not just chat: a
-      // family-category suggestion names the specific person Atlas already
-      // knows is overdue for contact, instead of a generic prompt.
-      const relationshipNote =
-        area.key === "family" && relationshipSignals.length > 0 ? ` ${relationshipSignals[0]}.` : "";
-      // Personal DNA Engine v1's foundation for scheduling (docs/ATLAS_
-      // ARCHITECTURE_VISION.md §3/§5): if a confident focus-window pattern
-      // exists for this area, surface it in the rationale. Ranking itself
-      // (which area/slot gets suggested) is untouched — this only makes the
-      // *explanation* smarter, deliberately short of rebuilding scheduling
-      // around energy/focus windows yet.
-      const areaLabel = momentCategoryLabel(area.key);
-      const focusPattern = personalPatterns.find((pattern) => pattern.includes(areaLabel));
-      const focusNote = focusPattern ? ` ${focusPattern}` : "";
-      return {
-        id: Math.random().toString(36).slice(2, 10),
-        title: ACTION_BY_CATEGORY[area.key],
-        category: area.key,
-        start: slot.start.toISOString(),
-        end: slot.end.toISOString(),
-        rationale: `זה התחום עם המדד הכי נמוך כרגע (${area.score}%), ומצאתי לו חלון פנוי ביומן.${relationshipNote}${focusNote}`,
-      };
-    });
+    // Each suggestion becomes a recommendation_event up front, in `pending`
+    // status — the write-path half of the feedback loop (docs/ATLAS_
+    // ARCHITECTURE_VISION.md §7). Its real id (not a client-random one) is
+    // what the client gets back as SuggestedAction.id, so accept/dismiss
+    // can later record an outcome against the same row.
+    const suggestions: SuggestedAction[] = await Promise.all(
+      freeSlots.slice(0, weakestAreas.length).map(async (slot, i) => {
+        const area = weakestAreas[i];
+        // Relationship Intelligence feeding scheduling, not just chat: a
+        // family-category suggestion names the specific person Atlas already
+        // knows is overdue for contact, instead of a generic prompt.
+        const relationshipNote =
+          area.key === "family" && relationshipSignals.length > 0 ? ` ${relationshipSignals[0]}.` : "";
+        // Personal DNA Engine v1's foundation for scheduling (docs/ATLAS_
+        // ARCHITECTURE_VISION.md §3/§5): if a confident focus-window pattern
+        // exists for this area, surface it in the rationale. Ranking itself
+        // (which area/slot gets suggested) is untouched — this only makes the
+        // *explanation* smarter, deliberately short of rebuilding scheduling
+        // around energy/focus windows yet.
+        const areaLabel = momentCategoryLabel(area.key);
+        const focusPattern = personalPatterns.find((pattern) => pattern.includes(areaLabel));
+        const focusNote = focusPattern ? ` ${focusPattern}` : "";
+
+        const title = ACTION_BY_CATEGORY[area.key];
+        const start = slot.start.toISOString();
+        const end = slot.end.toISOString();
+        const rationale = `זה התחום עם המדד הכי נמוך כרגע (${area.score}%), ומצאתי לו חלון פנוי ביומן.${relationshipNote}${focusNote}`;
+
+        const id = await createRecommendationEvent(user.id, {
+          type: "calendar_suggestion",
+          source: "calendar_suggestions_route",
+          payload: { title, category: area.key, start, end, rationale, areaScore: area.score },
+        });
+
+        return { id, title, category: area.key, start, end, rationale };
+      })
+    );
 
     return NextResponse.json({ connected: true, suggestions });
   } catch {

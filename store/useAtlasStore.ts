@@ -10,6 +10,7 @@ import { updatePersonalDNAAction, completeOnboardingAction } from "@/app/actions
 import { addGoalAction, toggleMilestoneAction, removeGoalAction } from "@/app/actions/goals";
 import { addUpcomingEventAction } from "@/app/actions/upcomingEvents";
 import { setTodayIntentionAction } from "@/app/actions/dailyIntention";
+import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import type {
   ChatMessage,
   Goal,
@@ -206,12 +207,23 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
       suggestedActions: state.suggestedActions.filter((s) => s.id !== id),
       upcomingEvents: [created, ...state.upcomingEvents],
     }));
+
+    // Feedback loop write (docs/ATLAS_ARCHITECTURE_VISION.md §7) — recorded
+    // after the real action succeeds, and never lets a tracking failure
+    // surface as an error on what is, to the user, a completed action.
+    recordRecommendationOutcomeAction(id, "accepted").catch((err) => {
+      console.error("Failed to record recommendation outcome:", err);
+    });
   },
 
-  dismissSuggestion: (id) =>
+  dismissSuggestion: (id) => {
     set((state) => ({
       suggestedActions: state.suggestedActions.filter((s) => s.id !== id),
-    })),
+    }));
+    recordRecommendationOutcomeAction(id, "rejected").catch((err) => {
+      console.error("Failed to record recommendation outcome:", err);
+    });
+  },
 }));
 
 // Re-exported for backward compatibility with existing call sites; the

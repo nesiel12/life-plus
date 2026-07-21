@@ -17,6 +17,7 @@ const EMPTY_CONTEXT: AtlasContext = {
   relevantMemory: [],
   relationshipSignals: [],
   personalPatterns: [],
+  recommendationInsights: [],
 };
 
 // Chat's system prompt is the first (and richest) consumer of the Context
@@ -25,8 +26,16 @@ const EMPTY_CONTEXT: AtlasContext = {
 // personalDNA. Kept out of route.ts (which imports server-only DB modules
 // transitively via buildAtlasContext) so it stays unit-testable on its own.
 export function buildSystemPrompt(context: AtlasContext = EMPTY_CONTEXT): string {
-  const { personalDNA, activeGoals, lifeAreas, upcomingEvents, relevantMemory, relationshipSignals, personalPatterns } =
-    context;
+  const {
+    personalDNA,
+    activeGoals,
+    lifeAreas,
+    upcomingEvents,
+    relevantMemory,
+    relationshipSignals,
+    personalPatterns,
+    recommendationInsights,
+  } = context;
 
   const dnaNotes: string[] = [];
   if (personalDNA?.peak_focus_hours) {
@@ -56,6 +65,7 @@ export function buildSystemPrompt(context: AtlasContext = EMPTY_CONTEXT): string
         "(reference naturally if genuinely relevant — don't force a connection that isn't there)",
       relevantMemory
     ),
+    formatContextSection("How well his past Atlas suggestions have landed", recommendationInsights),
   ]);
 
   return extra ? `${BASE_SYSTEM_PROMPT}\n\n${extra}` : BASE_SYSTEM_PROMPT;

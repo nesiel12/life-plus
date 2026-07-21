@@ -27,6 +27,11 @@ export interface AtlasContext {
   // that's what the user told Atlas at onboarding; this is what Atlas has
   // inferred from watching his actual behavior since.
   personalPatterns: string[];
+  // How past Atlas suggestions actually landed — Recommendation
+  // Intelligence & Feedback Loop v1 (docs/ATLAS_ARCHITECTURE_VISION.md §7).
+  // Only includes a recommendation type once it has enough responses to be
+  // signal, e.g. "הצעות ליומן: מתקבלות בכ-80% מהמקרים."
+  recommendationInsights: string[];
 }
 
 export interface BuildContextOptions {

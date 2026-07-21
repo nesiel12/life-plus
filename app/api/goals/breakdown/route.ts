@@ -9,6 +9,7 @@ import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
 import { formatContextSection, joinContextSections } from "@/lib/context/formatContext";
+import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
 import { categoryLabel } from "@/store/useAtlasStore";
 
 export const runtime = "nodejs";
@@ -50,12 +51,31 @@ export async function POST(request: Request) {
   if (parsed.error) return parsed.error;
   const { title, category } = parsed.data;
 
+  const user = await getUserByEmail(session.user.email);
+
+  // Goal breakdown records at "accepted", not "pending": the UI has no
+  // review step — GoalsPanel applies the returned milestones to a new goal
+  // immediately (docs/BACKLOG.md audit). Logging it as pending would create
+  // an event nothing will ever transition out of.
+  async function trackBreakdown(milestones: string[], usedAI: boolean) {
+    if (!user) return;
+    await createRecommendationEvent(user.id, {
+      type: "goal_milestones",
+      source: "goal_breakdown_route",
+      payload: { title, category, milestones, usedAI },
+      initialStatus: "accepted",
+    }).catch((err) => {
+      console.error("Failed to record recommendation event:", err);
+    });
+  }
+
   if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ milestones: genericMilestones(title) });
+    const milestones = genericMilestones(title);
+    await trackBreakdown(milestones, false);
+    return NextResponse.json({ milestones });
   }
 
   try {
-    const user = await getUserByEmail(session.user.email);
     const context = user ? await buildAtlasContext(user.id, { query: title }) : undefined;
 
     const baseSystem =
@@ -80,9 +100,13 @@ export async function POST(request: Request) {
       prompt: `היעד: "${title}" (תחום: ${categoryLabel(category)}). פרק אותו לרשימת אבני דרך.`,
     });
 
-    const milestones = parseMilestoneLines(text);
-    return NextResponse.json({ milestones: milestones.length > 0 ? milestones : genericMilestones(title) });
+    const parsedMilestones = parseMilestoneLines(text);
+    const milestones = parsedMilestones.length > 0 ? parsedMilestones : genericMilestones(title);
+    await trackBreakdown(milestones, parsedMilestones.length > 0);
+    return NextResponse.json({ milestones });
   } catch {
-    return NextResponse.json({ milestones: genericMilestones(title) });
+    const milestones = genericMilestones(title);
+    await trackBreakdown(milestones, false);
+    return NextResponse.json({ milestones });
   }
 }

@@ -7,12 +7,14 @@ import { peopleRepo } from "@/lib/db/people";
 import { toGoal, toLifeArea, toUpcomingEvent, toPerson } from "@/lib/mappers";
 import { retrieveRelevantMemory } from "@/lib/memory/retrieveMemory";
 import { getPersonalPatternDescriptions } from "@/lib/intelligence/personalDNA";
+import { getRecommendationInsights } from "@/lib/intelligence/recommendations";
 import { daysSince } from "@/lib/utils";
 import type { AtlasContext, BuildContextOptions } from "@/lib/context/types";
 
 const DEFAULT_STALE_THRESHOLD_DAYS = 7;
 const MAX_UPCOMING_EVENTS = 5;
 const MAX_PERSONAL_PATTERNS = 5;
+const MAX_RECOMMENDATION_INSIGHTS = 3;
 
 // The Context Engine (docs/ATLAS_ARCHITECTURE_VISION.md §5): the one place
 // that assembles "what does Atlas actually know that's relevant right now."
@@ -25,18 +27,25 @@ export async function buildAtlasContext(
   userId: string,
   options: BuildContextOptions = {}
 ): Promise<AtlasContext> {
-  const [personalDNA, goalRows, lifeAreaRows, upcomingEventRows, peopleRows, relevantMemory, personalPatterns] =
-    await Promise.all([
-      personalDnaRepo.get(userId),
-      goalsRepo.listWithMilestones(userId),
-      lifeAreaScoresRepo.list(userId),
-      upcomingEventsRepo.list(userId),
-      peopleRepo.list(userId),
-      options.query
-        ? retrieveRelevantMemory(userId, options.query, options.memoryLimit)
-        : Promise.resolve([]),
-      getPersonalPatternDescriptions(userId, MAX_PERSONAL_PATTERNS),
-    ]);
+  const [
+    personalDNA,
+    goalRows,
+    lifeAreaRows,
+    upcomingEventRows,
+    peopleRows,
+    relevantMemory,
+    personalPatterns,
+    recommendationInsights,
+  ] = await Promise.all([
+    personalDnaRepo.get(userId),
+    goalsRepo.listWithMilestones(userId),
+    lifeAreaScoresRepo.list(userId),
+    upcomingEventsRepo.list(userId),
+    peopleRepo.list(userId),
+    options.query ? retrieveRelevantMemory(userId, options.query, options.memoryLimit) : Promise.resolve([]),
+    getPersonalPatternDescriptions(userId, MAX_PERSONAL_PATTERNS),
+    getRecommendationInsights(userId, MAX_RECOMMENDATION_INSIGHTS),
+  ]);
 
   // Same rule the family page uses for its own stale-contact threshold
   // (docs/BACKLOG.md) — kept identical here rather than reinvented, so
@@ -67,5 +76,6 @@ export async function buildAtlasContext(
       })
       .filter((signal): signal is string => signal !== null),
     personalPatterns,
+    recommendationInsights,
   };
 }

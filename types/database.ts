@@ -6,6 +6,7 @@
 export type LifeAreaKeyDb = "faith" | "family" | "knowledge" | "health" | "career";
 export type MomentCategoryDb = LifeAreaKeyDb | "general";
 export type ChatRoleDb = "user" | "assistant" | "system";
+export type RecommendationStatusDb = "pending" | "accepted" | "rejected" | "modified" | "expired";
 
 // The Supabase client's generics require every table to carry a
 // `Relationships` array (foreign-key metadata used for `.select()` joins).
@@ -359,6 +360,39 @@ export interface Database {
           confidence?: number;
           evidence_count?: number;
           source?: string;
+        }
+      >;
+      recommendation_events: TableDef<
+        {
+          id: string;
+          user_id: string;
+          type: string;
+          source: string;
+          recommendation_payload: Record<string, unknown>;
+          status: RecommendationStatusDb;
+          metadata: Record<string, unknown>;
+          created_at: string;
+          responded_at: string | null;
+        },
+        {
+          id?: string;
+          user_id: string;
+          type: string;
+          source: string;
+          recommendation_payload?: Record<string, unknown>;
+          status?: RecommendationStatusDb;
+          metadata?: Record<string, unknown>;
+          responded_at?: string | null;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          source?: string;
+          recommendation_payload?: Record<string, unknown>;
+          status?: RecommendationStatusDb;
+          metadata?: Record<string, unknown>;
+          responded_at?: string | null;
         }
       >;
     };
