@@ -1,22 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { daysUntil, daysSince, daysUntilNextBirthday } from "@/lib/utils";
 
+// daysUntil/daysSince compare against *local* "today" (lib/utils.ts's own
+// startOfDay). Building a fixture with toISOString() serializes in UTC,
+// which silently picks the wrong calendar day whenever the test runs near
+// local midnight in a positive UTC-offset timezone — a real, previously
+// flaky bug in this file, not in daysUntil itself. Local date components
+// keep the fixture and the function comparing the same calendar day.
+function toLocalDateString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 describe("daysUntil", () => {
   it("returns 0 for today", () => {
-    const today = new Date().toISOString().slice(0, 10);
-    expect(daysUntil(today)).toBe(0);
+    expect(daysUntil(toLocalDateString(new Date()))).toBe(0);
   });
 
   it("returns a positive count for a future date", () => {
     const future = new Date();
     future.setDate(future.getDate() + 5);
-    expect(daysUntil(future.toISOString().slice(0, 10))).toBe(5);
+    expect(daysUntil(toLocalDateString(future))).toBe(5);
   });
 
   it("returns a negative count for a past date", () => {
     const past = new Date();
     past.setDate(past.getDate() - 3);
-    expect(daysUntil(past.toISOString().slice(0, 10))).toBe(-3);
+    expect(daysUntil(toLocalDateString(past))).toBe(-3);
   });
 });
 
@@ -24,7 +33,7 @@ describe("daysSince", () => {
   it("is the inverse of daysUntil", () => {
     const future = new Date();
     future.setDate(future.getDate() + 5);
-    const iso = future.toISOString().slice(0, 10);
+    const iso = toLocalDateString(future);
     expect(daysSince(iso)).toBe(-daysUntil(iso));
   });
 });

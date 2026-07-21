@@ -38,24 +38,25 @@ function context(patch: Partial<AtlasContext>): AtlasContext {
 // (scoring, tie-breaking, stability) is covered in lib/intelligence/core's
 // own tests — this file only proves the wiring, not the algorithm.
 describe("buildSystemPrompt", () => {
-  it("returns exactly the base prompt for an empty context", () => {
-    const prompt = buildSystemPrompt();
+  it("returns exactly the base prompt for an empty context, with no top signals", () => {
+    const { prompt, topSignals } = buildSystemPrompt();
     expect(prompt).toContain("You are Atlas");
     expect(prompt).not.toContain("ranked by importance");
+    expect(topSignals).toEqual([]);
   });
 
   it("returns exactly the base prompt when personalDNA has no fields set", () => {
-    const prompt = buildSystemPrompt(context({ personalDNA: dnaRow({}) }));
+    const { prompt } = buildSystemPrompt(context({ personalDNA: dnaRow({}) }));
     expect(prompt).not.toContain("ranked by importance");
   });
 
   it("includes peak focus hours when set", () => {
-    const prompt = buildSystemPrompt(context({ personalDNA: dnaRow({ peak_focus_hours: "בבוקר מוקדם" }) }));
+    const { prompt } = buildSystemPrompt(context({ personalDNA: dnaRow({ peak_focus_hours: "בבוקר מוקדם" }) }));
     expect(prompt).toContain("בבוקר מוקדם");
   });
 
   it("includes learning style and habit notes when set", () => {
-    const prompt = buildSystemPrompt(
+    const { prompt } = buildSystemPrompt(
       context({ personalDNA: dnaRow({ learning_style: "בהאזנה", habit_notes: ["שותה קפה לפני לימוד"] }) })
     );
     expect(prompt).toContain("בהאזנה");
@@ -63,13 +64,13 @@ describe("buildSystemPrompt", () => {
   });
 
   it("includes retrieved memory when present", () => {
-    const prompt = buildSystemPrompt(context({ relevantMemory: ["רגע (משפחה, 2026-07-01): שיחה עם אבא"] }));
+    const { prompt } = buildSystemPrompt(context({ relevantMemory: ["רגע (משפחה, 2026-07-01): שיחה עם אבא"] }));
     expect(prompt).toContain("ranked by importance");
     expect(prompt).toContain("שיחה עם אבא");
   });
 
   it("includes active goals, life areas, upcoming events, and relationship signals", () => {
-    const prompt = buildSystemPrompt(
+    const { prompt } = buildSystemPrompt(
       context({
         activeGoals: ["ללמוד מסכת חדשה — 40% הושלם"],
         lifeAreas: [{ key: "faith", label: "אמונה", score: 30, colorVar: "--accent-faith" }],
@@ -84,21 +85,21 @@ describe("buildSystemPrompt", () => {
   });
 
   it("includes inferred personal patterns when present", () => {
-    const prompt = buildSystemPrompt(
+    const { prompt } = buildSystemPrompt(
       context({ personalPatterns: ["הרגעים בתחום ידע מתועדים בעיקר בין 18:00–22:00."] })
     );
     expect(prompt).toContain("18:00–22:00");
   });
 
   it("includes recommendation feedback insights when present", () => {
-    const prompt = buildSystemPrompt(
+    const { prompt } = buildSystemPrompt(
       context({ recommendationInsights: ["הצעות ליומן: מתקבלות בכ-80% מהמקרים (4 מתוך 5)."] })
     );
     expect(prompt).toContain("80%");
   });
 
   it("combines personalDNA and memory together", () => {
-    const prompt = buildSystemPrompt(
+    const { prompt } = buildSystemPrompt(
       context({ personalDNA: dnaRow({ learning_style: "בהאזנה" }), relevantMemory: ["תובנה: משהו חשוב"] })
     );
     expect(prompt).toContain("בהאזנה");
@@ -106,12 +107,24 @@ describe("buildSystemPrompt", () => {
   });
 
   it("surfaces a note when a goal and a relationship signal both rank near the top", () => {
-    const prompt = buildSystemPrompt(
+    const { prompt } = buildSystemPrompt(
       context({
         activeGoals: ["סיים פרויקט"],
         relationshipSignals: ["התקשר לאמא"],
       })
     );
     expect(prompt).toContain("Competing priorities");
+  });
+
+  it("returns topSignals in the same ranked order reflected in the prompt", () => {
+    const { topSignals } = buildSystemPrompt(
+      context({
+        activeGoals: ["סיים פרויקט"],
+        relevantMemory: ["רגע ישן"],
+      })
+    );
+    expect(topSignals.length).toBeGreaterThan(0);
+    expect(topSignals[0]).toHaveProperty("score");
+    expect(topSignals[0]).toHaveProperty("summary");
   });
 });

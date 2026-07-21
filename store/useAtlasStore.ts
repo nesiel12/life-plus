@@ -53,7 +53,7 @@ interface AtlasState extends HydratedState {
   addMoment: (moment: { category: MomentCategory; title: string; content: string }) => Promise<void>;
   logPersonInteraction: (personId: string, note?: string) => Promise<void>;
   setPersonBirthday: (personId: string, birthday: string) => Promise<void>;
-  addChatMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => Promise<void>;
+  addChatMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => Promise<ChatMessage>;
   addInsight: (content: string) => Promise<void>;
   addKnowledgeEntry: (entry: Omit<KnowledgeEntry, "id">) => Promise<void>;
   markKnowledgeReviewed: (entryId: string) => Promise<void>;
@@ -120,6 +120,7 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   addChatMessage: async (message) => {
     const created = await addChatMessageAction(message.role, message.content);
     set((state) => ({ chatHistory: [...state.chatHistory, created] }));
+    return created;
   },
 
   addInsight: async (content) => {

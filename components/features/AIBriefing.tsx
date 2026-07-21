@@ -1,55 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import {
-  Sparkles,
-  Target,
-  Compass,
-  CalendarClock,
-  HeartHandshake,
-  Clock,
-  TrendingUp,
-  Brain,
-  AlertCircle,
-  type LucideIcon,
-} from "lucide-react";
+import { Sparkles, AlertCircle } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
-
-type SignalCategory =
-  | "personalDNA"
-  | "personalPattern"
-  | "goal"
-  | "lifeArea"
-  | "upcomingEvent"
-  | "relationship"
-  | "memory"
-  | "recommendation";
-
-interface BriefingSignal {
-  id: string;
-  category: SignalCategory;
-  summary: string;
-  confidence: number;
-}
+import { BriefingSignalList, type BriefingSignal } from "@/components/features/BriefingSignalList";
 
 interface Briefing {
   signals: BriefingSignal[];
   conflicts: string[];
 }
-
-const CATEGORY_ICON: Record<SignalCategory, LucideIcon> = {
-  personalDNA: Brain,
-  personalPattern: Sparkles,
-  goal: Target,
-  lifeArea: Compass,
-  upcomingEvent: CalendarClock,
-  relationship: HeartHandshake,
-  memory: Clock,
-  recommendation: TrendingUp,
-};
-
-const LOW_CONFIDENCE_THRESHOLD = 0.5;
 
 // The Experience Layer's flagship surface (docs/ATLAS_ARCHITECTURE_
 // VISION.md §10): renders the same ranked-signal pipeline every AI route
@@ -108,28 +67,7 @@ export function AIBriefing() {
         התדריך היומי
       </p>
 
-      <ul className="flex flex-col gap-3">
-        {briefing.signals.map((signal, i) => {
-          const Icon = CATEGORY_ICON[signal.category];
-          return (
-            <motion.li
-              key={signal.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.1 + i * 0.05, ease: "easeOut" }}
-              className="flex items-start gap-2.5 text-sm text-foreground/90"
-            >
-              <Icon size={15} className="mt-0.5 shrink-0 text-muted" aria-hidden />
-              <div className="flex flex-col gap-0.5">
-                <span>{signal.summary}</span>
-                {signal.confidence < LOW_CONFIDENCE_THRESHOLD && (
-                  <span className="text-xs text-muted">ביטחון נמוך</span>
-                )}
-              </div>
-            </motion.li>
-          );
-        })}
-      </ul>
+      <BriefingSignalList signals={briefing.signals} baseDelay={0.1} />
 
       {briefing.conflicts.length > 0 && (
         <div className="mt-4 flex items-start gap-2 rounded-lg bg-white/5 p-3 text-xs text-muted">
