@@ -13,7 +13,11 @@ import type { IntelligenceSignal, SignalCategory } from "@/lib/intelligence/core
 // a stated preference (personalDNA) is more certain than an inferred
 // pattern; a dated commitment (upcomingEvent) is more certain than a
 // retrieved memory that may no longer be current.
-const CATEGORY_DEFAULTS: Record<SignalCategory, { importance: number; confidence: number }> = {
+// Exported so a route that builds its own small, precisely-scoped signal
+// set (rather than a full AtlasContext, e.g. app/api/areas/insights —
+// Areas Experience v2) reuses the same category-level defaults instead of
+// picking new magic numbers that mean the same thing.
+export const CATEGORY_DEFAULTS: Record<SignalCategory, { importance: number; confidence: number }> = {
   personalDNA: { importance: 0.6, confidence: 0.9 },
   personalPattern: { importance: 0.55, confidence: 0.6 },
   goal: { importance: 0.7, confidence: 1 },
@@ -32,7 +36,7 @@ const CATEGORY_DEFAULTS: Record<SignalCategory, { importance: number; confidence
 // life area using the exact same threshold, rather than picking a second
 // number that means the same thing.
 export const WEAK_LIFE_AREA_SCORE_THRESHOLD = 40;
-const WEAK_LIFE_AREA_IMPORTANCE = 0.75;
+export const WEAK_LIFE_AREA_IMPORTANCE = 0.75;
 
 interface SignalOverrides {
   importance?: number;
