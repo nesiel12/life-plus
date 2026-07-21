@@ -8,9 +8,18 @@ import { getUserByEmail } from "@/lib/db/users";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
-import { formatContextSection, joinContextSections } from "@/lib/context/formatContext";
+import { joinContextSections } from "@/lib/context/formatContext";
+import { buildIntelligenceSignals, filterSignalsByCategory, rankSignals, formatSignalsForPrompt } from "@/lib/intelligence/core";
+import type { SignalCategory } from "@/lib/intelligence/core";
 import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
 import { categoryLabel } from "@/store/useAtlasStore";
+
+// Goal breakdown only needs to know about goal-behavior-relevant
+// intelligence — scoping the categories it considers is a task-boundary
+// decision (this route doesn't care about upcoming events or relationship
+// signals), distinct from *ranking* within that scope, which the engine
+// still owns entirely (docs/ATLAS_ARCHITECTURE_VISION.md §9).
+const RELEVANT_CATEGORIES: SignalCategory[] = ["personalDNA", "personalPattern", "goal", "memory"];
 
 export const runtime = "nodejs";
 
@@ -80,23 +89,16 @@ export async function POST(request: Request) {
 
     const baseSystem =
       "You break down personal goals into 4-6 concrete, actionable milestones. Respond only with a numbered list in Hebrew, one milestone per line, no extra commentary.";
-    const dnaNote = context?.personalDNA?.learning_style
-      ? `Tailor the milestones to his preferred learning style: ${context.personalDNA.learning_style}.`
-      : "";
-    const contextBlock = context
-      ? joinContextSections([
-          formatContextSection(
-            "Known patterns in how he actually completes goals — shape milestone count/size accordingly",
-            context.personalPatterns
-          ),
-          formatContextSection("His other active goals — avoid redundant milestones", context.activeGoals),
-          formatContextSection("Related things he's shared before", context.relevantMemory),
-        ])
+
+    const signals = context ? filterSignalsByCategory(buildIntelligenceSignals(context), RELEVANT_CATEGORIES) : [];
+    const formatted = formatSignalsForPrompt(rankSignals(signals));
+    const contextBlock = formatted
+      ? `What's relevant to how he actually completes goals, ranked by importance:\n${formatted}`
       : "";
 
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
-      system: joinContextSections([baseSystem, dnaNote, contextBlock]),
+      system: joinContextSections([baseSystem, contextBlock]),
       prompt: `היעד: "${title}" (תחום: ${categoryLabel(category)}). פרק אותו לרשימת אבני דרך.`,
     });
 

@@ -8,8 +8,16 @@ import { authOptions } from "@/lib/auth";
 import { getUserByEmail } from "@/lib/db/users";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
-import { formatContextSection, joinContextSections } from "@/lib/context/formatContext";
+import { joinContextSections } from "@/lib/context/formatContext";
 import type { AtlasContext } from "@/lib/context/types";
+import { buildIntelligenceSignals, filterSignalsByCategory, rankSignals, formatSignalsForPrompt } from "@/lib/intelligence/core";
+import type { SignalCategory } from "@/lib/intelligence/core";
+
+// Torah extraction only cares about related past study/moments — same
+// scope as before this milestone (context.relevantMemory alone), now
+// expressed as a category filter instead of hand-picking one AtlasContext
+// field (docs/ATLAS_ARCHITECTURE_VISION.md §9).
+const RELEVANT_CATEGORIES: SignalCategory[] = ["memory"];
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -78,8 +86,10 @@ async function summarize(
     return honestFallback(fileName, rawText);
   }
 
-  const relatedSessionsBlock = context
-    ? formatContextSection("שיעורים ורגעים קודמים שעשויים להיות קשורים", context.relevantMemory)
+  const signals = context ? filterSignalsByCategory(buildIntelligenceSignals(context), RELEVANT_CATEGORIES) : [];
+  const formattedSignals = formatSignalsForPrompt(rankSignals(signals));
+  const relatedSessionsBlock = formattedSignals
+    ? `שיעורים ורגעים קודמים שעשויים להיות קשורים, מדורגים לפי חשיבות:\n${formattedSignals}`
     : "";
 
   try {

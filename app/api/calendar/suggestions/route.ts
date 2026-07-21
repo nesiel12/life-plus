@@ -6,8 +6,19 @@ import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
 import { computeFreeSlots } from "@/lib/calendarFreeSlots";
 import { momentCategoryLabel } from "@/lib/lifeAreas";
+import { buildIntelligenceSignals, filterSignalsByCategory, rankSignals } from "@/lib/intelligence/core";
+import type { SignalCategory } from "@/lib/intelligence/core";
 import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
 import type { MomentCategory, SuggestedAction } from "@/types";
+
+// Calendar suggestions only enriches rationale text with relationship and
+// behavioral-pattern signals — same scope as before this milestone, now
+// picked via the shared ranking engine instead of "first in the array"
+// (relationshipSignals[0]) / "first match" (.find()), which were really
+// the same "what matters most" decision this engine exists to make
+// consistently (docs/ATLAS_ARCHITECTURE_VISION.md §9). Ranking itself
+// (which life area / which slot gets suggested) is untouched.
+const RATIONALE_CATEGORIES: SignalCategory[] = ["relationship", "personalPattern"];
 
 export const runtime = "nodejs";
 
@@ -60,7 +71,10 @@ export async function POST(request: NextRequest) {
   // previously the request body carried them, which meant ranking could run
   // against stale or (in principle) client-supplied values instead of the
   // real thing (docs/BACKLOG.md).
-  const { lifeAreas, relationshipSignals, personalPatterns } = await buildAtlasContext(user.id);
+  const context = await buildAtlasContext(user.id);
+  const { lifeAreas } = context;
+  const rationaleSignals = rankSignals(filterSignalsByCategory(buildIntelligenceSignals(context), RATIONALE_CATEGORIES));
+  const topRelationshipSignal = rationaleSignals.find((s) => s.category === "relationship");
 
   const now = new Date();
   const endOfDay = new Date(now);
@@ -106,7 +120,7 @@ export async function POST(request: NextRequest) {
         // family-category suggestion names the specific person Atlas already
         // knows is overdue for contact, instead of a generic prompt.
         const relationshipNote =
-          area.key === "family" && relationshipSignals.length > 0 ? ` ${relationshipSignals[0]}.` : "";
+          area.key === "family" && topRelationshipSignal ? ` ${topRelationshipSignal.summary}.` : "";
         // Personal DNA Engine v1's foundation for scheduling (docs/ATLAS_
         // ARCHITECTURE_VISION.md §3/§5): if a confident focus-window pattern
         // exists for this area, surface it in the rationale. Ranking itself
@@ -114,8 +128,10 @@ export async function POST(request: NextRequest) {
         // *explanation* smarter, deliberately short of rebuilding scheduling
         // around energy/focus windows yet.
         const areaLabel = momentCategoryLabel(area.key);
-        const focusPattern = personalPatterns.find((pattern) => pattern.includes(areaLabel));
-        const focusNote = focusPattern ? ` ${focusPattern}` : "";
+        const focusSignal = rationaleSignals.find(
+          (s) => s.category === "personalPattern" && s.summary.includes(areaLabel)
+        );
+        const focusNote = focusSignal ? ` ${focusSignal.summary}` : "";
 
         const title = ACTION_BY_CATEGORY[area.key];
         const start = slot.start.toISOString();

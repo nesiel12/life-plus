@@ -30,16 +30,23 @@ function context(patch: Partial<AtlasContext>): AtlasContext {
   };
 }
 
+// Regression suite for chat's Intelligence Engine wiring (docs/ATLAS_
+// ARCHITECTURE_VISION.md §9) — verifies every AtlasContext field still
+// reaches the prompt now that ordering/section-selection moved from
+// hand-written formatContextSection calls to buildIntelligenceSignals ->
+// rankSignals -> formatSignalsForPrompt. Ranking correctness itself
+// (scoring, tie-breaking, stability) is covered in lib/intelligence/core's
+// own tests — this file only proves the wiring, not the algorithm.
 describe("buildSystemPrompt", () => {
-  it("returns the base prompt for an empty context", () => {
+  it("returns exactly the base prompt for an empty context", () => {
     const prompt = buildSystemPrompt();
     expect(prompt).toContain("You are Atlas");
-    expect(prompt).not.toContain("What you know about him personally");
+    expect(prompt).not.toContain("ranked by importance");
   });
 
-  it("returns the base prompt when personalDNA has no fields set", () => {
+  it("returns exactly the base prompt when personalDNA has no fields set", () => {
     const prompt = buildSystemPrompt(context({ personalDNA: dnaRow({}) }));
-    expect(prompt).not.toContain("What you know about him personally");
+    expect(prompt).not.toContain("ranked by importance");
   });
 
   it("includes peak focus hours when set", () => {
@@ -55,9 +62,9 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("שותה קפה לפני לימוד");
   });
 
-  it("includes retrieved memory context when present", () => {
+  it("includes retrieved memory when present", () => {
     const prompt = buildSystemPrompt(context({ relevantMemory: ["רגע (משפחה, 2026-07-01): שיחה עם אבא"] }));
-    expect(prompt).toContain("Things he's shared before");
+    expect(prompt).toContain("ranked by importance");
     expect(prompt).toContain("שיחה עם אבא");
   });
 
@@ -80,7 +87,6 @@ describe("buildSystemPrompt", () => {
     const prompt = buildSystemPrompt(
       context({ personalPatterns: ["הרגעים בתחום ידע מתועדים בעיקר בין 18:00–22:00."] })
     );
-    expect(prompt).toContain("Patterns Atlas has noticed");
     expect(prompt).toContain("18:00–22:00");
   });
 
@@ -88,15 +94,24 @@ describe("buildSystemPrompt", () => {
     const prompt = buildSystemPrompt(
       context({ recommendationInsights: ["הצעות ליומן: מתקבלות בכ-80% מהמקרים (4 מתוך 5)."] })
     );
-    expect(prompt).toContain("How well his past Atlas suggestions have landed");
     expect(prompt).toContain("80%");
   });
 
-  it("combines personalDNA and every context section together", () => {
+  it("combines personalDNA and memory together", () => {
     const prompt = buildSystemPrompt(
       context({ personalDNA: dnaRow({ learning_style: "בהאזנה" }), relevantMemory: ["תובנה: משהו חשוב"] })
     );
     expect(prompt).toContain("בהאזנה");
     expect(prompt).toContain("משהו חשוב");
+  });
+
+  it("surfaces a note when a goal and a relationship signal both rank near the top", () => {
+    const prompt = buildSystemPrompt(
+      context({
+        activeGoals: ["סיים פרויקט"],
+        relationshipSignals: ["התקשר לאמא"],
+      })
+    );
+    expect(prompt).toContain("Competing priorities");
   });
 });

@@ -1,13 +1,11 @@
-// Shared "- bullet list" prompt-section formatting — previously each AI
-// route that wanted to fold a list of facts into a system prompt would
-// have hand-rolled this (lib/chatSystemPrompt.ts already had one before
-// the Context Engine existed). One place, used by every consumer of
-// AtlasContext (docs/ATLAS_ARCHITECTURE_VISION.md §5).
-export function formatContextSection(title: string, items: string[]): string {
-  if (items.length === 0) return "";
-  return `${title}:\n${items.map((item) => `- ${item}`).join("\n")}`;
-}
-
+// Joins prompt-text fragments (a base instruction, a ranked-signals block,
+// etc.), dropping empty ones — the one remaining shared formatting helper.
+// Its sibling, formatContextSection (per-category titled bullet lists),
+// was removed once the Atlas Intelligence Engine's formatSignalsForPrompt
+// (lib/intelligence/core/format.ts) replaced every call site that used it
+// (docs/ATLAS_ARCHITECTURE_VISION.md §9) — keeping an unused formatting
+// primitive around "for later" is exactly what that milestone existed to
+// stop doing.
 export function joinContextSections(sections: string[]): string {
   return sections.filter(Boolean).join("\n\n");
 }
