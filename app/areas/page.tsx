@@ -23,7 +23,7 @@ export default function AreasPage() {
               key={area.key}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.06 }}
+              transition={{ duration: 0.4, delay: i * 0.06, ease: "easeOut" }}
             >
               <Link href={`/areas/${meta.slug}`}>
                 <GlassCard className="h-full transition-transform hover:-translate-y-0.5">

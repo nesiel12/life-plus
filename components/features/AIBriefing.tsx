@@ -89,7 +89,7 @@ export function AIBriefing() {
         </p>
         <div className="flex flex-col gap-2.5" aria-hidden>
           {[85, 70, 55].map((width, i) => (
-            <div key={i} className="h-4 animate-pulse rounded-md bg-white/5" style={{ width: `${width}%` }} />
+            <div key={i} className="h-4 animate-pulse rounded-full bg-white/5" style={{ width: `${width}%` }} />
           ))}
         </div>
       </GlassCard>

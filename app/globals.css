@@ -53,3 +53,17 @@ body {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
+
+/* Consistent keyboard-focus indicator (design/motion/a11y audit). Every
+   input/textarea/select in the app removes the browser default outline
+   (they need `focus-ring` instead of Tailwind's `focus:outline-none`, which
+   left focus invisible everywhere — a real WCAG 2.4.7 gap, not a style
+   preference). :focus-visible, not :focus, so it only appears for keyboard
+   navigation and never flashes on a mouse click. */
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 2px;
+}

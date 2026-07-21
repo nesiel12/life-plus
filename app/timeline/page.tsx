@@ -23,7 +23,7 @@ export default function TimelinePage() {
             key={moment.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: Math.min(i * 0.06, 0.6) }}
+            transition={{ duration: 0.4, delay: Math.min(i * 0.06, 0.6), ease: "easeOut" }}
             className="glass-card rounded-2xl p-4"
             style={{ borderInlineStart: `3px solid var(${momentCategoryColorVar(moment.category)})` }}
           >

@@ -58,13 +58,13 @@ export function GoalsPanel() {
           onKeyDown={(e) => e.key === "Enter" && handleCreateGoal()}
           placeholder="יעד חדש, למשל: ללמוד מסכת חדשה"
           aria-label="כותרת היעד החדש"
-          className="flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
+          className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value as LifeAreaKey)}
           aria-label="תחום החיים של היעד"
-          className="rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground focus:outline-none"
+          className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
         >
           {CATEGORY_OPTIONS.map((c) => (
             <option key={c} value={c} className="bg-background">
@@ -95,7 +95,7 @@ export function GoalsPanel() {
               key={goal.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: gi * 0.05 }}
+              transition={{ duration: 0.3, delay: gi * 0.05, ease: "easeOut" }}
               className="rounded-xl bg-white/5 p-3"
             >
               <div className="mb-2 flex items-center justify-between">
@@ -105,7 +105,7 @@ export function GoalsPanel() {
                 </div>
                 <button
                   onClick={() => removeGoal(goal.id)}
-                  className="text-muted transition-colors hover:text-foreground"
+                  className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
                   aria-label="מחק יעד"
                 >
                   <Trash2 size={14} />

@@ -70,7 +70,7 @@ export function AreaMomentsView({ title, description, areaKey }: AreaMomentsView
             placeholder="מה קרה בתחום הזה?"
             aria-label="תוכן הרגע"
             rows={2}
-            className="mb-3 w-full resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
+            className="focus-ring mb-3 w-full resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
           />
           <button
             onClick={handleAdd}
@@ -90,7 +90,7 @@ export function AreaMomentsView({ title, description, areaKey }: AreaMomentsView
                 key={moment.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.5) }}
+                transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.5), ease: "easeOut" }}
                 className="rounded-xl bg-white/5 p-3 text-sm"
               >
                 <div className="mb-1 flex items-center justify-between">

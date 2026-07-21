@@ -59,7 +59,7 @@ export function NavBar() {
             )}
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="text-muted transition-colors hover:text-foreground"
+              className="focus-ring rounded-lg p-2 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
               aria-label="התנתק"
             >
               <LogOut size={16} />

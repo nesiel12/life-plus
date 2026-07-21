@@ -71,7 +71,7 @@ export function AICompanion() {
           </div>
           <button
             onClick={() => setOpen(false)}
-            className="text-muted transition-colors hover:text-foreground"
+            className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
             aria-label="סגור"
           >
             <X size={18} />
@@ -107,7 +107,7 @@ export function AICompanion() {
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="שתף מחשבה…"
             aria-label="הודעה לאטלס"
-            className="flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
+            className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
           />
           <button
             onClick={handleSend}

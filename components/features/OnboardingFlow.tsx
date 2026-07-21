@@ -69,7 +69,7 @@ export function OnboardingFlow() {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.25 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
           className="text-lg leading-relaxed text-foreground"
         >
           {question.prompt}
@@ -83,7 +83,7 @@ export function OnboardingFlow() {
         autoFocus
         placeholder="הקלד תשובה..."
         aria-label={question.prompt}
-        className="w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
+        className="focus-ring w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
       />
 
       {saveError && <p className="text-xs text-accent-family">{saveError}</p>}

@@ -68,7 +68,7 @@ export default function FamilyCarePage() {
               key={person.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.06 }}
+              transition={{ duration: 0.4, delay: i * 0.06, ease: "easeOut" }}
             >
               <GlassCard className="h-full">
                 <div className="mb-2 flex items-center justify-between">
@@ -118,7 +118,7 @@ export default function FamilyCarePage() {
                         onKeyDown={(e) => e.key === "Enter" && saveBirthday(person.id)}
                         placeholder="MM-DD"
                         aria-label={`תאריך יום הולדת של ${person.hebrewName ?? person.name} (חודש-יום)`}
-                        className="ltr w-20 rounded-lg bg-white/5 px-2 py-1.5 text-xs text-foreground placeholder:text-muted focus:outline-none"
+                        className="focus-ring ltr w-20 rounded-lg bg-white/5 px-2 py-1.5 text-xs text-foreground placeholder:text-muted"
                         autoFocus
                       />
                       <button

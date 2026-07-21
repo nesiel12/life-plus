@@ -48,7 +48,7 @@ export default function Home() {
         <motion.h1
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
           className="text-3xl font-medium tracking-tight sm:text-4xl"
         >
           {greeting ?? "שלום"}, {displayName}.
@@ -68,7 +68,7 @@ export default function Home() {
             placeholder="על מה תרצה להתמקד היום?"
             aria-label="הכוונה של היום"
             rows={2}
-            className="w-full resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
+            className="focus-ring w-full resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
           />
         </GlassCard>
 
