@@ -16,9 +16,8 @@ import type { IntelligenceSignal } from "@/lib/intelligence/core";
 import { deriveGoalStage } from "@/lib/goals/deriveGoalStage";
 import { buildNextActionRationale } from "@/lib/goals/buildNextActionRationale";
 import { deriveAttentionLevel } from "@/lib/areas/deriveAttentionLevel";
-import { computeActivityTrend } from "@/lib/areas/computeActivityTrend";
 import { LIFE_AREA_LIST } from "@/lib/lifeAreas";
-import { daysSince } from "@/lib/utils";
+import { daysSince, computeActivityTrend } from "@/lib/utils";
 import type { Goal } from "@/types";
 import type { AreaInsight } from "@/lib/areas/types";
 

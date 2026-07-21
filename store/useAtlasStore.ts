@@ -50,7 +50,12 @@ interface AtlasState extends HydratedState {
   hydrate: (state: HydratedState) => void;
 
   setTodayIntention: (intention: string) => Promise<void>;
-  addMoment: (moment: { category: MomentCategory; title: string; content: string }) => Promise<void>;
+  addMoment: (moment: {
+    category: MomentCategory;
+    title: string;
+    content: string;
+    personId?: string;
+  }) => Promise<void>;
   logPersonInteraction: (personId: string, note?: string) => Promise<void>;
   setPersonBirthday: (personId: string, birthday: string) => Promise<void>;
   addChatMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => Promise<ChatMessage>;

@@ -1,50 +1,96 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { HeartHandshake, Cake } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useAtlasStore } from "@/store/useAtlasStore";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { PersonRelationshipCard } from "@/components/features/PersonRelationshipCard";
 import { useApiCall } from "@/hooks/useApiCall";
-import { daysSince, daysUntilNextBirthday } from "@/lib/utils";
+import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
+import type { PersonInsight } from "@/lib/family/types";
 
-const DEFAULT_STALE_THRESHOLD_DAYS = 7;
-
+// Family Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §10): a
+// relationship workspace, not a contacts list. Score/note/birthday still
+// render instantly from the live store; health, interaction stats, the
+// suggested next interaction, and the relationship timeline layer in once
+// app/api/family/insights resolves — the same progressive-enhancement
+// convention every other Experience Layer screen uses. People render in
+// the order the route already ranked them (a real per-person Intelligence
+// Engine signal, see the route), not a fixed list order.
 export default function FamilyCarePage() {
   const people = useAtlasStore((s) => s.people);
-  // personalDNA.familyCheckInIntervalDays is collected at onboarding and
-  // previously never read anywhere (docs/BACKLOG.md) — this is what makes
-  // that answer actually change behavior, instead of a hardcoded constant.
-  const staleThresholdDays =
-    useAtlasStore((s) => s.personalDNA.familyCheckInIntervalDays) ?? DEFAULT_STALE_THRESHOLD_DAYS;
   const logPersonInteraction = useAtlasStore((s) => s.logPersonInteraction);
   const addMoment = useAtlasStore((s) => s.addMoment);
   const setPersonBirthday = useAtlasStore((s) => s.setPersonBirthday);
-  const [editingBirthdayFor, setEditingBirthdayFor] = useState<string | null>(null);
-  const [birthdayDraft, setBirthdayDraft] = useState("");
 
-  const { error: logError, run: logInteraction } = useApiCall(
-    async (personId: string, name: string) => {
-      await logPersonInteraction(personId);
-      await addMoment({ category: "family", title: `רגע עם ${name}`, content: `תיעוד רגע משמעותי עם ${name}.` });
-    }
-  );
+  const [insights, setInsights] = useState<PersonInsight[] | null>(null);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const refreshInsights = () => setRefreshToken((t) => t + 1);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/family/insights")
+      .then((res) => (res.ok ? res.json() : { people: [] }))
+      .then((data: { people: PersonInsight[] }) => {
+        if (!cancelled) setInsights(data.people);
+      })
+      .catch(() => {
+        // Insights are a progressive enhancement — a failed fetch just
+        // means cards render without them.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshToken, people.length]);
+
+  const insightByPersonId = useMemo(() => new Map((insights ?? []).map((i) => [i.personId, i])), [insights]);
+  const orderedPeople = insights
+    ? insights.map((i) => people.find((p) => p.id === i.personId)).filter((p): p is (typeof people)[number] => Boolean(p))
+    : people;
+
+  const { error: logError, run: logInteraction } = useApiCall(async (personId: string, name: string) => {
+    await logPersonInteraction(personId);
+    await addMoment({
+      category: "family",
+      title: `רגע עם ${name}`,
+      content: `תיעוד רגע משמעותי עם ${name}.`,
+      personId,
+    });
+  });
   const { error: birthdayError, run: submitBirthday } = useApiCall(setPersonBirthday);
 
-  function handleLog(personId: string, name: string) {
-    logInteraction(personId, name).catch(() => {
-      // error is already captured in logError for display below
+  function handleLogMoment(personId: string, name: string) {
+    logInteraction(personId, name)
+      .then(refreshInsights)
+      .catch(() => {
+        // error is already captured in logError for display below
+      });
+  }
+
+  function handleAcceptAction(personId: string, recommendationEventId: string, name: string) {
+    logInteraction(personId, name).then(refreshInsights);
+    recordRecommendationOutcomeAction(recommendationEventId, "accepted").catch((err) => {
+      console.error("Failed to record recommendation outcome:", err);
     });
   }
 
-  function saveBirthday(personId: string) {
-    if (/^\d{2}-\d{2}$/.test(birthdayDraft)) {
-      submitBirthday(personId, birthdayDraft).catch(() => {
-        // error is already captured in birthdayError for display below
-      });
-    }
-    setEditingBirthdayFor(null);
-    setBirthdayDraft("");
+  function handleDismissAction(recommendationEventId: string) {
+    setInsights((prev) =>
+      prev
+        ? prev.map((insight) =>
+            insight.suggestedAction?.recommendationEventId === recommendationEventId
+              ? { ...insight, suggestedAction: null }
+              : insight
+          )
+        : prev
+    );
+    recordRecommendationOutcomeAction(recommendationEventId, "rejected").catch((err) => {
+      console.error("Failed to record recommendation outcome:", err);
+    });
+  }
+
+  function handleSaveBirthday(personId: string, birthday: string) {
+    submitBirthday(personId, birthday).catch(() => {
+      // error is already captured in birthdayError for display below
+    });
   }
 
   return (
@@ -56,93 +102,18 @@ export default function FamilyCarePage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {people.map((person, i) => {
-          const since = person.lastMeaningfulInteraction
-            ? daysSince(person.lastMeaningfulInteraction)
-            : null;
-          const isStale = since !== null && since >= staleThresholdDays;
-          const untilBirthday = person.birthday ? daysUntilNextBirthday(person.birthday) : null;
-
-          return (
-            <motion.div
-              key={person.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.06, ease: "easeOut" }}
-            >
-              <GlassCard className="h-full">
-                <div className="mb-2 flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-foreground">{person.hebrewName ?? person.name}</p>
-                    <p className="text-xs text-muted">{person.relation}</p>
-                  </div>
-                  <HeartHandshake size={18} className="text-accent-family" />
-                </div>
-
-                {person.note && <p className="mb-2 text-sm text-foreground/70">{person.note}</p>}
-
-                <p className="mb-2 text-xs text-muted">
-                  {since === null
-                    ? "אין עדיין תיעוד"
-                    : since === 0
-                      ? "רגע היום"
-                      : `לפני ${since} ימים`}
-                </p>
-
-                {untilBirthday !== null && (
-                  <p className="mb-2 flex items-center gap-1 text-xs text-accent-family">
-                    <Cake size={12} />
-                    יום הולדת בעוד {untilBirthday} ימים
-                  </p>
-                )}
-
-                {isStale && (
-                  <p className="mb-3 text-xs text-accent-faith">
-                    לא תיעדת רגע עם {person.hebrewName ?? person.name} לאחרונה.
-                  </p>
-                )}
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => handleLog(person.id, person.hebrewName ?? person.name)}
-                    className="rounded-lg bg-accent-family/15 px-3 py-1.5 text-xs text-accent-family transition-opacity hover:opacity-80"
-                  >
-                    רשום רגע איתם
-                  </button>
-
-                  {editingBirthdayFor === person.id ? (
-                    <div className="flex items-center gap-1">
-                      <input
-                        value={birthdayDraft}
-                        onChange={(e) => setBirthdayDraft(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && saveBirthday(person.id)}
-                        placeholder="MM-DD"
-                        aria-label={`תאריך יום הולדת של ${person.hebrewName ?? person.name} (חודש-יום)`}
-                        className="focus-ring ltr w-20 rounded-lg bg-white/5 px-2 py-1.5 text-xs text-foreground placeholder:text-muted"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => saveBirthday(person.id)}
-                        className="text-xs text-accent-family"
-                      >
-                        שמור
-                      </button>
-                    </div>
-                  ) : (
-                    !person.birthday && (
-                      <button
-                        onClick={() => setEditingBirthdayFor(person.id)}
-                        className="text-xs text-muted transition-colors hover:text-foreground"
-                      >
-                        הוסף יום הולדת
-                      </button>
-                    )
-                  )}
-                </div>
-              </GlassCard>
-            </motion.div>
-          );
-        })}
+        {orderedPeople.map((person, i) => (
+          <PersonRelationshipCard
+            key={person.id}
+            person={person}
+            insight={insightByPersonId.get(person.id)}
+            delay={Math.min(i * 0.06, 0.3)}
+            onLogMoment={handleLogMoment}
+            onAcceptAction={handleAcceptAction}
+            onDismissAction={handleDismissAction}
+            onSaveBirthday={handleSaveBirthday}
+          />
+        ))}
       </div>
     </main>
   );

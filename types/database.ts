@@ -111,6 +111,7 @@ export interface Database {
           title: string;
           content: string;
           occurred_at: string;
+          person_id: string | null;
           created_at: string;
         },
         {
@@ -120,6 +121,7 @@ export interface Database {
           title: string;
           content: string;
           occurred_at?: string;
+          person_id?: string | null;
         },
         {
           id?: string;
@@ -128,6 +130,7 @@ export interface Database {
           title?: string;
           content?: string;
           occurred_at?: string;
+          person_id?: string | null;
         }
       >;
       upcoming_events: TableDef<

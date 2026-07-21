@@ -67,6 +67,7 @@ export function toMoment(row: MomentRow): Moment {
     category: row.category,
     title: row.title,
     content: row.content,
+    personId: row.person_id ?? undefined,
   };
 }
 

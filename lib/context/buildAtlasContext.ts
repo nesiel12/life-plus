@@ -8,6 +8,7 @@ import { toGoal, toLifeArea, toUpcomingEvent, toPerson } from "@/lib/mappers";
 import { retrieveRelevantMemory } from "@/lib/memory/retrieveMemory";
 import { getPersonalPatternDescriptions } from "@/lib/intelligence/personalDNA";
 import { getRecommendationInsights } from "@/lib/intelligence/recommendations";
+import { isPersonStale } from "@/lib/family/deriveRelationshipHealth";
 import { daysSince } from "@/lib/utils";
 import type { AtlasContext, BuildContextOptions } from "@/lib/context/types";
 
@@ -69,9 +70,11 @@ export async function buildAtlasContext(
     relationshipSignals: peopleRows
       .map(toPerson)
       .map((person) => {
-        if (!person.lastMeaningfulInteraction) return null;
-        const since = daysSince(person.lastMeaningfulInteraction);
-        if (since < staleThresholdDays) return null;
+        const since = person.lastMeaningfulInteraction ? daysSince(person.lastMeaningfulInteraction) : null;
+        // Same rule Family Experience v2's deriveRelationshipHealth uses for
+        // its own "needs_attention" tier — one shared predicate instead of
+        // two independent inline checks (this file previously had its own).
+        if (!isPersonStale(since, staleThresholdDays)) return null;
         return `לא יצרת קשר עם ${person.hebrewName ?? person.name} כבר ${since} ימים`;
       })
       .filter((signal): signal is string => signal !== null),

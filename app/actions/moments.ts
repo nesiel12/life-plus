@@ -9,6 +9,7 @@ export async function addMomentAction(input: {
   category: MomentCategory;
   title: string;
   content: string;
+  personId?: string;
 }) {
   const userId = await getCurrentUserId();
   const row = await momentsRepo.insert({
@@ -16,6 +17,7 @@ export async function addMomentAction(input: {
     category: input.category,
     title: input.title,
     content: input.content,
+    person_id: input.personId ?? null,
   });
   return toMoment(row);
 }

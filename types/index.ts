@@ -26,6 +26,7 @@ export interface Moment {
   category: MomentCategory;
   title: string;
   content: string;
+  personId?: string; // real link to a Person, when this moment is about someone specific
 }
 
 export type ChatRole = "user" | "assistant" | "system";
