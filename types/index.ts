@@ -106,4 +106,5 @@ export interface SuggestedAction {
   start: string; // ISO datetime
   end: string; // ISO datetime
   rationale: string;
+  confidence: number; // 0..1, see lib/suggestionConfidence.ts
 }

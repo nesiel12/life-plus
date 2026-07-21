@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, X, CalendarClock } from "lucide-react";
+import { Check, X, CalendarClock, Clock3 } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useApiCall } from "@/hooks/useApiCall";
@@ -10,6 +10,15 @@ import { useApiCall } from "@/hooks/useApiCall";
 function formatTimeRange(startISO: string, endISO: string): string {
   const fmt = (d: Date) => d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
   return `${fmt(new Date(startISO))}–${fmt(new Date(endISO))}`;
+}
+
+// Real, derived from the slot Atlas already found — not an invented
+// "effort" metric.
+function formatDuration(startISO: string, endISO: string): string {
+  const minutes = Math.round((new Date(endISO).getTime() - new Date(startISO).getTime()) / 60_000);
+  if (minutes < 60) return `${minutes} דקות`;
+  const hours = Math.round((minutes / 60) * 10) / 10;
+  return `כ-${hours} שעות`;
 }
 
 export function ScheduleSuggestions() {
@@ -72,41 +81,69 @@ export function ScheduleSuggestions() {
         <CalendarClock size={16} />
         הצעות מאטלס ללו״ז
       </p>
-      <ul className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-4">
         {suggestions.map((s, i) => (
           <motion.li
             key={s.id}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: i * 0.06 }}
-            className="rounded-xl bg-white/5 p-3 text-sm"
+            transition={{ duration: 0.3, delay: i * 0.06, ease: "easeOut" }}
+            className="rounded-xl bg-white/5 p-4 text-sm"
           >
             <div className="mb-1 flex items-center justify-between">
               <span className="font-medium text-foreground">{s.title}</span>
               <span className="ltr text-xs text-muted">{formatTimeRange(s.start, s.end)}</span>
             </div>
-            <p className="mb-2 text-xs text-foreground/70">{s.rationale}</p>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted">{categoryLabel(s.category)}</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleAccept(s.id)}
-                  disabled={accepting}
-                  className="flex items-center gap-1 rounded-lg bg-accent-health/15 px-2 py-1 text-xs text-accent-health disabled:opacity-40"
-                >
-                  <Check size={12} />
-                  {accepting && acceptingId === s.id ? "יוצר ביומן…" : "אשר"}
-                </button>
-                <button
-                  onClick={() => dismissSuggestion(s.id)}
-                  disabled={accepting}
-                  className="flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-xs text-muted disabled:opacity-40"
-                >
-                  <X size={12} />
-                  התעלם
-                </button>
+
+            <div className="mb-2 flex items-center gap-2 text-xs text-muted">
+              <span>{categoryLabel(s.category)}</span>
+              <span aria-hidden>·</span>
+              <span className="flex items-center gap-1">
+                <Clock3 size={11} aria-hidden />
+                {formatDuration(s.start, s.end)}
+              </span>
+            </div>
+
+            <p className="mb-3 text-xs leading-relaxed text-foreground/70">{s.rationale}</p>
+
+            {/* Confidence — the same thin-bar primitive goal progress and
+                life-area scores already use, not a new chart type. */}
+            <div className="mb-3 flex items-center gap-2">
+              <span className="shrink-0 text-xs text-muted">רמת התאמה</span>
+              <div
+                className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/5"
+                role="progressbar"
+                aria-valuenow={Math.round(s.confidence * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="רמת התאמה של ההצעה"
+              >
+                <div
+                  className="h-full rounded-full bg-accent-health"
+                  style={{ width: `${Math.round(s.confidence * 100)}%` }}
+                />
               </div>
             </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => handleAccept(s.id)}
+                disabled={accepting}
+                className="flex items-center gap-1 rounded-lg bg-accent-health/15 px-3 py-1.5 text-xs font-medium text-accent-health transition-opacity disabled:opacity-40"
+              >
+                <Check size={12} />
+                {accepting && acceptingId === s.id ? "יוצר ביומן…" : "אשר"}
+              </button>
+              <button
+                onClick={() => dismissSuggestion(s.id)}
+                disabled={accepting}
+                className="flex items-center gap-1 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground disabled:opacity-40"
+              >
+                <X size={12} />
+                התעלם
+              </button>
+            </div>
+
             {acceptError && acceptingId === s.id && (
               <p className="mt-2 text-xs text-accent-family">{acceptError}</p>
             )}

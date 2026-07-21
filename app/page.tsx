@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
@@ -8,9 +8,11 @@ import { CalendarHeart } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { LifeCompass } from "@/components/features/LifeCompass";
+import { AIBriefing } from "@/components/features/AIBriefing";
 import { ScheduleSuggestions } from "@/components/features/ScheduleSuggestions";
 import { GoalsPanel } from "@/components/features/GoalsPanel";
 import { daysUntil } from "@/lib/utils";
+import { greetingForHour } from "@/lib/greeting";
 
 export default function Home() {
   const { data: session } = useSession();
@@ -20,6 +22,14 @@ export default function Home() {
   const todayIntention = useAtlasStore((s) => s.todayIntention);
   const setTodayIntention = useAtlasStore((s) => s.setTodayIntention);
   const [draft, setDraft] = useState(todayIntention);
+
+  // Real time-of-day, not a fixed "בוקר טוב" — computed after mount (the
+  // user's own browser clock, not a server guess that could disagree with
+  // it) so there's nothing to reconcile between server and client render.
+  const [greeting, setGreeting] = useState<string | null>(null);
+  useEffect(() => {
+    setGreeting(greetingForHour(new Date().getHours()));
+  }, []);
 
   const displayName = session?.user?.name ?? user.hebrewName;
 
@@ -41,16 +51,13 @@ export default function Home() {
           transition={{ duration: 0.5 }}
           className="text-3xl font-medium tracking-tight sm:text-4xl"
         >
-          בוקר טוב, {displayName}.
+          {greeting ?? "שלום"}, {displayName}.
         </motion.h1>
       </div>
       <p className="mb-10 text-muted">{user.lifeStage}</p>
 
       <div className="flex flex-col gap-6">
-        <GlassCard delay={0.05}>
-          <p className="mb-4 text-sm font-medium text-muted">מצפן החיים</p>
-          <LifeCompass areas={lifeAreas} />
-        </GlassCard>
+        <AIBriefing />
 
         <GlassCard delay={0.1}>
           <p className="mb-3 text-sm font-medium text-muted">הכוונה של היום</p>
@@ -66,6 +73,13 @@ export default function Home() {
         </GlassCard>
 
         <GlassCard delay={0.15}>
+          <p className="mb-4 text-sm font-medium text-muted">מצפן החיים</p>
+          <LifeCompass areas={lifeAreas} />
+        </GlassCard>
+
+        <ScheduleSuggestions />
+
+        <GlassCard delay={0.22}>
           <p className="mb-4 text-sm font-medium text-muted">רגעים משמעותיים בקרוב</p>
           <ul className="flex flex-col gap-3">
             {upcomingEvents.map((event) => {
@@ -86,7 +100,6 @@ export default function Home() {
           </ul>
         </GlassCard>
 
-        <ScheduleSuggestions />
         <GoalsPanel />
       </div>
     </main>

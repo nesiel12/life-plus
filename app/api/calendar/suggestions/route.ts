@@ -9,6 +9,7 @@ import { momentCategoryLabel } from "@/lib/lifeAreas";
 import { buildIntelligenceSignals, filterSignalsByCategory, rankSignals } from "@/lib/intelligence/core";
 import type { SignalCategory } from "@/lib/intelligence/core";
 import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
+import { computeSuggestionConfidence } from "@/lib/suggestionConfidence";
 import type { MomentCategory, SuggestedAction } from "@/types";
 
 // Calendar suggestions only enriches rationale text with relationship and
@@ -137,14 +138,18 @@ export async function POST(request: NextRequest) {
         const start = slot.start.toISOString();
         const end = slot.end.toISOString();
         const rationale = `זה התחום עם המדד הכי נמוך כרגע (${area.score}%), ומצאתי לו חלון פנוי ביומן.${relationshipNote}${focusNote}`;
+        const confidence = computeSuggestionConfidence(
+          area.score,
+          lifeAreas.map((a) => a.score)
+        );
 
         const id = await createRecommendationEvent(user.id, {
           type: "calendar_suggestion",
           source: "calendar_suggestions_route",
-          payload: { title, category: area.key, start, end, rationale, areaScore: area.score },
+          payload: { title, category: area.key, start, end, rationale, areaScore: area.score, confidence },
         });
 
-        return { id, title, category: area.key, start, end, rationale };
+        return { id, title, category: area.key, start, end, rationale, confidence };
       })
     );
 
