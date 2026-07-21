@@ -50,6 +50,11 @@ export interface UserContext {
   lifeStage: string;
 }
 
+export interface Flashcard {
+  front: string;
+  back: string;
+}
+
 export interface KnowledgeEntry {
   id: string;
   date: string; // ISO date
@@ -57,6 +62,9 @@ export interface KnowledgeEntry {
   source: string;
   summary: string;
   durationMinutes?: number;
+  lastReviewedAt?: string; // ISO date; set only once the user marks it reviewed
+  flashcards?: Flashcard[]; // populated lazily, see app/api/torah/study-material
+  reviewQuestions?: string[];
 }
 
 export interface UpcomingEvent {

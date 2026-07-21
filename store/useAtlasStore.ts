@@ -4,7 +4,7 @@ import { addMomentAction } from "@/app/actions/moments";
 import { logPersonInteractionAction, setPersonBirthdayAction } from "@/app/actions/people";
 import { addChatMessageAction } from "@/app/actions/chat";
 import { addInsightAction } from "@/app/actions/insights";
-import { addKnowledgeEntryAction } from "@/app/actions/knowledge";
+import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/actions/knowledge";
 import { updateLifeAreaScoreAction } from "@/app/actions/lifeAreas";
 import { updatePersonalDNAAction, completeOnboardingAction } from "@/app/actions/personalDna";
 import { addGoalAction, toggleMilestoneAction, removeGoalAction } from "@/app/actions/goals";
@@ -56,6 +56,7 @@ interface AtlasState extends HydratedState {
   addChatMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => Promise<void>;
   addInsight: (content: string) => Promise<void>;
   addKnowledgeEntry: (entry: Omit<KnowledgeEntry, "id">) => Promise<void>;
+  markKnowledgeReviewed: (entryId: string) => Promise<void>;
   updateLifeAreaScore: (key: LifeArea["key"], score: number) => Promise<void>;
 
   updatePersonalDNA: (patch: Partial<PersonalDNA>) => Promise<void>;
@@ -129,6 +130,13 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   addKnowledgeEntry: async (entry) => {
     const created = await addKnowledgeEntryAction(entry);
     set((state) => ({ knowledgeEntries: [created, ...state.knowledgeEntries] }));
+  },
+
+  markKnowledgeReviewed: async (entryId) => {
+    const updated = await markKnowledgeReviewedAction(entryId);
+    set((state) => ({
+      knowledgeEntries: state.knowledgeEntries.map((k) => (k.id === entryId ? updated : k)),
+    }));
   },
 
   updateLifeAreaScore: async (key, score) => {

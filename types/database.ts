@@ -166,6 +166,9 @@ export interface Database {
           source: string;
           summary: string;
           duration_minutes: number | null;
+          last_reviewed_at: string | null;
+          flashcards: { front: string; back: string }[] | null;
+          review_questions: string[] | null;
           created_at: string;
         },
         {
@@ -176,6 +179,9 @@ export interface Database {
           source: string;
           summary: string;
           duration_minutes?: number | null;
+          last_reviewed_at?: string | null;
+          flashcards?: { front: string; back: string }[] | null;
+          review_questions?: string[] | null;
         },
         {
           id?: string;
@@ -185,6 +191,9 @@ export interface Database {
           source?: string;
           summary?: string;
           duration_minutes?: number | null;
+          last_reviewed_at?: string | null;
+          flashcards?: { front: string; back: string }[] | null;
+          review_questions?: string[] | null;
         }
       >;
       daily_intentions: TableDef<

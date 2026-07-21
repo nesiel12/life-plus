@@ -1,4 +1,4 @@
-import { getLocalDayOfWeek } from "@/lib/intelligence/personalDNA/timezone";
+import { getLocalDayOfWeek, getLocalDateKey } from "@/lib/intelligence/personalDNA/timezone";
 import type { PatternCandidate } from "@/lib/intelligence/personalDNA/types";
 
 const DAY_LABELS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"]; // index matches Date.getDay()
@@ -8,16 +8,8 @@ const MIN_STRENGTH_FOR_MOST_ACTIVE_DAY = 0.25; // meaningfully more than an even
 const MIN_WINDOW_DAYS_FOR_CONSISTENCY = 7;
 const CONSISTENCY_WINDOW_DAYS = 30;
 
-function toLocalDateKey(isoDateTime: string): string {
-  // Distinct-day bucketing needs to agree with getLocalDayOfWeek's timezone,
-  // not UTC — otherwise an evening entry near midnight could be counted on
-  // the wrong local day.
-  const formatted = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date(isoDateTime));
-  return formatted; // en-CA formats as YYYY-MM-DD
-}
-
 function analyzeMostActiveDay(activityDates: string[]): PatternCandidate | null {
-  const distinctDays = new Set(activityDates.map(toLocalDateKey));
+  const distinctDays = new Set(activityDates.map((d) => getLocalDateKey(d)));
   if (distinctDays.size < MIN_DISTINCT_DAYS_FOR_MOST_ACTIVE_DAY) return null;
 
   const counts = new Array(7).fill(0);
@@ -58,7 +50,9 @@ function analyzeActivityConsistency(activityDates: string[], now: number): Patte
   if (windowDays < MIN_WINDOW_DAYS_FOR_CONSISTENCY) return null;
 
   const activeDaysInWindow = new Set(
-    activityDates.filter((iso) => (now - new Date(iso).getTime()) / 86_400_000 <= CONSISTENCY_WINDOW_DAYS).map(toLocalDateKey)
+    activityDates
+      .filter((iso) => (now - new Date(iso).getTime()) / 86_400_000 <= CONSISTENCY_WINDOW_DAYS)
+      .map((d) => getLocalDateKey(d))
   );
 
   const consistency = Math.min(1, activeDaysInWindow.size / windowDays);

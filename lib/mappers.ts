@@ -88,6 +88,9 @@ export function toKnowledgeEntry(row: KnowledgeEntryRow): KnowledgeEntry {
     source: row.source,
     summary: row.summary,
     durationMinutes: row.duration_minutes ?? undefined,
+    lastReviewedAt: row.last_reviewed_at ?? undefined,
+    flashcards: row.flashcards ?? undefined,
+    reviewQuestions: row.review_questions ?? undefined,
   };
 }
 

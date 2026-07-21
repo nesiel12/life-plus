@@ -22,3 +22,9 @@ export async function addKnowledgeEntryAction(input: {
   });
   return toKnowledgeEntry(row);
 }
+
+export async function markKnowledgeReviewedAction(entryId: string) {
+  const userId = await getCurrentUserId();
+  const row = await knowledgeEntriesRepo.markReviewed(userId, entryId);
+  return toKnowledgeEntry(row);
+}

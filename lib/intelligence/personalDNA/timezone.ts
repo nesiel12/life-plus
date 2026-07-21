@@ -31,3 +31,12 @@ export function getLocalDayOfWeek(isoDateTime: string, timeZone: string = DEFAUL
   const weekday = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(new Date(isoDateTime));
   return WEEKDAY_TO_INDEX[weekday] ?? new Date(isoDateTime).getDay();
 }
+
+// A YYYY-MM-DD key in local time — the same distinct-day bucketing
+// analyzers/routine.ts uses for its 30-day consistency score, exported so
+// lib/learning/computeStudyStreak.ts (Learning Experience v2) buckets days
+// identically instead of a second, potentially timezone-inconsistent
+// implementation. en-CA happens to format as YYYY-MM-DD.
+export function getLocalDateKey(isoDateTime: string, timeZone: string = DEFAULT_TIMEZONE): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date(isoDateTime));
+}
