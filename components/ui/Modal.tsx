@@ -1,8 +1,11 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 // Single stacking-order scale for every overlay in the app, instead of each
 // component picking its own z-index independently (see docs/TECH_DEBT.md #12).
@@ -50,16 +53,70 @@ export function Modal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, closeOnEscape, onClose]);
 
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // WCAG modal-dialog focus management (docs/BACKLOG.md): move focus into
+  // the panel on open (unless something inside it — e.g. an autoFocus field
+  // — already claimed it), trap Tab within the panel while open, and return
+  // focus to whatever had it before the modal opened (typically the button
+  // that triggered it) once it closes.
+  useEffect(() => {
+    if (!open) return;
+
+    const triggerElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const focusFirst = () => {
+      const panel = panelRef.current;
+      if (!panel || panel.contains(document.activeElement)) return;
+      const focusable = panel.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      (focusable ?? panel).focus();
+    };
+    const raf = requestAnimationFrame(focusFirst);
+
+    function handleTab(e: KeyboardEvent) {
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const focusable = Array.from(
+        panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+      ).filter((el) => el.offsetParent !== null);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener("keydown", handleTab);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("keydown", handleTab);
+      triggerElement?.focus();
+    };
+  }, [open]);
+
   if (!backdrop) {
     return (
       <AnimatePresence>
         {open && (
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.96 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className={cn("glass-card fixed rounded-2xl shadow-2xl", zIndex, panelClassName)}
+            className={cn(
+              "focus-ring glass-card fixed rounded-2xl shadow-2xl",
+              zIndex,
+              panelClassName
+            )}
           >
             {children}
           </motion.div>
@@ -83,11 +140,15 @@ export function Modal({
           onClick={closeOnBackdropClick ? onClose : undefined}
         >
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
             initial={{ opacity: 0, y: -16, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -16, scale: 0.97 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className={cn("glass-card w-full rounded-2xl shadow-2xl", panelClassName)}
+            className={cn("focus-ring glass-card w-full rounded-2xl shadow-2xl", panelClassName)}
             onClick={(e) => e.stopPropagation()}
           >
             {children}
