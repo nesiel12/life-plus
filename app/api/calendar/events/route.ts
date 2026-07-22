@@ -15,6 +15,10 @@ const createEventSchema = z.object({
   end: z.string().datetime({ offset: true }),
 });
 
+const deleteEventSchema = z.object({
+  googleEventId: z.string().trim().min(1),
+});
+
 interface GoogleEventResponse {
   id?: string;
   htmlLink?: string;
@@ -70,6 +74,49 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ id: data.id, htmlLink: data.htmlLink });
+  } catch {
+    return NextResponse.json({ error: "Could not reach Google Calendar." }, { status: 502 });
+  }
+}
+
+// The confirm step of "clear my evening" (AI Command Panel, docs/ATLAS_
+// ARCHITECTURE_VISION.md §12) — the client already showed the user the real
+// events app/api/commands/interpret found and got an explicit confirmation
+// before calling this per event, mirroring the same "propose, then a
+// distinct confirm mutates" pattern the POST handler above already
+// established for creating an event from an accepted suggestion.
+export async function DELETE(request: NextRequest) {
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  if (!token?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limited = rateLimitResponse(`calendar-events-delete:${token.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
+  if (limited) return limited;
+
+  const accessToken = token.error ? undefined : token.accessToken;
+  if (!accessToken) {
+    return NextResponse.json({ error: "Google Calendar is not connected." }, { status: 409 });
+  }
+
+  const parsed = await parseJsonBody(request, deleteEventSchema);
+  if (parsed.error) return parsed.error;
+  const { googleEventId } = parsed.data;
+
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(googleEventId)}`,
+      { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    // Google returns 410 Gone for an already-deleted event — treat that as
+    // success too, since the end state ("this event no longer exists") is
+    // exactly what was asked for.
+    if (!res.ok && res.status !== 410) {
+      return NextResponse.json({ error: "Google Calendar rejected the deletion." }, { status: 502 });
+    }
+
+    return NextResponse.json({ deleted: true });
   } catch {
     return NextResponse.json({ error: "Could not reach Google Calendar." }, { status: 502 });
   }

@@ -8,6 +8,7 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { Logo } from "@/components/ui/Logo";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
 import { BriefingSignalList, type BriefingSignal } from "@/components/features/BriefingSignalList";
+import { CommandPanel } from "@/components/features/CommandPanel";
 import { cn } from "@/lib/utils";
 
 interface Briefing {
@@ -30,6 +31,7 @@ const FRIENDLY_ERROR = "לא הצלחתי להתחבר כרגע. נסה שוב �
 export function AICompanion() {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"chat" | "command">("chat");
   const [input, setInput] = useState("");
   const user = useAtlasStore((s) => s.user);
   const chatHistory = useAtlasStore((s) => s.chatHistory);
@@ -153,6 +155,35 @@ export function AICompanion() {
           </button>
         </div>
 
+        {/* AI Command Panel (docs/ATLAS_ARCHITECTURE_VISION.md §12): a
+            distinct, explicitly-chosen mode rather than silently guessing
+            "is this message a command or a chat" from free text — the user
+            decides, then the panel decides what to do with it. */}
+        <div className="flex gap-1 border-b border-glass-border px-3 py-2">
+          <button
+            onClick={() => setMode("chat")}
+            className={cn(
+              "focus-ring rounded-lg px-2.5 py-1 text-xs transition-colors",
+              mode === "chat" ? "bg-white/5 text-foreground" : "text-muted hover:text-foreground"
+            )}
+          >
+            שיחה
+          </button>
+          <button
+            onClick={() => setMode("command")}
+            className={cn(
+              "focus-ring rounded-lg px-2.5 py-1 text-xs transition-colors",
+              mode === "command" ? "bg-white/5 text-foreground" : "text-muted hover:text-foreground"
+            )}
+          >
+            פקודה
+          </button>
+        </div>
+
+        {mode === "command" && <CommandPanel />}
+
+        {mode === "chat" && (
+        <>
         <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
           {showProactiveOpener && (
             <div className="flex flex-col gap-3">
@@ -245,6 +276,8 @@ export function AICompanion() {
             <Send size={16} />
           </button>
         </div>
+        </>
+        )}
       </Modal>
 
       <motion.button

@@ -4,7 +4,11 @@ import type { MomentCategory } from "@/types";
 
 export type TimeWindow = "morning" | "midday" | "afternoon" | "evening" | "night";
 
-const WINDOW_LABELS: Record<TimeWindow, string> = {
+// Exported for lib/energy/deriveEnergyLevel.ts (Today's energy-level card,
+// docs/ATLAS_ARCHITECTURE_VISION.md §12): comparing "the user's current
+// local hour" against a peakActivityWindow pattern's value only means
+// something if both sides bucket hours into windows the exact same way.
+export const WINDOW_LABELS: Record<TimeWindow, string> = {
   morning: "05:00–11:00",
   midday: "11:00–15:00",
   afternoon: "15:00–18:00",
@@ -23,7 +27,7 @@ const CATEGORY_LABELS: Record<MomentCategory, string> = {
 
 const MIN_EVIDENCE_PER_CATEGORY = 5;
 
-function hourToWindow(hour: number): TimeWindow {
+export function hourToWindow(hour: number): TimeWindow {
   if (hour >= 5 && hour < 11) return "morning";
   if (hour >= 11 && hour < 15) return "midday";
   if (hour >= 15 && hour < 18) return "afternoon";

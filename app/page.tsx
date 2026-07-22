@@ -9,6 +9,8 @@ import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { LifeCompass } from "@/components/features/LifeCompass";
 import { AIBriefing } from "@/components/features/AIBriefing";
+import { EnergyLevelBadge } from "@/components/features/EnergyLevelBadge";
+import { ScreenTimeWidget } from "@/components/features/ScreenTimeWidget";
 import { ScheduleSuggestions } from "@/components/features/ScheduleSuggestions";
 import { GoalsPanel } from "@/components/features/GoalsPanel";
 import { daysUntil } from "@/lib/utils";
@@ -54,7 +56,9 @@ export default function Home() {
           {greeting ?? "שלום"}, {displayName}.
         </motion.h1>
       </div>
-      <p className="mb-10 text-muted">{user.lifeStage}</p>
+      <p className="mb-4 text-muted">{user.lifeStage}</p>
+      <EnergyLevelBadge />
+      <ScreenTimeWidget />
 
       <div className="flex flex-col gap-6">
         <AIBriefing />
