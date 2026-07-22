@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { AreaHealthCard } from "@/components/features/AreaHealthCard";
+import { useInsights } from "@/hooks/useInsights";
 import { LIFE_AREAS } from "@/lib/lifeAreas";
 import type { AreaInsight } from "@/lib/areas/types";
 import type { LifeAreaKey } from "@/types";
@@ -15,23 +15,8 @@ import type { LifeAreaKey } from "@/types";
 // Experience Layer screen uses.
 export default function AreasPage() {
   const lifeAreas = useAtlasStore((s) => s.lifeAreas);
-  const [insights, setInsights] = useState<AreaInsight[] | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/areas/insights")
-      .then((res) => (res.ok ? res.json() : { areas: [] }))
-      .then((data: { areas: AreaInsight[] }) => {
-        if (!cancelled) setInsights(data.areas);
-      })
-      .catch(() => {
-        // Insights are a progressive enhancement — a failed fetch just
-        // means cards render in the default order without them.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data } = useInsights<{ areas: AreaInsight[] }>("/api/areas/insights", { areas: [] });
+  const insights = data?.areas ?? null;
 
   const insightByKey = new Map((insights ?? []).map((i) => [i.areaKey, i]));
   // The Intelligence Engine's own per-area ranking (app/api/areas/insights)

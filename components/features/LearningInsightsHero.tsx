@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Flame, Sparkles, Check, X } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { ConfidenceBar } from "@/components/ui/ConfidenceBar";
 import type { LearningInsights } from "@/lib/learning/types";
 
 interface LearningInsightsHeroProps {
@@ -67,22 +68,7 @@ export function LearningInsightsHero({ insights, onAcceptNextReview, onDismissNe
           <p className="mb-1 text-sm text-foreground">{insights.nextReview.topic}</p>
           <p className="mb-2 text-xs leading-relaxed text-foreground/70">{insights.nextReview.rationale}</p>
 
-          <div className="mb-2 flex items-center gap-2">
-            <span className="shrink-0 text-xs text-muted">רמת התאמה</span>
-            <div
-              className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/5"
-              role="progressbar"
-              aria-valuenow={Math.round(insights.nextReview.confidence * 100)}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="רמת התאמה של הצעת החזרה"
-            >
-              <div
-                className="h-full rounded-full bg-accent-faith"
-                style={{ width: `${Math.round(insights.nextReview.confidence * 100)}%` }}
-              />
-            </div>
-          </div>
+          <ConfidenceBar value={insights.nextReview.confidence} ariaLabel="רמת התאמה של הצעת החזרה" className="mb-2" />
 
           <div className="flex items-center justify-end gap-2">
             <button

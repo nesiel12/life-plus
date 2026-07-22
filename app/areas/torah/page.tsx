@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { UploadCloud, FileAudio, Sparkles, Plus, Link2, Search } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { LearningInsightsHero } from "@/components/features/LearningInsightsHero";
 import { KnowledgeLibraryCard } from "@/components/features/KnowledgeLibraryCard";
 import { useApiCall } from "@/hooks/useApiCall";
+import { useInsights } from "@/hooks/useInsights";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import type { KnowledgeEntry } from "@/types";
 import type { LearningInsights } from "@/lib/learning/types";
@@ -40,27 +41,14 @@ export default function TorahSpacePage() {
 
   // Learning Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §10): streak,
   // progress, suggested next review, and per-entry related knowledge/memory/
-  // goals — fetched client-side on mount, the same established pattern
-  // AIBriefing/ScheduleSuggestions/Goals Experience v2 already use.
-  const [insights, setInsights] = useState<LearningInsights | null>(null);
-  const [refreshToken, setRefreshToken] = useState(0);
-  const refreshInsights = () => setRefreshToken((t) => t + 1);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/torah/insights")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: LearningInsights | null) => {
-        if (!cancelled) setInsights(data);
-      })
-      .catch(() => {
-        // Insights are a progressive enhancement — a failed fetch just means
-        // the library renders without them, not an error state.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshToken, knowledgeEntries.length]);
+  // goals — fetched client-side on mount via the shared useInsights hook
+  // (Atlas Core Optimization v1), the same established pattern AIBriefing/
+  // ScheduleSuggestions/Goals Experience v2 already use.
+  const {
+    data: insights,
+    setData: setInsights,
+    refresh: refreshInsights,
+  } = useInsights<LearningInsights | null>("/api/torah/insights", null, [knowledgeEntries.length]);
 
   const entryInsightById = useMemo(() => {
     const map = new Map(insights?.entries.map((e) => [e.entryId, e]) ?? []);

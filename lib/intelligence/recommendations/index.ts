@@ -3,6 +3,7 @@ import { recommendationEventsRepo } from "@/lib/db/recommendationEvents";
 import { summarizeRecommendationOutcomes } from "@/lib/intelligence/recommendations/feedback";
 
 export { createRecommendationEvent, recordRecommendationOutcome } from "@/lib/intelligence/recommendations/track";
+export { indexPendingEventsByKey } from "@/lib/intelligence/recommendations/dedupe";
 
 const TYPE_LABELS: Record<string, string> = {
   calendar_suggestion: "הצעות ליומן",

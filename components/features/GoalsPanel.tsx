@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Sparkles, Target } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { GoalJourneyCard } from "@/components/features/GoalJourneyCard";
 import { useApiCall } from "@/hooks/useApiCall";
+import { useInsights } from "@/hooks/useInsights";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import { cn } from "@/lib/utils";
 import { LIFE_AREA_LIST } from "@/lib/lifeAreas";
@@ -25,31 +26,17 @@ export function GoalsPanel() {
   // per-goal layer — stage, estimated completion, next recommended action,
   // related memory — fetched from app/api/goals/insights the same
   // client-side-on-mount way AIBriefing/ScheduleSuggestions already
-  // established. Keyed by goalId so a card can render instantly from the
-  // live store and layer the insight in once it arrives.
-  const [insights, setInsights] = useState<Record<string, GoalInsight>>({});
-  // Bumped after any mutation that changes stage/progress/next-action
-  // (toggle, accept, create, remove) — same "bump a counter to re-run an
-  // effect" idiom app/layout's AppShell already uses for its retry button.
-  const [refreshToken, setRefreshToken] = useState(0);
-  const refreshInsights = () => setRefreshToken((t) => t + 1);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/goals/insights")
-      .then((res) => (res.ok ? res.json() : { goals: [] }))
-      .then((data: { goals: GoalInsight[] }) => {
-        if (cancelled) return;
-        setInsights(Object.fromEntries(data.goals.map((insight) => [insight.goalId, insight])));
-      })
-      .catch(() => {
-        // Insights are a progressive enhancement — a failed fetch just means
-        // cards stay in their base (store-only) form, not an error state.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshToken, goals.length]);
+  // established, via the shared useInsights hook (Atlas Core Optimization
+  // v1). Re-keyed by goalId below so a card can look itself up instantly.
+  const { data, setData: setInsightsData, refresh: refreshInsights } = useInsights<{ goals: GoalInsight[] }>(
+    "/api/goals/insights",
+    { goals: [] },
+    [goals.length]
+  );
+  const insights = useMemo(
+    () => Object.fromEntries((data?.goals ?? []).map((insight) => [insight.goalId, insight])),
+    [data]
+  );
 
   const {
     loading: breaking,
@@ -98,8 +85,8 @@ export function GoalsPanel() {
   }
 
   function handleDismissNextAction(goalId: string, recommendationEventId: string) {
-    setInsights((prev) =>
-      prev[goalId] ? { ...prev, [goalId]: { ...prev[goalId], nextAction: null } } : prev
+    setInsightsData((prev) =>
+      prev ? { goals: prev.goals.map((g) => (g.goalId === goalId ? { ...g, nextAction: null } : g)) } : prev
     );
     recordRecommendationOutcomeAction(recommendationEventId, "rejected").catch((err) => {
       console.error("Failed to record recommendation outcome:", err);

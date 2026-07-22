@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Check, X, CalendarClock, Clock3 } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { ConfidenceBar } from "@/components/ui/ConfidenceBar";
 import { useApiCall } from "@/hooks/useApiCall";
 
 function formatTimeRange(startISO: string, endISO: string): string {
@@ -106,24 +107,12 @@ export function ScheduleSuggestions() {
 
             <p className="mb-3 text-xs leading-relaxed text-foreground/70">{s.rationale}</p>
 
-            {/* Confidence — the same thin-bar primitive goal progress and
-                life-area scores already use, not a new chart type. */}
-            <div className="mb-3 flex items-center gap-2">
-              <span className="shrink-0 text-xs text-muted">רמת התאמה</span>
-              <div
-                className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/5"
-                role="progressbar"
-                aria-valuenow={Math.round(s.confidence * 100)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="רמת התאמה של ההצעה"
-              >
-                <div
-                  className="h-full rounded-full bg-accent-health"
-                  style={{ width: `${Math.round(s.confidence * 100)}%` }}
-                />
-              </div>
-            </div>
+            <ConfidenceBar
+              value={s.confidence}
+              ariaLabel="רמת התאמה של ההצעה"
+              barColorClass="bg-accent-health"
+              className="mb-3"
+            />
 
             <div className="flex items-center justify-end gap-2">
               <button

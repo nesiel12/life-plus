@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { PersonRelationshipCard } from "@/components/features/PersonRelationshipCard";
 import { useApiCall } from "@/hooks/useApiCall";
+import { useInsights } from "@/hooks/useInsights";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import type { PersonInsight } from "@/lib/family/types";
 
@@ -21,25 +22,12 @@ export default function FamilyCarePage() {
   const addMoment = useAtlasStore((s) => s.addMoment);
   const setPersonBirthday = useAtlasStore((s) => s.setPersonBirthday);
 
-  const [insights, setInsights] = useState<PersonInsight[] | null>(null);
-  const [refreshToken, setRefreshToken] = useState(0);
-  const refreshInsights = () => setRefreshToken((t) => t + 1);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/family/insights")
-      .then((res) => (res.ok ? res.json() : { people: [] }))
-      .then((data: { people: PersonInsight[] }) => {
-        if (!cancelled) setInsights(data.people);
-      })
-      .catch(() => {
-        // Insights are a progressive enhancement — a failed fetch just
-        // means cards render without them.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshToken, people.length]);
+  const { data, setData, refresh: refreshInsights } = useInsights<{ people: PersonInsight[] }>(
+    "/api/family/insights",
+    { people: [] },
+    [people.length]
+  );
+  const insights = data?.people ?? null;
 
   const insightByPersonId = useMemo(() => new Map((insights ?? []).map((i) => [i.personId, i])), [insights]);
   const orderedPeople = insights
@@ -73,13 +61,15 @@ export default function FamilyCarePage() {
   }
 
   function handleDismissAction(recommendationEventId: string) {
-    setInsights((prev) =>
+    setData((prev) =>
       prev
-        ? prev.map((insight) =>
-            insight.suggestedAction?.recommendationEventId === recommendationEventId
-              ? { ...insight, suggestedAction: null }
-              : insight
-          )
+        ? {
+            people: prev.people.map((insight) =>
+              insight.suggestedAction?.recommendationEventId === recommendationEventId
+                ? { ...insight, suggestedAction: null }
+                : insight
+            ),
+          }
         : prev
     );
     recordRecommendationOutcomeAction(recommendationEventId, "rejected").catch((err) => {

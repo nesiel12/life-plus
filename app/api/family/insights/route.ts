@@ -8,9 +8,9 @@ import { momentsRepo } from "@/lib/db/moments";
 import { personalDnaRepo } from "@/lib/db/personalDna";
 import { recommendationEventsRepo } from "@/lib/db/recommendationEvents";
 import { toPerson, toMoment } from "@/lib/mappers";
-import { retrieveRelevantMemory } from "@/lib/memory/retrieveMemory";
-import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
-import { rankSignals, CATEGORY_DEFAULTS } from "@/lib/intelligence/core";
+import { fetchMemoryCandidates, rankMemoryCandidates } from "@/lib/memory/retrieveMemory";
+import { createRecommendationEvent, indexPendingEventsByKey } from "@/lib/intelligence/recommendations";
+import { rankSignals, CATEGORY_DEFAULTS, WEAK_LIFE_AREA_IMPORTANCE } from "@/lib/intelligence/core";
 import type { IntelligenceSignal } from "@/lib/intelligence/core";
 import { computeSuggestionConfidence } from "@/lib/suggestionConfidence";
 import { buildTimelineEvents } from "@/lib/timeline/buildTimelineEvents";
@@ -24,17 +24,7 @@ export const runtime = "nodejs";
 const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 };
 const MAX_RELATED_MEMORY = 3;
 const DEFAULT_STALE_THRESHOLD_DAYS = 7;
-// A relationship that "needs attention" deserves the same elevated-
-// importance boost Areas Experience v2 already established for a weak life
-// area (WEAK_LIFE_AREA_IMPORTANCE, lib/intelligence/core/normalize.ts) —
-// same value, kept local here rather than importing a constant named for a
-// different domain.
-const NEEDS_ATTENTION_IMPORTANCE = 0.75;
 const NEXT_INTERACTION_TYPE = "family_next_interaction";
-
-interface NextInteractionPayload {
-  personId?: string;
-}
 
 // Family Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §10). Same
 // architectural call as Goals/Learning/Areas Experience v2: does not call
@@ -57,23 +47,19 @@ export async function GET() {
     return NextResponse.json({ people: [] });
   }
 
-  const [peopleRows, momentRows, personalDna, recommendationEvents] = await Promise.all([
+  const [peopleRows, momentRows, personalDna, recommendationEvents, memoryCandidates] = await Promise.all([
     peopleRepo.list(user.id),
     momentsRepo.list(user.id),
     personalDnaRepo.get(user.id),
     recommendationEventsRepo.list(user.id),
+    fetchMemoryCandidates(user.id),
   ]);
 
   const people = peopleRows.map(toPerson);
   const moments = momentRows.map(toMoment);
   const staleThresholdDays = personalDna?.family_check_in_interval_days ?? DEFAULT_STALE_THRESHOLD_DAYS;
 
-  const pendingNextInteractionByPerson = new Map(
-    recommendationEvents
-      .filter((event) => event.type === NEXT_INTERACTION_TYPE && event.status === "pending")
-      .map((event) => [(event.recommendation_payload as NextInteractionPayload).personId, event])
-      .filter((entry): entry is [string, (typeof recommendationEvents)[number]] => Boolean(entry[0]))
-  );
+  const pendingNextInteractionByPerson = indexPendingEventsByKey(recommendationEvents, NEXT_INTERACTION_TYPE, "personId");
 
   const now = Date.now();
 
@@ -106,7 +92,9 @@ export async function GET() {
 
       // Memory Engine reuse: the person's own name as the query, same
       // pattern Goals/Learning/Areas Experience v2 each established.
-      const relatedMemory = await retrieveRelevantMemory(user.id, person.hebrewName ?? person.name, MAX_RELATED_MEMORY);
+      // Candidates were fetched once above (Atlas Core Optimization v1) —
+      // ranking per person is a pure, synchronous pass, not a re-fetch.
+      const relatedMemory = rankMemoryCandidates(memoryCandidates, person.hebrewName ?? person.name, MAX_RELATED_MEMORY);
 
       const picked = pickSuggestedAction({ health, daysUntilBirthday, hasRelatedMemory: relatedMemory.length > 0 });
       const confidence = computeSuggestionConfidence(recencyScores[i], recencyScores);
@@ -146,7 +134,11 @@ export async function GET() {
         source: "family-insights",
         title: person.hebrewName ?? person.name,
         summary: `${person.hebrewName ?? person.name}: ${health}`,
-        importance: health === "needs_attention" ? NEEDS_ATTENTION_IMPORTANCE : CATEGORY_DEFAULTS.relationship.importance,
+        // Reuses the same elevated-importance boost Areas Experience v2
+        // established for a weak life area — a relationship that needs
+        // attention deserves the identical signal-priority treatment, not a
+        // second hand-copied number (Atlas Core Optimization v1).
+        importance: health === "needs_attention" ? WEAK_LIFE_AREA_IMPORTANCE : CATEGORY_DEFAULTS.relationship.importance,
         confidence: CATEGORY_DEFAULTS.relationship.confidence,
         recency: 1,
       };

@@ -9,26 +9,15 @@ import { rankByRelevance, type MemoryCandidate } from "@/lib/memory/rankRelevanc
 
 const DEFAULT_LIMIT = 5;
 
-// Memory Engine v1's only DB-facing piece: pulls the user's existing
-// moments/knowledge_entries/insights/chat_messages (already durably
-// stored — this is a recall gap, not a storage gap, see docs/ATLAS_
-// ARCHITECTURE_VISION.md §2) and ranks them against the current query.
-// Returns pre-formatted lines ready to drop into an LLM prompt, so callers
-// don't need to know the underlying entity shapes.
-//
-// chat_messages joined the candidate pool for AI Companion Experience v2
-// (§10) — real support for "reference previous conversations" and
-// continuity across sessions. A short conversation sends its whole
-// history to /api/chat anyway (app/api/chat/route.ts's zod schema caps it
-// at 50 messages), so this mostly duplicates what the model can already
-// see for a light user; its real value shows up once history grows past
-// that cap and an older, relevant exchange needs to be recalled on
-// purpose rather than assumed to still be in the visible window.
-export async function retrieveRelevantMemory(
-  userId: string,
-  query: string,
-  limit = DEFAULT_LIMIT
-): Promise<string[]> {
+// Memory Engine v1's DB-facing piece, split into fetch-once/rank-many
+// (Atlas Core Optimization v1). Previously a single function did both, so
+// a caller ranking against N different queries in the same request (every
+// */insights route — Goals, Learning, Areas, Family) triggered N redundant
+// re-fetches of the same four tables. fetchMemoryCandidates does the I/O;
+// rankMemoryCandidates is pure. retrieveRelevantMemory composes both,
+// unchanged in signature and behavior, for the single-query call sites
+// (chat, goal breakdown, Torah extraction) that never needed the split.
+export async function fetchMemoryCandidates(userId: string): Promise<MemoryCandidate[]> {
   const [momentRows, knowledgeRows, insightRows, chatMessageRows] = await Promise.all([
     momentsRepo.list(userId),
     knowledgeEntriesRepo.list(userId),
@@ -36,7 +25,7 @@ export async function retrieveRelevantMemory(
     chatMessagesRepo.list(userId),
   ]);
 
-  const candidates: MemoryCandidate[] = [
+  return [
     ...momentRows.map(toMoment).map(
       (m): MemoryCandidate => ({
         id: `moment:${m.id}`,
@@ -70,6 +59,25 @@ export async function retrieveRelevantMemory(
       })
     ),
   ];
+}
 
+export function rankMemoryCandidates(candidates: MemoryCandidate[], query: string, limit = DEFAULT_LIMIT): string[] {
   return rankByRelevance(query, candidates, limit).map((ranked) => ranked.label);
+}
+
+// chat_messages joined the candidate pool for AI Companion Experience v2
+// (§10) — real support for "reference previous conversations" and
+// continuity across sessions. A short conversation sends its whole
+// history to /api/chat anyway (app/api/chat/route.ts's zod schema caps it
+// at 50 messages), so this mostly duplicates what the model can already
+// see for a light user; its real value shows up once history grows past
+// that cap and an older, relevant exchange needs to be recalled on
+// purpose rather than assumed to still be in the visible window.
+export async function retrieveRelevantMemory(
+  userId: string,
+  query: string,
+  limit = DEFAULT_LIMIT
+): Promise<string[]> {
+  const candidates = await fetchMemoryCandidates(userId);
+  return rankMemoryCandidates(candidates, query, limit);
 }

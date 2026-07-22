@@ -9,7 +9,7 @@ import { momentsRepo } from "@/lib/db/moments";
 import { knowledgeEntriesRepo } from "@/lib/db/knowledgeEntries";
 import { personalPatternsRepo } from "@/lib/db/personalPatterns";
 import { toLifeArea, toGoal, toMoment, toKnowledgeEntry } from "@/lib/mappers";
-import { retrieveRelevantMemory } from "@/lib/memory/retrieveMemory";
+import { fetchMemoryCandidates, rankMemoryCandidates } from "@/lib/memory/retrieveMemory";
 import { MIN_CONFIDENCE_TO_SURFACE } from "@/lib/intelligence/personalDNA/confidence";
 import { rankSignals, CATEGORY_DEFAULTS, WEAK_LIFE_AREA_IMPORTANCE } from "@/lib/intelligence/core";
 import type { IntelligenceSignal } from "@/lib/intelligence/core";
@@ -73,12 +73,13 @@ export async function GET() {
     return NextResponse.json({ areas: [] });
   }
 
-  const [scoreRows, goalRows, momentRows, knowledgeRows, patternRows] = await Promise.all([
+  const [scoreRows, goalRows, momentRows, knowledgeRows, patternRows, memoryCandidates] = await Promise.all([
     lifeAreaScoresRepo.list(user.id),
     goalsRepo.listWithMilestones(user.id),
     momentsRepo.list(user.id),
     knowledgeEntriesRepo.list(user.id),
     personalPatternsRepo.list(user.id),
+    fetchMemoryCandidates(user.id),
   ]);
 
   const lifeAreas = scoreRows.map(toLifeArea);
@@ -92,124 +93,124 @@ export async function GET() {
 
   const now = Date.now();
 
-  const computed = await Promise.all(
-    LIFE_AREA_LIST.map(async (meta) => {
-      const area = lifeAreas.find((a) => a.key === meta.key);
-      const score = area?.score ?? 0;
+  // No await left in this loop now that memory ranking is synchronous
+  // (Atlas Core Optimization v1) — a plain map, not Promise.all over async
+  // callbacks that never actually awaited anything.
+  const computed = LIFE_AREA_LIST.map((meta) => {
+    const area = lifeAreas.find((a) => a.key === meta.key);
+    const score = area?.score ?? 0;
 
-      // "Faith" activity spans both moments tagged faith and Torah Space's
-      // own knowledge_entries — the same mapping Learning Experience v2 and
-      // Timeline Experience v1 already established, not a new convention.
-      const areaMoments = moments.filter((m) => m.category === meta.key);
-      const activityDates =
-        meta.key === "faith"
-          ? [...areaMoments.map((m) => m.timestamp), ...knowledgeEntries.map((k) => k.date)]
-          : areaMoments.map((m) => m.timestamp);
+    // "Faith" activity spans both moments tagged faith and Torah Space's
+    // own knowledge_entries — the same mapping Learning Experience v2 and
+    // Timeline Experience v1 already established, not a new convention.
+    const areaMoments = moments.filter((m) => m.category === meta.key);
+    const activityDates =
+      meta.key === "faith"
+        ? [...areaMoments.map((m) => m.timestamp), ...knowledgeEntries.map((k) => k.date)]
+        : areaMoments.map((m) => m.timestamp);
 
-      const { recentCount, previousCount } = computeActivityTrend(activityDates, now);
-      const lastActivityDaysAgo =
-        activityDates.length > 0
-          ? Math.min(...activityDates.map((d) => Math.max(0, daysSince(d))))
-          : null;
+    const { recentCount, previousCount } = computeActivityTrend(activityDates, now);
+    const lastActivityDaysAgo =
+      activityDates.length > 0 ? Math.min(...activityDates.map((d) => Math.max(0, daysSince(d)))) : null;
 
-      const areaGoals = goals.filter((g) => g.category === meta.key);
-      const activeGoalsCount = areaGoals.filter(
-        (g) => g.milestones.length === 0 || g.milestones.some((m) => !m.done)
-      ).length;
+    const areaGoals = goals.filter((g) => g.category === meta.key);
+    const activeGoalsCount = areaGoals.filter(
+      (g) => g.milestones.length === 0 || g.milestones.some((m) => !m.done)
+    ).length;
 
-      const priorityGoal = pickPriorityGoal(areaGoals);
-      const stage = priorityGoal
-        ? deriveGoalStage({
-            createdAt: priorityGoal.createdAt,
-            completedMilestones: priorityGoal.milestones.filter((m) => m.done).length,
-            totalMilestones: priorityGoal.milestones.length,
-          })
-        : null;
+    const priorityGoal = pickPriorityGoal(areaGoals);
+    const stage = priorityGoal
+      ? deriveGoalStage({
+          createdAt: priorityGoal.createdAt,
+          completedMilestones: priorityGoal.milestones.filter((m) => m.done).length,
+          totalMilestones: priorityGoal.milestones.length,
+        })
+      : null;
 
-      const attentionLevel = deriveAttentionLevel({
-        score,
-        recentCount,
-        previousCount,
-        hasStuckGoal: stage === "stuck",
-      });
+    const attentionLevel = deriveAttentionLevel({
+      score,
+      recentCount,
+      previousCount,
+      hasStuckGoal: stage === "stuck",
+    });
 
-      // Memory Engine reuse: the area's own label as the query — the one
-      // real, relevant "what's happened here lately" highlight, same
-      // pattern Goals/Learning Experience v2 already established per item.
-      const [recentHighlight = null] = await retrieveRelevantMemory(user.id, meta.label, MAX_HIGHLIGHT);
+    // Memory Engine reuse: the area's own label as the query — the one
+    // real, relevant "what's happened here lately" highlight, same
+    // pattern Goals/Learning Experience v2 already established per item.
+    // Candidates were fetched once above (Atlas Core Optimization v1).
+    const [recentHighlight = null] = rankMemoryCandidates(memoryCandidates, meta.label, MAX_HIGHLIGHT);
 
-      // Personal DNA reuse: the focus analyzer's own per-area pattern
-      // (category "focus", subject = this area's key) — real, confidence-
-      // gated, never fabricated when there's no evidence yet.
-      const focusPattern = patternRows.find(
-        (p) => p.category === "focus" && p.subject === meta.key && p.confidence >= MIN_CONFIDENCE_TO_SURFACE
-      );
-      const aiInsight = focusPattern?.description ?? null;
+    // Personal DNA reuse: the focus analyzer's own per-area pattern
+    // (category "focus", subject = this area's key) — real, confidence-
+    // gated, never fabricated when there's no evidence yet.
+    const focusPattern = patternRows.find(
+      (p) => p.category === "focus" && p.subject === meta.key && p.confidence >= MIN_CONFIDENCE_TO_SURFACE
+    );
+    const aiInsight = focusPattern?.description ?? null;
 
-      let recommendedAction: AreaInsight["recommendedAction"] = null;
-      if (priorityGoal && stage) {
-        const nextMilestone = priorityGoal.milestones.find((m) => !m.done);
-        if (nextMilestone) {
-          const rationale = buildNextActionRationale({
-            stage,
-            isWeakestLifeArea: attentionLevel === "needs_attention",
-            hasRelatedMemory: Boolean(recentHighlight),
-            taskSizePreference: taskSizePattern
-              ? { value: taskSizePattern.value as "smallTasks" | "largeTasks", confidence: taskSizePattern.confidence }
-              : null,
-          });
-          recommendedAction = { title: nextMilestone.title, rationale, goalTitle: priorityGoal.title };
-        }
-      }
-
-      // A per-area signal pair, ranked with the Intelligence Engine's own
-      // formula and category defaults (docs/ATLAS_ARCHITECTURE_VISION.md
-      // §9) — not to pick display text (there's rarely more than one real
-      // candidate per area to choose between), but to decide grid order:
-      // areas needing attention or carrying a confident behavioral insight
-      // surface first, instead of a fixed enum order.
-      const signals: IntelligenceSignal[] = [
-        {
-          id: `area-${meta.key}`,
-          category: "lifeArea",
-          source: "life-area-scores",
-          title: meta.label,
-          summary: `${meta.label}: ${score}%`,
-          importance: attentionLevel === "needs_attention" ? WEAK_LIFE_AREA_IMPORTANCE : CATEGORY_DEFAULTS.lifeArea.importance,
-          confidence: CATEGORY_DEFAULTS.lifeArea.confidence,
-          recency: 1,
-        },
-      ];
-      if (focusPattern) {
-        signals.push({
-          id: `pattern-${meta.key}`,
-          category: "personalPattern",
-          source: "personal-dna-engine",
-          title: "דפוס התנהגות",
-          summary: focusPattern.description,
-          importance: CATEGORY_DEFAULTS.personalPattern.importance,
-          confidence: focusPattern.confidence,
-          recency: 1,
+    let recommendedAction: AreaInsight["recommendedAction"] = null;
+    if (priorityGoal && stage) {
+      const nextMilestone = priorityGoal.milestones.find((m) => !m.done);
+      if (nextMilestone) {
+        const rationale = buildNextActionRationale({
+          stage,
+          isWeakestLifeArea: attentionLevel === "needs_attention",
+          hasRelatedMemory: Boolean(recentHighlight),
+          taskSizePreference: taskSizePattern
+            ? { value: taskSizePattern.value as "smallTasks" | "largeTasks", confidence: taskSizePattern.confidence }
+            : null,
         });
+        recommendedAction = { title: nextMilestone.title, rationale, goalTitle: priorityGoal.title };
       }
-      const priorityScore = rankSignals(signals)[0]?.score ?? 0;
+    }
 
-      const insight: AreaInsight = {
-        areaKey: meta.key,
-        score,
-        attentionLevel,
-        activeGoalsCount,
-        recentCount,
-        previousCount,
-        lastActivityDaysAgo,
-        recentHighlight,
-        aiInsight,
-        recommendedAction,
-      };
+    // A per-area signal pair, ranked with the Intelligence Engine's own
+    // formula and category defaults (docs/ATLAS_ARCHITECTURE_VISION.md
+    // §9) — not to pick display text (there's rarely more than one real
+    // candidate per area to choose between), but to decide grid order:
+    // areas needing attention or carrying a confident behavioral insight
+    // surface first, instead of a fixed enum order.
+    const signals: IntelligenceSignal[] = [
+      {
+        id: `area-${meta.key}`,
+        category: "lifeArea",
+        source: "life-area-scores",
+        title: meta.label,
+        summary: `${meta.label}: ${score}%`,
+        importance: attentionLevel === "needs_attention" ? WEAK_LIFE_AREA_IMPORTANCE : CATEGORY_DEFAULTS.lifeArea.importance,
+        confidence: CATEGORY_DEFAULTS.lifeArea.confidence,
+        recency: 1,
+      },
+    ];
+    if (focusPattern) {
+      signals.push({
+        id: `pattern-${meta.key}`,
+        category: "personalPattern",
+        source: "personal-dna-engine",
+        title: "דפוס התנהגות",
+        summary: focusPattern.description,
+        importance: CATEGORY_DEFAULTS.personalPattern.importance,
+        confidence: focusPattern.confidence,
+        recency: 1,
+      });
+    }
+    const priorityScore = rankSignals(signals)[0]?.score ?? 0;
 
-      return { insight, priorityScore };
-    })
-  );
+    const insight: AreaInsight = {
+      areaKey: meta.key,
+      score,
+      attentionLevel,
+      activeGoalsCount,
+      recentCount,
+      previousCount,
+      lastActivityDaysAgo,
+      recentHighlight,
+      aiInsight,
+      recommendedAction,
+    };
+
+    return { insight, priorityScore };
+  });
 
   const areas = computed.sort((a, b) => b.priorityScore - a.priorityScore).map((c) => c.insight);
 

@@ -8,8 +8,8 @@ import { personalPatternsRepo } from "@/lib/db/personalPatterns";
 import { lifeAreaScoresRepo } from "@/lib/db/lifeAreaScores";
 import { recommendationEventsRepo } from "@/lib/db/recommendationEvents";
 import { toGoal, toLifeArea } from "@/lib/mappers";
-import { retrieveRelevantMemory } from "@/lib/memory/retrieveMemory";
-import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
+import { fetchMemoryCandidates, rankMemoryCandidates } from "@/lib/memory/retrieveMemory";
+import { createRecommendationEvent, indexPendingEventsByKey } from "@/lib/intelligence/recommendations";
 import { MIN_CONFIDENCE_TO_SURFACE } from "@/lib/intelligence/personalDNA/confidence";
 import { WEAK_LIFE_AREA_SCORE_THRESHOLD } from "@/lib/intelligence/core/normalize";
 import { computeSuggestionConfidence } from "@/lib/suggestionConfidence";
@@ -23,10 +23,6 @@ export const runtime = "nodejs";
 const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 }; // 20 requests / 5 min
 const MAX_RELATED_MEMORY = 3;
 const NEXT_ACTION_TYPE = "goal_next_action";
-
-interface NextActionPayload {
-  goalId?: string;
-}
 
 // Goals Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §4): per-goal
 // insight — stage, real estimated completion, and a Recommendation-
@@ -55,11 +51,12 @@ export async function GET() {
     return NextResponse.json({ goals: [] });
   }
 
-  const [goalRows, patternRows, lifeAreaRows, recommendationEvents] = await Promise.all([
+  const [goalRows, patternRows, lifeAreaRows, recommendationEvents, memoryCandidates] = await Promise.all([
     goalsRepo.listWithMilestones(user.id),
     personalPatternsRepo.list(user.id),
     lifeAreaScoresRepo.list(user.id),
     recommendationEventsRepo.list(user.id),
+    fetchMemoryCandidates(user.id),
   ]);
 
   const goals = goalRows.map(toGoal);
@@ -84,12 +81,7 @@ export async function GET() {
   // recommendation_events with duplicates of the same still-unanswered
   // suggestion (a real difference from calendar suggestions, where every
   // slot is genuinely new each time).
-  const pendingNextActionByGoal = new Map(
-    recommendationEvents
-      .filter((event) => event.type === NEXT_ACTION_TYPE && event.status === "pending")
-      .map((event) => [(event.recommendation_payload as NextActionPayload).goalId, event])
-      .filter((entry): entry is [string, (typeof recommendationEvents)[number]] => Boolean(entry[0]))
-  );
+  const pendingNextActionByGoal = indexPendingEventsByKey(recommendationEvents, NEXT_ACTION_TYPE, "goalId");
 
   const insights: GoalInsight[] = await Promise.all(
     goals.map(async (goal) => {
@@ -100,7 +92,9 @@ export async function GET() {
 
       // Memory Engine reuse: the goal's own title is the query, same pattern
       // /api/goals/breakdown already uses when generating milestones.
-      const relatedMemory = await retrieveRelevantMemory(user.id, goal.title, MAX_RELATED_MEMORY);
+      // Candidates were fetched once above (Atlas Core Optimization v1) —
+      // ranking per goal is a pure, synchronous pass, not a re-fetch.
+      const relatedMemory = rankMemoryCandidates(memoryCandidates, goal.title, MAX_RELATED_MEMORY);
 
       const lifeArea = lifeAreas.find((a) => a.key === goal.category);
       const isWeakestLifeArea = Boolean(lifeArea && lifeArea.score < WEAK_LIFE_AREA_SCORE_THRESHOLD);

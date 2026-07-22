@@ -8,9 +8,9 @@ import { goalsRepo } from "@/lib/db/goals";
 import { personalPatternsRepo } from "@/lib/db/personalPatterns";
 import { recommendationEventsRepo } from "@/lib/db/recommendationEvents";
 import { toKnowledgeEntry, toGoal } from "@/lib/mappers";
-import { retrieveRelevantMemory } from "@/lib/memory/retrieveMemory";
+import { fetchMemoryCandidates, rankMemoryCandidates } from "@/lib/memory/retrieveMemory";
 import { rankByRelevance, tokenize, type MemoryCandidate } from "@/lib/memory/rankRelevance";
-import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
+import { createRecommendationEvent, indexPendingEventsByKey } from "@/lib/intelligence/recommendations";
 import { MIN_CONFIDENCE_TO_SURFACE } from "@/lib/intelligence/personalDNA/confidence";
 import { computeStudyStreak } from "@/lib/learning/computeStudyStreak";
 import { pickNextReview } from "@/lib/learning/pickNextReview";
@@ -22,10 +22,6 @@ const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 };
 const MAX_RELATED = 3;
 const MIN_ENTRY_AGE_DAYS_FOR_REVIEW = 1; // don't suggest "review" on something logged minutes ago
 const NEXT_REVIEW_TYPE = "learning_next_review";
-
-interface NextReviewPayload {
-  entryId?: string;
-}
 
 // Learning Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §10). Same
 // architectural call as Goals Experience v2's app/api/goals/insights: does
@@ -48,11 +44,12 @@ export async function GET() {
     return NextResponse.json({ streakDays: 0, topicFocus: null, cadencePerWeek: null, nextReview: null, entries: [] });
   }
 
-  const [entryRows, goalRows, patternRows, recommendationEvents] = await Promise.all([
+  const [entryRows, goalRows, patternRows, recommendationEvents, memoryCandidates] = await Promise.all([
     knowledgeEntriesRepo.list(user.id),
     goalsRepo.listWithMilestones(user.id),
     personalPatternsRepo.list(user.id),
     recommendationEventsRepo.list(user.id),
+    fetchMemoryCandidates(user.id),
   ]);
 
   const entries = entryRows.map(toKnowledgeEntry);
@@ -73,12 +70,7 @@ export async function GET() {
   // Recommendation Intelligence reuse: don't spawn a fresh `pending`
   // learning_next_review event on every page view — reuse the existing
   // pending one for this entry, same reasoning as Goals' goal_next_action.
-  const pendingReviewByEntry = new Map(
-    recommendationEvents
-      .filter((event) => event.type === NEXT_REVIEW_TYPE && event.status === "pending")
-      .map((event) => [(event.recommendation_payload as NextReviewPayload).entryId, event])
-      .filter((entry): entry is [string, (typeof recommendationEvents)[number]] => Boolean(entry[0]))
-  );
+  const pendingReviewByEntry = indexPendingEventsByKey(recommendationEvents, NEXT_REVIEW_TYPE, "entryId");
 
   const now = Date.now();
   const reviewCandidate = pickNextReview(entries.map((e) => ({ id: e.id, date: e.date, lastReviewedAt: e.lastReviewedAt })));
@@ -113,23 +105,24 @@ export async function GET() {
     nextReview = { entryId: entry.id, topic: entry.topic, rationale, confidence, recommendationEventId };
   }
 
-  const entryInsights: EntryInsight[] = await Promise.all(
-    entries.map(async (entry) => {
-      const relatedMemory = await retrieveRelevantMemory(user.id, entry.topic, MAX_RELATED);
+  // No await left in this loop now that memory ranking is synchronous
+  // (Atlas Core Optimization v1) — a plain map, not Promise.all over async
+  // callbacks that never actually awaited anything.
+  const entryInsights: EntryInsight[] = entries.map((entry) => {
+    const relatedMemory = rankMemoryCandidates(memoryCandidates, entry.topic, MAX_RELATED);
 
-      const knowledgeCandidates: MemoryCandidate[] = entries
-        .filter((e) => e.id !== entry.id)
-        .map((e) => ({ id: e.id, text: `${e.topic} ${e.summary} ${e.source}`, timestamp: e.date, label: e.topic }));
-      const relatedKnowledge = rankByRelevance(entry.topic, knowledgeCandidates, MAX_RELATED).map((r) => r.label);
+    const knowledgeCandidates: MemoryCandidate[] = entries
+      .filter((e) => e.id !== entry.id)
+      .map((e) => ({ id: e.id, text: `${e.topic} ${e.summary} ${e.source}`, timestamp: e.date, label: e.topic }));
+    const relatedKnowledge = rankByRelevance(entry.topic, knowledgeCandidates, MAX_RELATED).map((r) => r.label);
 
-      const entryTokens = tokenize(entry.topic);
-      const connectedGoals = goals
-        .filter((g) => [...tokenize(g.title)].some((t) => entryTokens.has(t)))
-        .map((g) => g.title);
+    const entryTokens = tokenize(entry.topic);
+    const connectedGoals = goals
+      .filter((g) => [...tokenize(g.title)].some((t) => entryTokens.has(t)))
+      .map((g) => g.title);
 
-      return { entryId: entry.id, relatedMemory, relatedKnowledge, connectedGoals };
-    })
-  );
+    return { entryId: entry.id, relatedMemory, relatedKnowledge, connectedGoals };
+  });
 
   const insights: LearningInsights = {
     streakDays,
