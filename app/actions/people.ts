@@ -7,6 +7,23 @@ import type { Database } from "@/types/database";
 
 type PersonUpdate = Database["public"]["Tables"]["people"]["Update"];
 
+export async function addPersonAction(input: {
+  name: string;
+  hebrewName?: string;
+  relation: string;
+  birthday?: string;
+}) {
+  const userId = await getCurrentUserId();
+  const row = await peopleRepo.insert({
+    user_id: userId,
+    name: input.name,
+    hebrew_name: input.hebrewName ?? null,
+    relation: input.relation,
+    birthday: input.birthday ?? null,
+  });
+  return toPerson(row);
+}
+
 export async function logPersonInteractionAction(personId: string, note?: string) {
   const userId = await getCurrentUserId();
   const patch: PersonUpdate = { last_meaningful_interaction: new Date().toISOString() };

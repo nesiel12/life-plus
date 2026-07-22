@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { UserPlus } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { PersonRelationshipCard } from "@/components/features/PersonRelationshipCard";
 import { useApiCall } from "@/hooks/useApiCall";
@@ -18,9 +19,14 @@ import type { PersonInsight } from "@/lib/family/types";
 // Engine signal, see the route), not a fixed list order.
 export default function FamilyCarePage() {
   const people = useAtlasStore((s) => s.people);
+  const addPerson = useAtlasStore((s) => s.addPerson);
   const logPersonInteraction = useAtlasStore((s) => s.logPersonInteraction);
   const addMoment = useAtlasStore((s) => s.addMoment);
   const setPersonBirthday = useAtlasStore((s) => s.setPersonBirthday);
+
+  const [newName, setNewName] = useState("");
+  const [newRelation, setNewRelation] = useState("");
+  const { loading: addingPerson, error: addPersonError, run: createPerson } = useApiCall(addPerson);
 
   const { data, setData, refresh: refreshInsights } = useInsights<{ people: PersonInsight[] }>(
     "/api/family/insights",
@@ -83,12 +89,54 @@ export default function FamilyCarePage() {
     });
   }
 
+  function handleAddPerson() {
+    const name = newName.trim();
+    const relation = newRelation.trim();
+    if (!name || !relation) return;
+    createPerson({ name, relation })
+      .then(() => {
+        setNewName("");
+        setNewRelation("");
+      })
+      .catch(() => {
+        // error is already captured in addPersonError for display below
+      });
+  }
+
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
       <h1 className="mb-1 text-2xl font-medium tracking-tight">לוח הקשבה משפחתי</h1>
       <p className="mb-10 text-sm text-muted">לא CRM — פשוט מקום לזכור את מי שחשוב.</p>
-      {(logError || birthdayError) && (
-        <p className="-mt-6 mb-10 text-xs text-accent-family">{logError ?? birthdayError}</p>
+
+      <div className="mb-10 flex flex-col gap-2 sm:flex-row">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleAddPerson()}
+          placeholder="שם, למשל: אמא"
+          aria-label="שם איש הקשר החדש"
+          className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+        />
+        <input
+          value={newRelation}
+          onChange={(e) => setNewRelation(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleAddPerson()}
+          placeholder="קרבה, למשל: אמא"
+          aria-label="הקרבה של איש הקשר החדש"
+          className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-40"
+        />
+        <button
+          onClick={handleAddPerson}
+          disabled={!newName.trim() || !newRelation.trim() || addingPerson}
+          className="focus-ring flex items-center justify-center gap-1 rounded-lg bg-accent-family/20 px-3 py-2 text-sm text-accent-family transition-opacity disabled:opacity-40"
+        >
+          <UserPlus size={14} />
+          {addingPerson ? "מוסיף…" : "הוסף איש קשר"}
+        </button>
+      </div>
+
+      {(logError || birthdayError || addPersonError) && (
+        <p className="-mt-6 mb-10 text-xs text-accent-family">{logError ?? birthdayError ?? addPersonError}</p>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

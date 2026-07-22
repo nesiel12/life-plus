@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { momentCategoryLabel } from "@/lib/lifeAreas";
 import { addMomentAction } from "@/app/actions/moments";
-import { logPersonInteractionAction, setPersonBirthdayAction } from "@/app/actions/people";
+import { addPersonAction, logPersonInteractionAction, setPersonBirthdayAction } from "@/app/actions/people";
 import { addChatMessageAction } from "@/app/actions/chat";
 import { addInsightAction } from "@/app/actions/insights";
 import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/actions/knowledge";
@@ -56,6 +56,7 @@ interface AtlasState extends HydratedState {
     content: string;
     personId?: string;
   }) => Promise<void>;
+  addPerson: (person: { name: string; hebrewName?: string; relation: string; birthday?: string }) => Promise<void>;
   logPersonInteraction: (personId: string, note?: string) => Promise<void>;
   setPersonBirthday: (personId: string, birthday: string) => Promise<void>;
   addChatMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => Promise<ChatMessage>;
@@ -106,6 +107,11 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   addMoment: async (moment) => {
     const created = await addMomentAction(moment);
     set((state) => ({ moments: [created, ...state.moments] }));
+  },
+
+  addPerson: async (person) => {
+    const created = await addPersonAction(person);
+    set((state) => ({ people: [created, ...state.people] }));
   },
 
   logPersonInteraction: async (personId, note) => {
