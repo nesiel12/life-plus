@@ -27,6 +27,7 @@ type KnowledgeEntryRow = Database["public"]["Tables"]["knowledge_entries"]["Row"
 type ChatMessageRow = Database["public"]["Tables"]["chat_messages"]["Row"];
 type InsightRow = Database["public"]["Tables"]["insights"]["Row"];
 type PersonalDnaRow = Database["public"]["Tables"]["personal_dna"]["Row"];
+type PersonalDnaUpdate = Database["public"]["Tables"]["personal_dna"]["Update"];
 
 export function toUserContext(row: UserRow): UserContext {
   return {
@@ -118,7 +119,27 @@ export function toPersonalDNA(row: PersonalDnaRow | null): PersonalDNA {
     learningStyle: row?.learning_style ?? undefined,
     familyCheckInIntervalDays: row?.family_check_in_interval_days ?? undefined,
     habitNotes: row?.habit_notes ?? [],
+    sleepNotes: row?.sleep_notes ?? undefined,
+    careerNotes: row?.career_notes ?? undefined,
+    motivationTriggers: row?.motivation_triggers ?? [],
   };
+}
+
+// Shared by app/actions/personalDna.ts's updatePersonalDNAAction and
+// app/api/onboarding/message/route.ts — both take a camelCase Partial<PersonalDNA>
+// patch and need the same snake_case conversion; only undefined fields are
+// omitted so a caller can safely patch just the fields it actually has new
+// values for without clobbering the rest on upsert.
+export function toPersonalDnaPatch(patch: Partial<PersonalDNA>): PersonalDnaUpdate {
+  const row: PersonalDnaUpdate = {};
+  if (patch.peakFocusHours !== undefined) row.peak_focus_hours = patch.peakFocusHours;
+  if (patch.learningStyle !== undefined) row.learning_style = patch.learningStyle;
+  if (patch.familyCheckInIntervalDays !== undefined) row.family_check_in_interval_days = patch.familyCheckInIntervalDays;
+  if (patch.habitNotes !== undefined) row.habit_notes = patch.habitNotes;
+  if (patch.sleepNotes !== undefined) row.sleep_notes = patch.sleepNotes;
+  if (patch.careerNotes !== undefined) row.career_notes = patch.careerNotes;
+  if (patch.motivationTriggers !== undefined) row.motivation_triggers = patch.motivationTriggers;
+  return row;
 }
 
 export function toGoal(row: GoalWithMilestones): Goal {

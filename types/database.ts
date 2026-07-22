@@ -224,6 +224,9 @@ export interface Database {
           learning_style: string | null;
           family_check_in_interval_days: number | null;
           habit_notes: string[];
+          sleep_notes: string | null;
+          career_notes: string | null;
+          motivation_triggers: string[];
           onboarding_complete: boolean;
           updated_at: string;
         },
@@ -233,6 +236,9 @@ export interface Database {
           learning_style?: string | null;
           family_check_in_interval_days?: number | null;
           habit_notes?: string[];
+          sleep_notes?: string | null;
+          career_notes?: string | null;
+          motivation_triggers?: string[];
           onboarding_complete?: boolean;
         },
         {
@@ -241,6 +247,9 @@ export interface Database {
           learning_style?: string | null;
           family_check_in_interval_days?: number | null;
           habit_notes?: string[];
+          sleep_notes?: string | null;
+          career_notes?: string | null;
+          motivation_triggers?: string[];
           onboarding_complete?: boolean;
         }
       >;

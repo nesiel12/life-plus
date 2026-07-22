@@ -81,6 +81,9 @@ export interface PersonalDNA {
   learningStyle?: string;
   familyCheckInIntervalDays?: number;
   habitNotes: string[];
+  sleepNotes?: string;
+  careerNotes?: string;
+  motivationTriggers: string[];
 }
 
 export interface OnboardingQuestion {

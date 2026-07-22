@@ -67,6 +67,12 @@ interface AtlasState extends HydratedState {
 
   updatePersonalDNA: (patch: Partial<PersonalDNA>) => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  // Local-only, no network call: app/api/onboarding/message already
+  // persisted these server-side (Deep Onboarding, docs/ATLAS_ARCHITECTURE_
+  // VISION.md §12) — this just merges the response into the store so the
+  // rest of the app (Family page, chat context, etc.) reflects it without a
+  // full refetch.
+  applyOnboardingProgress: (update: { personalDNA: PersonalDNA; newPeople: Person[] }) => void;
 
   addGoal: (title: string, category: Goal["category"], milestoneTitles: string[]) => Promise<void>;
   toggleMilestone: (goalId: string, milestoneId: string) => Promise<void>;
@@ -86,7 +92,7 @@ const EMPTY_STATE: HydratedState = {
   knowledgeEntries: [],
   chatHistory: [],
   insights: [],
-  personalDNA: { habitNotes: [] },
+  personalDNA: { habitNotes: [], motivationTriggers: [] },
   onboardingComplete: false,
   goals: [],
   todayIntention: "",
@@ -166,6 +172,13 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   completeOnboarding: async () => {
     set({ onboardingComplete: true });
     await completeOnboardingAction();
+  },
+
+  applyOnboardingProgress: ({ personalDNA, newPeople }) => {
+    set((state) => ({
+      personalDNA,
+      people: newPeople.length > 0 ? [...newPeople, ...state.people] : state.people,
+    }));
   },
 
   addGoal: async (title, category, milestoneTitles) => {

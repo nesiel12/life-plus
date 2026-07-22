@@ -6,6 +6,7 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { ONBOARDING_QUESTIONS } from "@/lib/constants";
 import { Logo } from "@/components/ui/Logo";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
+import { DeepOnboardingChat } from "@/components/features/DeepOnboardingChat";
 import { useApiCall } from "@/hooks/useApiCall";
 import type { PersonalDNA } from "@/types";
 
@@ -17,8 +18,12 @@ function parseAnswer(fieldId: keyof PersonalDNA, raw: string): Partial<PersonalD
   return { [fieldId]: raw } as Partial<PersonalDNA>;
 }
 
-export function OnboardingFlow() {
-  const onboardingComplete = useAtlasStore((s) => s.onboardingComplete);
+// The honest fallback for Deep Onboarding (docs/ATLAS_ARCHITECTURE_VISION.md
+// §12): a fixed question list, used only when app/api/onboarding/message
+// reports no AI provider is configured. Unchanged from before that milestone
+// — same questions, same behavior — so the one path that must always work
+// (first-run setup) never depends on a live model call.
+function StaticOnboardingForm() {
   const updatePersonalDNA = useAtlasStore((s) => s.updatePersonalDNA);
   const completeOnboarding = useAtlasStore((s) => s.completeOnboarding);
 
@@ -48,14 +53,7 @@ export function OnboardingFlow() {
   }
 
   return (
-    <Modal
-      open={!onboardingComplete}
-      closeOnBackdropClick={false}
-      closeOnEscape={false}
-      zIndex={Z_INDEX.onboarding}
-      backdropClassName="items-center bg-black/60 pt-0"
-      panelClassName="max-w-md flex flex-col gap-6 p-8"
-    >
+    <>
       <div className="flex items-center gap-2">
         <Logo size={22} />
         <span className="text-sm text-muted">
@@ -95,6 +93,28 @@ export function OnboardingFlow() {
       >
         {saving ? "שומר…" : isLast ? "סיים" : "המשך"}
       </button>
+    </>
+  );
+}
+
+export function OnboardingFlow() {
+  const onboardingComplete = useAtlasStore((s) => s.onboardingComplete);
+  const [useStaticForm, setUseStaticForm] = useState(false);
+
+  return (
+    <Modal
+      open={!onboardingComplete}
+      closeOnBackdropClick={false}
+      closeOnEscape={false}
+      zIndex={Z_INDEX.onboarding}
+      backdropClassName="items-center bg-black/60 pt-0"
+      panelClassName="max-w-md flex flex-col gap-6 p-8"
+    >
+      {useStaticForm ? (
+        <StaticOnboardingForm />
+      ) : (
+        <DeepOnboardingChat onUnavailable={() => setUseStaticForm(true)} />
+      )}
     </Modal>
   );
 }
