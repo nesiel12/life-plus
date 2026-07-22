@@ -1,5 +1,3 @@
-import { streamText } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -9,6 +7,7 @@ import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { buildSystemPrompt } from "@/lib/chatSystemPrompt";
 import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
+import { streamChatReply, isProviderConfigured } from "@/lib/ai";
 
 export const runtime = "nodejs";
 
@@ -59,7 +58,7 @@ export async function POST(request: Request) {
   if (parsed.error) return parsed.error;
   const { message, history = [] } = parsed.data;
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!isProviderConfigured()) {
     return textResponse(mockReply(message), []);
   }
 
@@ -69,8 +68,7 @@ export async function POST(request: Request) {
     const { prompt, topSignals } = buildSystemPrompt(context);
     const basedOn = topSignals.slice(0, MAX_BASED_ON).map((signal) => signal.summary);
 
-    const result = streamText({
-      model: openai("gpt-4o-mini"),
+    const result = streamChatReply({
       system: prompt,
       messages: [...history, { role: "user", content: message }],
     });

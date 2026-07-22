@@ -1,5 +1,3 @@
-import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -13,6 +11,7 @@ import { buildIntelligenceSignals, filterSignalsByCategory, rankSignals, formatS
 import type { SignalCategory } from "@/lib/intelligence/core";
 import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
 import { categoryLabel } from "@/store/useAtlasStore";
+import { generateChatText, isProviderConfigured } from "@/lib/ai";
 
 // Goal breakdown only needs to know about goal-behavior-relevant
 // intelligence — scoping the categories it considers is a task-boundary
@@ -78,7 +77,7 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!isProviderConfigured()) {
     const milestones = genericMilestones(title);
     await trackBreakdown(milestones, false);
     return NextResponse.json({ milestones });
@@ -96,8 +95,7 @@ export async function POST(request: Request) {
       ? `What's relevant to how he actually completes goals, ranked by importance:\n${formatted}`
       : "";
 
-    const { text } = await generateText({
-      model: openai("gpt-4o-mini"),
+    const text = await generateChatText({
       system: joinContextSections([baseSystem, contextBlock]),
       prompt: `היעד: "${title}" (תחום: ${categoryLabel(category)}). פרק אותו לרשימת אבני דרך.`,
     });

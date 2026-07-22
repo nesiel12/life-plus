@@ -1,5 +1,3 @@
-import { generateObject, experimental_transcribe as transcribe } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -12,6 +10,7 @@ import { joinContextSections } from "@/lib/context/formatContext";
 import type { AtlasContext } from "@/lib/context/types";
 import { buildIntelligenceSignals, filterSignalsByCategory, rankSignals, formatSignalsForPrompt } from "@/lib/intelligence/core";
 import type { SignalCategory } from "@/lib/intelligence/core";
+import { generateStructuredData, transcribeAudio as transcribeWithProvider, isProviderConfigured } from "@/lib/ai";
 
 // Torah extraction only cares about related past study/moments — same
 // scope as before this milestone (context.relevantMemory alone), now
@@ -51,7 +50,7 @@ async function extractPdfText(file: File): Promise<string> {
 
 async function transcribeAudio(file: File): Promise<{ text: string; durationMinutes?: number }> {
   const buffer = new Uint8Array(await file.arrayBuffer());
-  const result = await transcribe({ model: openai.transcription("whisper-1"), audio: buffer });
+  const result = await transcribeWithProvider(buffer);
   return {
     text: result.text.trim(),
     durationMinutes: result.durationInSeconds ? Math.round(result.durationInSeconds / 60) : undefined,
@@ -82,7 +81,7 @@ async function summarize(
     };
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!isProviderConfigured()) {
     return honestFallback(fileName, rawText);
   }
 
@@ -93,8 +92,7 @@ async function summarize(
     : "";
 
   try {
-    const { object } = await generateObject({
-      model: openai("gpt-4o-mini"),
+    const object = await generateStructuredData({
       schema: extractedShiurSchema,
       system: joinContextSections([
         "אתה עוזר שמנתח תמלול או טקסט של שיעור תורני ומחלץ ממנו נושא, מקור וסיכום תמציתי. " +
@@ -139,7 +137,7 @@ export async function POST(request: Request) {
     }
 
     if (file.type.startsWith("audio/")) {
-      if (!process.env.OPENAI_API_KEY) {
+      if (!isProviderConfigured()) {
         return NextResponse.json(
           { error: "תמלול אודיו דורש מפתח AI מחובר. פנה למנהל המערכת." },
           { status: 503 }

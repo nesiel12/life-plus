@@ -1,5 +1,3 @@
-import { generateObject } from "ai";
-import { openai } from "@ai-sdk/openai";
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -9,6 +7,7 @@ import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { knowledgeEntriesRepo } from "@/lib/db/knowledgeEntries";
 import { toKnowledgeEntry } from "@/lib/mappers";
+import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
 
 export const runtime = "nodejs";
 
@@ -63,7 +62,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ flashcards: entryRow.flashcards, reviewQuestions: entryRow.review_questions });
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!isProviderConfigured()) {
     return NextResponse.json(
       { flashcards: [], reviewQuestions: [], error: "אין מפתח AI מחובר, אז לא ניתן לייצר כרטיסיות ושאלות חזרה." },
       { status: 200 }
@@ -71,8 +70,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { object } = await generateObject({
-      model: openai("gpt-4o-mini"),
+    const object = await generateStructuredData({
       schema: studyMaterialSchema,
       system:
         "You create study material (flashcards and review questions) from a Torah shiur's topic, source, and summary. Respond only based on the content given, no invented facts, everything in Hebrew.",
