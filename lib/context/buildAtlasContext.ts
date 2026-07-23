@@ -9,7 +9,8 @@ import { retrieveRelevantMemory } from "@/lib/memory/retrieveMemory";
 import { getPersonalPatternDescriptions } from "@/lib/intelligence/personalDNA";
 import { getRecommendationInsights } from "@/lib/intelligence/recommendations";
 import { isPersonStale } from "@/lib/family/deriveRelationshipHealth";
-import { daysSince } from "@/lib/utils";
+import { BIRTHDAY_WINDOW_DAYS } from "@/lib/family/pickSuggestedAction";
+import { daysSince, daysUntilNextAnnualDate } from "@/lib/utils";
 import type { AtlasContext, BuildContextOptions } from "@/lib/context/types";
 
 const DEFAULT_STALE_THRESHOLD_DAYS = 7;
@@ -67,17 +68,39 @@ export async function buildAtlasContext(
       .slice(0, MAX_UPCOMING_EVENTS)
       .map((event) => `${event.title} (${event.date})`),
     relevantMemory,
+    // Proactive CRM Actions (docs/ATLAS_ARCHITECTURE_VISION.md §13): two
+    // real, independent reasons a person can surface here — a stale
+    // relationship (unchanged from before) and now also a real approaching
+    // birthday, using the exact person data already fetched for this
+    // request. Deliberately not a full pickSuggestedAction() call: that
+    // needs interaction-trend/moments data this context doesn't fetch (and
+    // buildAtlasContext is called by every AI route, so adding a per-person
+    // moments query here would be a real, broad cost) — isPersonStale alone
+    // is already the identical condition pickSuggestedAction's own
+    // "needs_attention" branch checks, so reusing it is honest, not a
+    // shortcut.
     relationshipSignals: peopleRows
       .map(toPerson)
-      .map((person) => {
+      .flatMap((person) => {
+        const displayName = person.hebrewName ?? person.name;
+        const signals: string[] = [];
+
         const since = person.lastMeaningfulInteraction ? daysSince(person.lastMeaningfulInteraction) : null;
-        // Same rule Family Experience v2's deriveRelationshipHealth uses for
-        // its own "needs_attention" tier — one shared predicate instead of
-        // two independent inline checks (this file previously had its own).
-        if (!isPersonStale(since, staleThresholdDays)) return null;
-        return `לא יצרת קשר עם ${person.hebrewName ?? person.name} כבר ${since} ימים`;
-      })
-      .filter((signal): signal is string => signal !== null),
+        if (isPersonStale(since, staleThresholdDays)) {
+          signals.push(`לא יצרת קשר עם ${displayName} כבר ${since} ימים — כדאי להתקשר.`);
+        }
+
+        const untilBirthday = person.birthday ? daysUntilNextAnnualDate(person.birthday) : null;
+        if (untilBirthday !== null && untilBirthday >= 0 && untilBirthday <= BIRTHDAY_WINDOW_DAYS) {
+          signals.push(
+            untilBirthday === 0
+              ? `היום יום ההולדת של ${displayName} — אולי כדאי לקנות מתנה.`
+              : `יום ההולדת של ${displayName} בעוד ${untilBirthday} ימים — זמן טוב לחשוב על מתנה.`
+          );
+        }
+
+        return signals;
+      }),
     personalPatterns,
     recommendationInsights,
   };

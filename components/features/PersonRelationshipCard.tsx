@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import {
   HeartHandshake,
   Cake,
+  Heart,
   Phone,
   MessageCircle,
   Users,
@@ -12,11 +13,12 @@ import {
   Check,
   X,
   History,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ConfidenceBar } from "@/components/ui/ConfidenceBar";
-import { daysUntilNextBirthday } from "@/lib/utils";
+import { daysUntilNextAnnualDate } from "@/lib/utils";
 import type { Person } from "@/types";
 import type { PersonInsight, RelationshipHealth, SuggestedActionType } from "@/lib/family/types";
 
@@ -33,6 +35,63 @@ const ACTION_ICON: Record<SuggestedActionType, LucideIcon> = {
   congratulate: Gift,
 };
 
+interface MeetupSuggestion {
+  available: boolean;
+  slots: { start: string; end: string }[];
+  locationSuggestion: string | null;
+  note: string;
+}
+
+// The birthday/anniversary "add a date" affordance, identical in shape for
+// both fields (Relationship CRM, docs/ATLAS_ARCHITECTURE_VISION.md §13) —
+// one implementation instead of two copies of the same edit/save flow.
+function InlineDateField({
+  label,
+  ariaLabel,
+  onSave,
+}: {
+  label: string;
+  ariaLabel: string;
+  onSave: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  function save() {
+    if (/^\d{2}-\d{2}$/.test(draft)) onSave(draft);
+    setEditing(false);
+    setDraft("");
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        className="focus-ring text-xs text-muted transition-colors hover:text-foreground"
+      >
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && save()}
+        placeholder="MM-DD"
+        aria-label={ariaLabel}
+        className="focus-ring ltr w-20 rounded-lg bg-white/5 px-2 py-1.5 text-xs text-foreground placeholder:text-muted"
+        autoFocus
+      />
+      <button onClick={save} className="focus-ring text-xs text-accent-family">
+        שמור
+      </button>
+    </div>
+  );
+}
+
 interface PersonRelationshipCardProps {
   person: Person;
   insight: PersonInsight | undefined;
@@ -41,6 +100,7 @@ interface PersonRelationshipCardProps {
   onAcceptAction: (personId: string, recommendationEventId: string, name: string) => void;
   onDismissAction: (recommendationEventId: string) => void;
   onSaveBirthday: (personId: string, birthday: string) => void;
+  onSaveAnniversary: (personId: string, anniversary: string) => void;
 }
 
 export function PersonRelationshipCard({
@@ -51,22 +111,35 @@ export function PersonRelationshipCard({
   onAcceptAction,
   onDismissAction,
   onSaveBirthday,
+  onSaveAnniversary,
 }: PersonRelationshipCardProps) {
-  const [editingBirthday, setEditingBirthday] = useState(false);
-  const [birthdayDraft, setBirthdayDraft] = useState("");
   const [showTimeline, setShowTimeline] = useState(false);
+  const [meetup, setMeetup] = useState<MeetupSuggestion | null>(null);
+  const [loadingMeetup, setLoadingMeetup] = useState(false);
 
   const displayName = person.hebrewName ?? person.name;
   const health = insight ? HEALTH_CONFIG[insight.health] : null;
-  const untilBirthday = person.birthday ? daysUntilNextBirthday(person.birthday) : null;
+  const untilBirthday = person.birthday ? daysUntilNextAnnualDate(person.birthday) : null;
+  const untilAnniversary = person.anniversary ? daysUntilNextAnnualDate(person.anniversary) : null;
   const ActionIcon = insight?.suggestedAction ? ACTION_ICON[insight.suggestedAction.type] : null;
 
-  function saveBirthday() {
-    if (/^\d{2}-\d{2}$/.test(birthdayDraft)) {
-      onSaveBirthday(person.id, birthdayDraft);
-    }
-    setEditingBirthday(false);
-    setBirthdayDraft("");
+  // Meeting Coordinator (docs/ATLAS_ARCHITECTURE_VISION.md §13): fetched
+  // on demand, not automatically — this is the user's own calendar
+  // availability, not a background computation every card needs to pay for
+  // on every render.
+  function handleSuggestMeetup() {
+    setLoadingMeetup(true);
+    fetch("/api/family/meetup-suggestion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personId: person.id }),
+    })
+      .then((res) => res.json())
+      .then((data: MeetupSuggestion) => setMeetup(data))
+      .catch(() =>
+        setMeetup({ available: false, slots: [], locationSuggestion: null, note: "לא הצלחתי לבדוק זמנים כרגע." })
+      )
+      .finally(() => setLoadingMeetup(false));
   }
 
   return (
@@ -105,6 +178,13 @@ export function PersonRelationshipCard({
         <p className="mb-2 flex items-center gap-1 text-xs text-accent-family">
           <Cake size={12} aria-hidden />
           יום הולדת בעוד {untilBirthday} ימים
+        </p>
+      )}
+
+      {untilAnniversary !== null && (
+        <p className="mb-2 flex items-center gap-1 text-xs text-accent-family">
+          <Heart size={12} aria-hidden />
+          יום נישואין בעוד {untilAnniversary} ימים
         </p>
       )}
 
@@ -177,32 +257,61 @@ export function PersonRelationshipCard({
           רשום רגע איתם
         </button>
 
-        {editingBirthday ? (
-          <div className="flex items-center gap-1">
-            <input
-              value={birthdayDraft}
-              onChange={(e) => setBirthdayDraft(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && saveBirthday()}
-              placeholder="MM-DD"
-              aria-label={`תאריך יום הולדת של ${displayName} (חודש-יום)`}
-              className="focus-ring ltr w-20 rounded-lg bg-white/5 px-2 py-1.5 text-xs text-foreground placeholder:text-muted"
-              autoFocus
-            />
-            <button onClick={saveBirthday} className="focus-ring text-xs text-accent-family">
-              שמור
-            </button>
-          </div>
-        ) : (
-          !person.birthday && (
-            <button
-              onClick={() => setEditingBirthday(true)}
-              className="focus-ring text-xs text-muted transition-colors hover:text-foreground"
-            >
-              הוסף יום הולדת
-            </button>
-          )
+        <button
+          onClick={handleSuggestMeetup}
+          disabled={loadingMeetup}
+          className="focus-ring flex items-center gap-1 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground disabled:opacity-50"
+        >
+          <CalendarClock size={12} aria-hidden />
+          {loadingMeetup ? "בודק זמנים…" : "הצע להיפגש"}
+        </button>
+
+        {!person.birthday && (
+          <InlineDateField
+            label="הוסף יום הולדת"
+            ariaLabel={`תאריך יום הולדת של ${displayName} (חודש-יום)`}
+            onSave={(value) => onSaveBirthday(person.id, value)}
+          />
+        )}
+
+        {!person.anniversary && (
+          <InlineDateField
+            label="הוסף יום נישואין"
+            ariaLabel={`תאריך יום נישואין עם ${displayName} (חודש-יום)`}
+            onSave={(value) => onSaveAnniversary(person.id, value)}
+          />
         )}
       </div>
+
+      {meetup && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="mt-3 rounded-xl bg-white/5 p-3 text-xs"
+        >
+          <p className="mb-2 text-foreground/70">{meetup.note}</p>
+          {meetup.slots.length > 0 && (
+            <ul className="mb-2 flex flex-col gap-1 text-foreground/90">
+              {meetup.slots.map((slot, i) => (
+                <li key={i} className="flex items-center gap-1">
+                  <CalendarClock size={11} aria-hidden />
+                  <span className="ltr">
+                    {new Date(slot.start).toLocaleString("he-IL", {
+                      weekday: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {meetup.locationSuggestion && (
+            <p className="text-muted">מקום מוצע: {meetup.locationSuggestion}</p>
+          )}
+        </motion.div>
+      )}
     </GlassCard>
   );
 }

@@ -16,7 +16,7 @@ import { computeSuggestionConfidence } from "@/lib/suggestionConfidence";
 import { buildTimelineEvents } from "@/lib/timeline/buildTimelineEvents";
 import { deriveRelationshipHealth } from "@/lib/family/deriveRelationshipHealth";
 import { pickSuggestedAction } from "@/lib/family/pickSuggestedAction";
-import { daysSince, daysUntilNextBirthday, computeActivityTrend } from "@/lib/utils";
+import { daysSince, daysUntilNextAnnualDate, computeActivityTrend } from "@/lib/utils";
 import type { PersonInsight } from "@/lib/family/types";
 
 export const runtime = "nodejs";
@@ -81,7 +81,7 @@ export async function GET() {
         ? daysSince(person.lastMeaningfulInteraction)
         : null;
       const { recentCount, previousCount } = computeActivityTrend(personMoments.map((m) => m.timestamp), now);
-      const daysUntilBirthday = person.birthday ? daysUntilNextBirthday(person.birthday) : null;
+      const daysUntilBirthday = person.birthday ? daysUntilNextAnnualDate(person.birthday) : null;
 
       const health = deriveRelationshipHealth({
         daysSinceLastInteraction,

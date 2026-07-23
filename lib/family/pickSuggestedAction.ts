@@ -12,7 +12,12 @@ export interface PickedAction {
   rationale: string;
 }
 
-const BIRTHDAY_WINDOW_DAYS = 7;
+// Exported for lib/context/buildAtlasContext.ts (Proactive CRM Actions,
+// docs/ATLAS_ARCHITECTURE_VISION.md §13) — Today's own birthday-proximity
+// signal uses the exact same window this function already gates
+// "congratulate" on, rather than a second number that means the same
+// thing.
+export const BIRTHDAY_WINDOW_DAYS = 7;
 
 // Deterministic, never LLM-generated — mirrors how every other "next
 // action" in this app works (Goals' next milestone, Learning's next

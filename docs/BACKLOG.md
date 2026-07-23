@@ -51,7 +51,6 @@ Each entry: what it is, why it's at that priority, where it lives, and what it d
 ## Low Priority
 *Minor polish, cleanup, optimization.*
 
-- **`README.md` needs a real rewrite** — still close to `create-next-app` boilerplate despite the project having moved far past that, and now needs the Supabase setup steps (env vars, `npm run db:migrate`) documented too.
 - **Dark-only theme, `color-scheme: dark` forced.** Recorded as a deliberate decision, not a defect — listed for visibility, not action.
 - **Bundle size** (~199KB shared First Load JS) is on the higher side for a "calm, fast" app. Not a problem yet; worth watching as more features land, especially once real Server Component data-fetching (Phase 1 follow-through) can claw some of it back.
 

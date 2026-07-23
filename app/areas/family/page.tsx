@@ -23,6 +23,7 @@ export default function FamilyCarePage() {
   const logPersonInteraction = useAtlasStore((s) => s.logPersonInteraction);
   const addMoment = useAtlasStore((s) => s.addMoment);
   const setPersonBirthday = useAtlasStore((s) => s.setPersonBirthday);
+  const setPersonAnniversary = useAtlasStore((s) => s.setPersonAnniversary);
 
   const [newName, setNewName] = useState("");
   const [newRelation, setNewRelation] = useState("");
@@ -50,6 +51,7 @@ export default function FamilyCarePage() {
     });
   });
   const { error: birthdayError, run: submitBirthday } = useApiCall(setPersonBirthday);
+  const { error: anniversaryError, run: submitAnniversary } = useApiCall(setPersonAnniversary);
 
   function handleLogMoment(personId: string, name: string) {
     logInteraction(personId, name)
@@ -86,6 +88,12 @@ export default function FamilyCarePage() {
   function handleSaveBirthday(personId: string, birthday: string) {
     submitBirthday(personId, birthday).catch(() => {
       // error is already captured in birthdayError for display below
+    });
+  }
+
+  function handleSaveAnniversary(personId: string, anniversary: string) {
+    submitAnniversary(personId, anniversary).catch(() => {
+      // error is already captured in anniversaryError for display below
     });
   }
 
@@ -135,8 +143,10 @@ export default function FamilyCarePage() {
         </button>
       </div>
 
-      {(logError || birthdayError || addPersonError) && (
-        <p className="-mt-6 mb-10 text-xs text-accent-family">{logError ?? birthdayError ?? addPersonError}</p>
+      {(logError || birthdayError || anniversaryError || addPersonError) && (
+        <p className="-mt-6 mb-10 text-xs text-accent-family">
+          {logError ?? birthdayError ?? anniversaryError ?? addPersonError}
+        </p>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -150,6 +160,7 @@ export default function FamilyCarePage() {
             onAcceptAction={handleAcceptAction}
             onDismissAction={handleDismissAction}
             onSaveBirthday={handleSaveBirthday}
+            onSaveAnniversary={handleSaveAnniversary}
           />
         ))}
       </div>

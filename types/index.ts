@@ -15,6 +15,7 @@ export interface Person {
   relation: string;
   lastMeaningfulInteraction?: string; // ISO date
   birthday?: string; // "MM-DD"
+  anniversary?: string; // "MM-DD"
   note?: string;
 }
 
@@ -96,6 +97,7 @@ export interface Milestone {
   title: string;
   done: boolean;
   completedAt?: string; // ISO date; set only going forward (see migration 20260720000003)
+  dueDate?: string; // ISO date; spread across a goal's targetDate, see lib/goals/distributeMilestoneDates.ts
 }
 
 export interface Goal {
@@ -104,6 +106,7 @@ export interface Goal {
   category: LifeAreaKey;
   createdAt: string; // ISO date
   targetDate?: string; // ISO date
+  personId?: string; // real link to a Person, when this goal is about a specific relationship
   milestones: Milestone[];
 }
 

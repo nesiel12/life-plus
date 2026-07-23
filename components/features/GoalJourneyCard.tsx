@@ -10,6 +10,7 @@ import {
   Link2,
   Check,
   X,
+  HeartHandshake,
   type LucideIcon,
 } from "lucide-react";
 import { categoryLabel } from "@/store/useAtlasStore";
@@ -34,6 +35,11 @@ interface GoalJourneyCardProps {
   // milestone checklist); only the "smart" additions wait a beat, the same
   // progressive-enhancement convention AIBriefing already established.
   insight: GoalInsight | undefined;
+  // Real name of the person this goal is about (Relationship CRM,
+  // docs/ATLAS_ARCHITECTURE_VISION.md §13) — undefined for a goal with no
+  // person_id, resolved by the caller (GoalsPanel already has the people
+  // list; this card shouldn't fetch/own that lookup itself).
+  personName?: string;
   delay: number;
   onToggleMilestone: (milestoneId: string) => void;
   onRemove: () => void;
@@ -44,6 +50,7 @@ interface GoalJourneyCardProps {
 export function GoalJourneyCard({
   goal,
   insight,
+  personName,
   delay,
   onToggleMilestone,
   onRemove,
@@ -63,7 +70,15 @@ export function GoalJourneyCard({
       <div className="mb-2 flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-foreground">{goal.title}</p>
-          <span className="text-xs text-muted">{categoryLabel(goal.category)}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted">{categoryLabel(goal.category)}</span>
+            {personName && (
+              <span className="flex items-center gap-1 text-xs text-accent-family">
+                <HeartHandshake size={11} aria-hidden />
+                {personName}
+              </span>
+            )}
+          </div>
         </div>
         <button
           onClick={onRemove}
@@ -160,6 +175,11 @@ export function GoalJourneyCard({
               className="accent-current"
             />
             <span className={cn(m.done && "text-muted line-through")}>{m.title}</span>
+            {m.dueDate && !m.done && (
+              <span className="ltr text-muted">
+                עד {new Date(m.dueDate).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" })}
+              </span>
+            )}
           </li>
         ))}
       </ul>

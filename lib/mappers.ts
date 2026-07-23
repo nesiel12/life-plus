@@ -57,6 +57,7 @@ export function toPerson(row: PersonRow): Person {
     relation: row.relation,
     lastMeaningfulInteraction: row.last_meaningful_interaction ?? undefined,
     birthday: row.birthday ?? undefined,
+    anniversary: row.anniversary ?? undefined,
     note: row.note ?? undefined,
   };
 }
@@ -149,11 +150,13 @@ export function toGoal(row: GoalWithMilestones): Goal {
     category: row.category,
     createdAt: row.created_at,
     targetDate: row.target_date ?? undefined,
+    personId: row.person_id ?? undefined,
     milestones: row.milestones.map((m) => ({
       id: m.id,
       title: m.title,
       done: m.done,
       completedAt: m.completed_at ?? undefined,
+      dueDate: m.due_date ?? undefined,
     })),
   };
 }

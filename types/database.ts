@@ -78,6 +78,7 @@ export interface Database {
           relation: string;
           last_meaningful_interaction: string | null;
           birthday: string | null;
+          anniversary: string | null;
           note: string | null;
           created_at: string;
           updated_at: string;
@@ -90,6 +91,7 @@ export interface Database {
           relation: string;
           last_meaningful_interaction?: string | null;
           birthday?: string | null;
+          anniversary?: string | null;
           note?: string | null;
         },
         {
@@ -100,6 +102,7 @@ export interface Database {
           relation?: string;
           last_meaningful_interaction?: string | null;
           birthday?: string | null;
+          anniversary?: string | null;
           note?: string | null;
         }
       >;
@@ -260,6 +263,7 @@ export interface Database {
           title: string;
           category: LifeAreaKeyDb;
           target_date: string | null;
+          person_id: string | null;
           created_at: string;
         },
         {
@@ -268,6 +272,7 @@ export interface Database {
           title: string;
           category: LifeAreaKeyDb;
           target_date?: string | null;
+          person_id?: string | null;
         },
         {
           id?: string;
@@ -275,6 +280,7 @@ export interface Database {
           title?: string;
           category?: LifeAreaKeyDb;
           target_date?: string | null;
+          person_id?: string | null;
         }
       >;
       milestones: TableDef<
@@ -285,6 +291,7 @@ export interface Database {
           done: boolean;
           position: number;
           completed_at: string | null;
+          due_date: string | null;
           created_at: string;
         },
         {
@@ -294,6 +301,7 @@ export interface Database {
           done?: boolean;
           position?: number;
           completed_at?: string | null;
+          due_date?: string | null;
         },
         {
           id?: string;
@@ -302,6 +310,7 @@ export interface Database {
           done?: boolean;
           position?: number;
           completed_at?: string | null;
+          due_date?: string | null;
         }
       >;
       chat_messages: TableDef<

@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import { momentCategoryLabel } from "@/lib/lifeAreas";
 import { addMomentAction } from "@/app/actions/moments";
-import { addPersonAction, logPersonInteractionAction, setPersonBirthdayAction } from "@/app/actions/people";
+import {
+  addPersonAction,
+  logPersonInteractionAction,
+  setPersonBirthdayAction,
+  setPersonAnniversaryAction,
+} from "@/app/actions/people";
 import { addChatMessageAction } from "@/app/actions/chat";
 import { addInsightAction } from "@/app/actions/insights";
 import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/actions/knowledge";
@@ -56,9 +61,16 @@ interface AtlasState extends HydratedState {
     content: string;
     personId?: string;
   }) => Promise<void>;
-  addPerson: (person: { name: string; hebrewName?: string; relation: string; birthday?: string }) => Promise<void>;
+  addPerson: (person: {
+    name: string;
+    hebrewName?: string;
+    relation: string;
+    birthday?: string;
+    anniversary?: string;
+  }) => Promise<void>;
   logPersonInteraction: (personId: string, note?: string) => Promise<void>;
   setPersonBirthday: (personId: string, birthday: string) => Promise<void>;
+  setPersonAnniversary: (personId: string, anniversary: string) => Promise<void>;
   addChatMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => Promise<ChatMessage>;
   addInsight: (content: string) => Promise<void>;
   addKnowledgeEntry: (entry: Omit<KnowledgeEntry, "id">) => Promise<void>;
@@ -74,7 +86,12 @@ interface AtlasState extends HydratedState {
   // full refetch.
   applyOnboardingProgress: (update: { personalDNA: PersonalDNA; newPeople: Person[] }) => void;
 
-  addGoal: (title: string, category: Goal["category"], milestoneTitles: string[]) => Promise<void>;
+  addGoal: (
+    title: string,
+    category: Goal["category"],
+    milestoneTitles: string[],
+    options?: { targetDate?: string; personId?: string }
+  ) => Promise<void>;
   toggleMilestone: (goalId: string, milestoneId: string) => Promise<void>;
   removeGoal: (goalId: string) => Promise<void>;
 
@@ -134,6 +151,13 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     }));
   },
 
+  setPersonAnniversary: async (personId, anniversary) => {
+    const updated = await setPersonAnniversaryAction(personId, anniversary);
+    set((state) => ({
+      people: state.people.map((p) => (p.id === personId ? updated : p)),
+    }));
+  },
+
   addChatMessage: async (message) => {
     const created = await addChatMessageAction(message.role, message.content);
     set((state) => ({ chatHistory: [...state.chatHistory, created] }));
@@ -181,8 +205,8 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     }));
   },
 
-  addGoal: async (title, category, milestoneTitles) => {
-    const created = await addGoalAction(title, category, milestoneTitles);
+  addGoal: async (title, category, milestoneTitles, options) => {
+    const created = await addGoalAction(title, category, milestoneTitles, options);
     set((state) => ({ goals: [created, ...state.goals] }));
   },
 

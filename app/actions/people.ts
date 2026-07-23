@@ -12,6 +12,7 @@ export async function addPersonAction(input: {
   hebrewName?: string;
   relation: string;
   birthday?: string;
+  anniversary?: string;
 }) {
   const userId = await getCurrentUserId();
   const row = await peopleRepo.insert({
@@ -20,6 +21,7 @@ export async function addPersonAction(input: {
     hebrew_name: input.hebrewName ?? null,
     relation: input.relation,
     birthday: input.birthday ?? null,
+    anniversary: input.anniversary ?? null,
   });
   return toPerson(row);
 }
@@ -35,5 +37,11 @@ export async function logPersonInteractionAction(personId: string, note?: string
 export async function setPersonBirthdayAction(personId: string, birthday: string) {
   const userId = await getCurrentUserId();
   const row = await peopleRepo.update(userId, personId, { birthday });
+  return toPerson(row);
+}
+
+export async function setPersonAnniversaryAction(personId: string, anniversary: string) {
+  const userId = await getCurrentUserId();
+  const row = await peopleRepo.update(userId, personId, { anniversary });
   return toPerson(row);
 }

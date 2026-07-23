@@ -1,6 +1,7 @@
 import "server-only";
 import { getSupabaseClient } from "@/lib/supabase";
 import { createUserScopedRepo } from "@/lib/db/createUserScopedRepo";
+import { distributeMilestoneDates } from "@/lib/goals/distributeMilestoneDates";
 import type { Database } from "@/types/database";
 
 type GoalRow = Database["public"]["Tables"]["goals"]["Row"];
@@ -40,12 +41,30 @@ export const goalsRepo = {
     userId: string,
     title: string,
     category: GoalRow["category"],
-    milestoneTitles: string[]
+    milestoneTitles: string[],
+    options: { targetDate?: string; personId?: string } = {}
   ): Promise<GoalWithMilestones> {
-    const goal = await goalsRepoBase.insert({ user_id: userId, title, category });
+    const goal = await goalsRepoBase.insert({
+      user_id: userId,
+      title,
+      category,
+      target_date: options.targetDate ?? null,
+      person_id: options.personId ?? null,
+    });
 
     const client = getSupabaseClient();
     if (milestoneTitles.length === 0) return { ...goal, milestones: [] };
+
+    // Goals Engine timeline (docs/ATLAS_ARCHITECTURE_VISION.md §13): a real
+    // target date spreads deterministically across milestones instead of
+    // leaving them an undated checklist. No target date -> every due_date
+    // stays null, same honest "no timeline claimed" behavior as every other
+    // field in this app that only shows up once there's a real value.
+    const dueDates = distributeMilestoneDates(
+      milestoneTitles.length,
+      new Date(),
+      options.targetDate ? new Date(options.targetDate) : null
+    );
 
     const { data: milestones, error } = await client
       .from("milestones")
@@ -54,6 +73,7 @@ export const goalsRepo = {
           goal_id: goal.id,
           title: milestoneTitle,
           position,
+          due_date: dueDates[position],
         }))
       )
       .select();

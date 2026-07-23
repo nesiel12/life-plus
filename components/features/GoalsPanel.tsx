@@ -15,12 +15,19 @@ import type { GoalInsight } from "@/lib/goals/types";
 
 export function GoalsPanel() {
   const goals = useAtlasStore((s) => s.goals);
+  const people = useAtlasStore((s) => s.people);
   const addGoal = useAtlasStore((s) => s.addGoal);
   const toggleMilestone = useAtlasStore((s) => s.toggleMilestone);
   const removeGoal = useAtlasStore((s) => s.removeGoal);
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<LifeAreaKey>("knowledge");
+  // Goals Engine timeline + relationship goals (docs/ATLAS_ARCHITECTURE_
+  // VISION.md §13) — both optional, both blank by default: a goal with no
+  // target date gets no milestone due dates (honest, no invented timeline),
+  // and most goals aren't about a specific person.
+  const [targetDate, setTargetDate] = useState("");
+  const [personId, setPersonId] = useState("");
 
   // Goals Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §4): the "smart"
   // per-goal layer — stage, estimated completion, next recommended action,
@@ -50,8 +57,13 @@ export function GoalsPanel() {
     });
     if (!res.ok) throw new Error("לא הצלחנו לפרק את היעד. נסה שוב.");
     const data = await res.json();
-    await addGoal(trimmedTitle, selectedCategory, data.milestones ?? []);
+    await addGoal(trimmedTitle, selectedCategory, data.milestones ?? [], {
+      targetDate: targetDate || undefined,
+      personId: personId || undefined,
+    });
     setTitle("");
+    setTargetDate("");
+    setPersonId("");
   });
 
   function handleCreateGoal() {
@@ -131,6 +143,31 @@ export function GoalsPanel() {
         </button>
       </div>
 
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+        <input
+          type="date"
+          value={targetDate}
+          onChange={(e) => setTargetDate(e.target.value)}
+          aria-label="תאריך יעד (אופציונלי) — ייצור ציר זמן לאבני הדרך"
+          className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+        />
+        <select
+          value={personId}
+          onChange={(e) => setPersonId(e.target.value)}
+          aria-label="קשר את היעד לאדם (אופציונלי)"
+          className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+        >
+          <option value="" className="bg-background">
+            לא קשור לאדם ספציפי
+          </option>
+          {people.map((person) => (
+            <option key={person.id} value={person.id} className="bg-background">
+              {person.hebrewName ?? person.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {breakdownError && <p className="mb-4 text-xs text-accent-family">{breakdownError}</p>}
 
       <div className="flex flex-col gap-4">
@@ -139,6 +176,12 @@ export function GoalsPanel() {
             key={goal.id}
             goal={goal}
             insight={insights[goal.id]}
+            personName={
+              goal.personId
+                ? (people.find((p) => p.id === goal.personId)?.hebrewName ??
+                  people.find((p) => p.id === goal.personId)?.name)
+                : undefined
+            }
             delay={gi * 0.05}
             onToggleMilestone={(milestoneId) => handleToggleMilestone(goal.id, milestoneId)}
             onRemove={() => handleRemove(goal.id)}

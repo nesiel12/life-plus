@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysUntil, daysSince, daysUntilNextBirthday, computeActivityTrend } from "@/lib/utils";
+import { daysUntil, daysSince, daysUntilNextAnnualDate, computeActivityTrend } from "@/lib/utils";
 
 // daysUntil/daysSince compare against *local* "today" (lib/utils.ts's own
 // startOfDay). Building a fixture with toISOString() serializes in UTC,
@@ -38,16 +38,16 @@ describe("daysSince", () => {
   });
 });
 
-describe("daysUntilNextBirthday", () => {
+describe("daysUntilNextAnnualDate", () => {
   it("returns null for malformed input", () => {
-    expect(daysUntilNextBirthday("")).toBeNull();
-    expect(daysUntilNextBirthday("garbage")).toBeNull();
+    expect(daysUntilNextAnnualDate("")).toBeNull();
+    expect(daysUntilNextAnnualDate("garbage")).toBeNull();
   });
 
   it("returns 0 when today is the birthday", () => {
     const today = new Date();
     const mmdd = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    expect(daysUntilNextBirthday(mmdd)).toBe(0);
+    expect(daysUntilNextAnnualDate(mmdd)).toBe(0);
   });
 
   it("rolls over to next year when the birthday already passed this year", () => {
@@ -55,7 +55,7 @@ describe("daysUntilNextBirthday", () => {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     const mmdd = `${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
-    const result = daysUntilNextBirthday(mmdd);
+    const result = daysUntilNextAnnualDate(mmdd);
     expect(result).not.toBeNull();
     expect(result as number).toBeGreaterThan(300);
   });

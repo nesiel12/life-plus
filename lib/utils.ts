@@ -19,7 +19,10 @@ export function daysSince(dateISO: string): number {
   return -daysUntil(dateISO);
 }
 
-export function daysUntilNextBirthday(mmdd: string): number | null {
+// Generic "MM-DD" annual-recurrence math — birthdays and anniversaries
+// (Relationship CRM, docs/ATLAS_ARCHITECTURE_VISION.md §13) are the same
+// question asked twice, not two different calculations.
+export function daysUntilNextAnnualDate(mmdd: string): number | null {
   const [month, day] = mmdd.split("-").map(Number);
   if (!month || !day) return null;
 
