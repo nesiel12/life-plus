@@ -9,6 +9,7 @@ import { Logo } from "@/components/ui/Logo";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
 import { BriefingSignalList, type BriefingSignal } from "@/components/features/BriefingSignalList";
 import { CommandPanel } from "@/components/features/CommandPanel";
+import { decodeBasedOnHeader } from "@/lib/api/basedOnHeader";
 import { cn } from "@/lib/utils";
 
 interface Briefing {
@@ -83,8 +84,7 @@ export function AICompanion() {
       });
       if (!res.ok || !res.body) throw new Error("Chat request failed");
 
-      const basedOnHeader = res.headers.get("x-atlas-based-on");
-      const basedOn: string[] = basedOnHeader ? JSON.parse(basedOnHeader) : [];
+      const basedOn = decodeBasedOnHeader(res.headers.get("x-atlas-based-on"));
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

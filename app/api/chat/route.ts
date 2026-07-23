@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getUserByEmail } from "@/lib/db/users";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
+import { encodeBasedOnHeader } from "@/lib/api/basedOnHeader";
 import { buildSystemPrompt } from "@/lib/chatSystemPrompt";
 import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
 import { streamChatReply, isProviderConfigured } from "@/lib/ai";
@@ -35,12 +36,15 @@ function mockReply(message: string): string {
 // plain text/plain streamed body plus one small header, on every path
 // (real reply, mock fallback, and error fallback alike) — so the client
 // has exactly one response shape to consume regardless of which path
-// produced it, instead of branching on JSON-vs-stream.
+// produced it, instead of branching on JSON-vs-stream. Header value is
+// encoded via lib/api/basedOnHeader.ts (real Hebrew text isn't valid in a
+// raw HTTP header) — components/layout/AICompanion.tsx's read site uses
+// the matching decode.
 function textResponse(text: string, basedOn: string[]): Response {
   return new Response(text, {
     headers: {
       "content-type": "text/plain; charset=utf-8",
-      "x-atlas-based-on": JSON.stringify(basedOn),
+      "x-atlas-based-on": encodeBasedOnHeader(basedOn),
     },
   });
 }
@@ -74,9 +78,16 @@ export async function POST(request: Request) {
     });
 
     return result.toTextStreamResponse({
-      headers: { "x-atlas-based-on": JSON.stringify(basedOn) },
+      headers: { "x-atlas-based-on": encodeBasedOnHeader(basedOn) },
     });
-  } catch {
+  } catch (err) {
+    // Previously a bare `catch {}` — any real failure here (a Google API
+    // error, a DB error from buildAtlasContext, anything) silently showed
+    // the exact same "no key connected" text as a genuinely missing key,
+    // which is what made this class of bug so hard to diagnose from the
+    // outside. Logging the real error is a permanent fix, not just a
+    // debug aid — the user-facing fallback behavior is unchanged.
+    console.error("[chat] Real AI call failed, falling back to mock reply:", err);
     return textResponse(mockReply(message), []);
   }
 }
