@@ -7,7 +7,7 @@ Atlas is a personal, Hebrew-language (RTL) "Proactive AI Life Operating System" 
 - **Next.js App Router** + TypeScript, Tailwind CSS
 - **Supabase Postgres** for persistence
 - **NextAuth.js** (Google OAuth) for authentication
-- **Vercel AI SDK** (`ai`, `@ai-sdk/openai`) for every AI-backed feature, wrapped behind `lib/ai/`
+- **Vercel AI SDK** (`ai`, `@ai-sdk/openai`, `@ai-sdk/google`) for every AI-backed feature, wrapped behind `lib/ai/` — supports OpenAI and Gemini as chat providers, selected by whichever API key is configured
 - **Vitest** for tests, GitHub Actions for CI
 
 ## Setup
@@ -22,7 +22,8 @@ Atlas is a personal, Hebrew-language (RTL) "Proactive AI Life Operating System" 
 
    | Variable | Purpose |
    |---|---|
-   | `OPENAI_API_KEY` | Enables every AI-backed route (chat, goal breakdown, Torah extraction, Deep Onboarding, the AI Command Panel). Every route degrades to an honest fallback (never a fabricated response) when this is unset. |
+   | `OPENAI_API_KEY` | Enables every AI-backed route (chat, goal breakdown, Torah extraction, Deep Onboarding, the AI Command Panel) via OpenAI, and is required for audio transcription (Torah Space uploads) regardless of which provider handles chat. |
+   | `GEMINI_API_KEY` | Alternative chat provider — get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). If both `OPENAI_API_KEY` and `GEMINI_API_KEY` are set, OpenAI is used. Every AI-backed route degrades to an honest fallback (never a fabricated response) when neither is set. |
    | `NEXTAUTH_SECRET` | Generate with `openssl rand -base64 32`. |
    | `NEXTAUTH_URL` | `http://localhost:3000` for local development. |
    | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials from the [Google Cloud Console](https://console.cloud.google.com/apis/credentials). Needs the `calendar.events` scope for calendar suggestions/commands to work. |

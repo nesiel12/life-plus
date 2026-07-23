@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — every real secret-bearing file is ignored; .env.example is a
+# safe, blank template and is meant to be committed so `git clone` +
+# `cp .env.example .env.local` actually works for a new setup.
 .env*
+!.env.example
 
 # vercel
 .vercel

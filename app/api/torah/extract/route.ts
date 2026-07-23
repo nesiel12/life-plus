@@ -10,7 +10,12 @@ import { joinContextSections } from "@/lib/context/formatContext";
 import type { AtlasContext } from "@/lib/context/types";
 import { buildIntelligenceSignals, filterSignalsByCategory, rankSignals, formatSignalsForPrompt } from "@/lib/intelligence/core";
 import type { SignalCategory } from "@/lib/intelligence/core";
-import { generateStructuredData, transcribeAudio as transcribeWithProvider, isProviderConfigured } from "@/lib/ai";
+import {
+  generateStructuredData,
+  transcribeAudio as transcribeWithProvider,
+  isProviderConfigured,
+  isTranscriptionConfigured,
+} from "@/lib/ai";
 
 // Torah extraction only cares about related past study/moments — same
 // scope as before this milestone (context.relevantMemory alone), now
@@ -137,9 +142,12 @@ export async function POST(request: Request) {
     }
 
     if (file.type.startsWith("audio/")) {
-      if (!isProviderConfigured()) {
+      // Transcription is OpenAI/Whisper-specific — distinct from
+      // isProviderConfigured() (chat/text generation, which Gemini also
+      // covers) since a Gemini-only setup doesn't enable this capability.
+      if (!isTranscriptionConfigured()) {
         return NextResponse.json(
-          { error: "תמלול אודיו דורש מפתח AI מחובר. פנה למנהל המערכת." },
+          { error: "תמלול אודיו דורש מפתח OpenAI מחובר (Whisper). פנה למנהל המערכת." },
           { status: 503 }
         );
       }
