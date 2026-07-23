@@ -18,7 +18,16 @@ import { resolveChatProvider, type ChatProvider } from "@/lib/ai/resolveChatProv
 // it was the incumbent, and nothing about a route already relying on it
 // should change just because a Gemini key gets added later.
 const OPENAI_CHAT_MODEL_ID = "gpt-4o-mini";
-const GEMINI_CHAT_MODEL_ID = "gemini-2.5-flash";
+// A Google-maintained alias ("whatever flash model is currently
+// recommended for new users"), not a pinned dated model — deliberately,
+// after a pinned "gemini-2.5-flash" broke in production with "no longer
+// available to new users" (a 404, not a deprecation warning). Verified
+// directly against a real key/account before landing this: "gemini-2.5-flash"
+// and "gemini-2.5-flash-lite" both 404 the same way, "gemini-2.0-flash"
+// hits a zero-quota free-tier limit on this account, "gemini-flash-latest"
+// actually returns a real reply. Google re-points this alias as models
+// come and go, which is exactly what avoids re-hitting this class of bug.
+const GEMINI_CHAT_MODEL_ID = "gemini-flash-latest";
 const TRANSCRIPTION_MODEL_ID = "whisper-1";
 
 function currentChatProvider(): ChatProvider {
