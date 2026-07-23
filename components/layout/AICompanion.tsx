@@ -134,12 +134,19 @@ export function AICompanion() {
 
   return (
     <>
+      {/* UI/UX Revamp: docked to the trailing (left) edge — the sidebar
+          (components/layout/Sidebar.tsx) owns the right/leading edge now —
+          as a floating glass panel with a margin from the screen edge
+          (not flush), matching the glassmorphism "floating card" language
+          used throughout the rest of the redesign rather than a native-
+          feeling docked drawer. Sits above the mobile tab bar via the
+          `bottom-20`/`sm:bottom-4` split. */}
       <Modal
         open={open}
         onClose={() => setOpen(false)}
         backdrop={false}
         zIndex={Z_INDEX.panel}
-        panelClassName="bottom-24 right-6 h-[32rem] w-[24rem] flex flex-col sm:right-8"
+        panelClassName="top-4 bottom-20 left-4 flex w-[calc(100%-2rem)] max-w-md flex-col sm:bottom-4 sm:w-[26rem]"
       >
         <div className="flex items-center justify-between border-b border-glass-border px-4 py-3">
           <div className="flex items-center gap-2">
@@ -283,7 +290,7 @@ export function AICompanion() {
       <motion.button
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "fixed bottom-6 right-6 flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-accent-faith/80 to-accent-knowledge/80 text-background shadow-xl sm:right-8",
+          "fixed bottom-20 left-4 flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-accent-faith/80 to-accent-knowledge/80 text-background shadow-xl sm:bottom-6 sm:left-8",
           Z_INDEX.panel
         )}
         animate={{ boxShadow: ["0 0 0 0 rgba(212,175,122,0.3)", "0 0 0 12px rgba(212,175,122,0)"] }}

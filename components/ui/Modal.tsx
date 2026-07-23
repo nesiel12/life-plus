@@ -113,7 +113,7 @@ export function Modal({
             exit={{ opacity: 0, y: 24, scale: 0.96 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
             className={cn(
-              "focus-ring glass-card fixed rounded-2xl shadow-2xl",
+              "focus-ring glass-panel glass-glow fixed rounded-2xl",
               zIndex,
               panelClassName
             )}
@@ -148,7 +148,7 @@ export function Modal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -16, scale: 0.97 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className={cn("focus-ring glass-card w-full rounded-2xl shadow-2xl", panelClassName)}
+            className={cn("focus-ring glass-panel glass-glow w-full rounded-2xl", panelClassName)}
             onClick={(e) => e.stopPropagation()}
           >
             {children}

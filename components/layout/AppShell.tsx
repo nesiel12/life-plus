@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import type { ReactNode } from "react";
-import { NavBar } from "@/components/layout/NavBar";
+import { Sidebar, MobileTabBar } from "@/components/layout/Sidebar";
 import { AICompanion } from "@/components/layout/AICompanion";
 import { QuickCapture } from "@/components/features/QuickCapture";
 import { OnboardingFlow } from "@/components/features/OnboardingFlow";
@@ -83,12 +83,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <>
-      <NavBar />
-      {children}
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="min-w-0 flex-1 pb-20 sm:pb-0">{children}</div>
+      <MobileTabBar />
       <AICompanion />
       <QuickCapture />
       <OnboardingFlow />
-    </>
+    </div>
   );
 }
