@@ -54,13 +54,20 @@ export async function buildAtlasContext(
   // "Atlas thinks you're overdue to reach out" always means the same thing
   // everywhere it's said.
   const staleThresholdDays = personalDNA?.family_check_in_interval_days ?? DEFAULT_STALE_THRESHOLD_DAYS;
+  const people = peopleRows.map(toPerson);
 
   return {
     personalDNA,
     activeGoals: goalRows.map(toGoal).map((goal) => {
       const done = goal.milestones.filter((m) => m.done).length;
       const progress = goal.milestones.length ? Math.round((done / goal.milestones.length) * 100) : 0;
-      return `${goal.title} — ${progress}% הושלם`;
+      // A goal's own target date (e.g. a wedding date set as a goal's
+      // deadline) previously never reached the AI at all — activeGoals
+      // dropped it, and it isn't a row in upcoming_events either. Surfacing
+      // it here is what lets Atlas actually know about a dated commitment
+      // like this instead of only its progress percentage.
+      const dateNote = goal.targetDate ? ` (תאריך יעד: ${goal.targetDate})` : "";
+      return `${goal.title} — ${progress}% הושלם${dateNote}`;
     }),
     lifeAreas: lifeAreaRows.map(toLifeArea),
     upcomingEvents: upcomingEventRows
@@ -79,8 +86,14 @@ export async function buildAtlasContext(
     // is already the identical condition pickSuggestedAction's own
     // "needs_attention" branch checks, so reusing it is honest, not a
     // shortcut.
-    relationshipSignals: peopleRows
-      .map(toPerson)
+    // Unconditional roster (name + how they're related), distinct from
+    // relationshipSignals below — this is what lets lib/chatSystemPrompt.ts
+    // name real people dynamically instead of a hardcoded, drifting list
+    // (it previously named a fixed set of family members from memory, which
+    // silently went stale the moment a new person — e.g. a partner — was
+    // added via the Family page and never updated here).
+    peopleRoster: people.map((person) => `${person.hebrewName ?? person.name} (${person.relation})`),
+    relationshipSignals: people
       .flatMap((person) => {
         const displayName = person.hebrewName ?? person.name;
         const signals: string[] = [];

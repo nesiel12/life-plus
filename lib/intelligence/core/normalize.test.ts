@@ -12,6 +12,9 @@ function dnaRow(patch: Partial<PersonalDnaRow>): PersonalDnaRow {
     learning_style: null,
     family_check_in_interval_days: null,
     habit_notes: [],
+    sleep_notes: null,
+    career_notes: null,
+    motivation_triggers: [],
     ...patch,
   } as PersonalDnaRow;
 }
@@ -24,6 +27,7 @@ function context(patch: Partial<AtlasContext>): AtlasContext {
     upcomingEvents: [],
     relevantMemory: [],
     relationshipSignals: [],
+    peopleRoster: [],
     personalPatterns: [],
     recommendationInsights: [],
     ...patch,
@@ -38,10 +42,24 @@ describe("buildIntelligenceSignals", () => {
   it("produces one signal per personalDNA field that's actually set", () => {
     const signals = buildIntelligenceSignals(
       context({
-        personalDNA: dnaRow({ peak_focus_hours: "בבוקר", learning_style: "בהאזנה", habit_notes: ["הרגל א", "הרגל ב"] }),
+        personalDNA: dnaRow({
+          peak_focus_hours: "בבוקר",
+          learning_style: "בהאזנה",
+          habit_notes: ["הרגל א", "הרגל ב"],
+          sleep_notes: "ישן מוקדם",
+          career_notes: "מתכנת",
+          motivation_triggers: ["דדליין"],
+        }),
       })
     );
-    expect(signals.filter((s) => s.category === "personalDNA")).toHaveLength(4);
+    // peak_focus_hours, learning_style, sleep_notes, career_notes (1 each) +
+    // 2 habit_notes + 1 motivation_trigger = 7.
+    expect(signals.filter((s) => s.category === "personalDNA")).toHaveLength(7);
+  });
+
+  it("peopleRoster does not itself become a ranked signal — it feeds the identity prompt directly, not the briefing", () => {
+    const signals = buildIntelligenceSignals(context({ peopleRoster: ["יסמין (בת זוג)"] }));
+    expect(signals).toEqual([]);
   });
 
   it("maps every AtlasContext field to its own category", () => {

@@ -85,8 +85,22 @@ export function buildIntelligenceSignals(context: AtlasContext): IntelligenceSig
     if (dna.learning_style) {
       signals.push(makeSignal(nextId("dna"), "personalDNA", "personal_dna", "סגנון למידה", dna.learning_style));
     }
+    // sleep_notes/career_notes/motivation_triggers were added to the schema
+    // by Deep Onboarding (docs/ATLAS_ARCHITECTURE_VISION.md §11) but never
+    // wired in here — real data an onboarding conversation collected was
+    // silently never reaching the AI. Same treatment as peak_focus_hours/
+    // learning_style above.
+    if (dna.sleep_notes) {
+      signals.push(makeSignal(nextId("dna"), "personalDNA", "personal_dna", "שינה", dna.sleep_notes));
+    }
+    if (dna.career_notes) {
+      signals.push(makeSignal(nextId("dna"), "personalDNA", "personal_dna", "קריירה", dna.career_notes));
+    }
     for (const note of dna.habit_notes) {
       signals.push(makeSignal(nextId("dna"), "personalDNA", "personal_dna", "הרגל", note));
+    }
+    for (const trigger of dna.motivation_triggers) {
+      signals.push(makeSignal(nextId("dna"), "personalDNA", "personal_dna", "מניע", trigger));
     }
   }
 

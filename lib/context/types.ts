@@ -21,6 +21,12 @@ export interface AtlasContext {
   upcomingEvents: string[];
   relevantMemory: string[];
   relationshipSignals: string[];
+  // Baseline "who's in his life," unconditional — unlike relationshipSignals
+  // (only populated when something is actionable: stale contact, birthday
+  // window), this always includes every real person on file so the system
+  // prompt's own identity paragraph (lib/chatSystemPrompt.ts) can name them
+  // dynamically instead of a hand-maintained, drifting hardcoded list.
+  peopleRoster: string[];
   // Confident, explainable beliefs about the user's behavioral patterns —
   // Personal DNA Engine v1 (docs/ATLAS_ARCHITECTURE_VISION.md §3), already
   // filtered to MIN_CONFIDENCE_TO_SURFACE. Distinct from personalDNA above:

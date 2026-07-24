@@ -12,6 +12,9 @@ function dnaRow(patch: Partial<PersonalDnaRow>): PersonalDnaRow {
     learning_style: null,
     family_check_in_interval_days: null,
     habit_notes: [],
+    sleep_notes: null,
+    career_notes: null,
+    motivation_triggers: [],
     ...patch,
   } as PersonalDnaRow;
 }
@@ -24,6 +27,7 @@ function context(patch: Partial<AtlasContext>): AtlasContext {
     upcomingEvents: [],
     relevantMemory: [],
     relationshipSignals: [],
+    peopleRoster: [],
     personalPatterns: [],
     recommendationInsights: [],
     ...patch,
@@ -61,6 +65,31 @@ describe("buildSystemPrompt", () => {
     );
     expect(prompt).toContain("בהאזנה");
     expect(prompt).toContain("שותה קפה לפני לימוד");
+  });
+
+  it("includes sleep notes, career notes, and motivation triggers when set (Deep Onboarding fields)", () => {
+    const { prompt } = buildSystemPrompt(
+      context({
+        personalDNA: dnaRow({
+          sleep_notes: "הולך לישון מוקדם",
+          career_notes: "בונה מוצרי AI",
+          motivation_triggers: ["דדליין קרוב"],
+        }),
+      })
+    );
+    expect(prompt).toContain("הולך לישון מוקדם");
+    expect(prompt).toContain("בונה מוצרי AI");
+    expect(prompt).toContain("דדליין קרוב");
+  });
+
+  it("names real people from peopleRoster in the identity paragraph instead of a hardcoded list", () => {
+    const { prompt } = buildSystemPrompt(context({ peopleRoster: ["יסמין (בת זוג)"] }));
+    expect(prompt).toContain("יסמין (בת זוג)");
+  });
+
+  it("omits the people sentence entirely when no one is on file, rather than a fabricated list", () => {
+    const { prompt } = buildSystemPrompt();
+    expect(prompt).not.toContain("closest to him");
   });
 
   it("includes retrieved memory when present", () => {

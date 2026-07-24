@@ -7,10 +7,21 @@ import {
 } from "@/lib/intelligence/core";
 import type { RankedSignal } from "@/lib/intelligence/core";
 
-const BASE_SYSTEM_PROMPT = `You are Atlas — a calm, personal life companion, not a generic assistant.
+// The people sentence used to be a hardcoded, hand-maintained list —
+// real when written, but with no way to stay correct as the Family CRM
+// (people table) changed underneath it. It already went stale once (a
+// partner added later was never reflected here). Built dynamically from
+// context.peopleRoster instead, so this sentence can never drift from
+// what Atlas actually has on file again.
+function buildIdentityPrompt(peopleRoster: string[]): string {
+  const peopleLine =
+    peopleRoster.length > 0
+      ? ` The people closest to him, on file: ${peopleRoster.join(", ")}.`
+      : "";
+
+  return `You are Atlas — a calm, personal life companion, not a generic assistant.
 You know Nesiel (נסיאל): he learns Torah daily, tracks a morning Seder, and builds AI/software
-projects. His family includes his parents Hedva (חדוה) and Oded (עודד), his siblings Elyasaf, Anael,
-Adir Michael, Odaya, and Roniya, and a young cousin he cares about.
+projects.${peopleLine}
 
 Speak calmly and briefly. Reflect his patterns back to him with warmth and insight rather than giving
 generic productivity advice. Never sound like a customer-support chatbot.
@@ -22,6 +33,7 @@ continuity, not as a citation. When you suggest or recommend something, briefly 
 what's actually below — never invent a reason that isn't there. Where it's genuinely relevant, connect
 across goals, memories, calendar, learning, and life areas yourself rather than waiting to be asked —
 but only when there's a real connection, not as a habit.`;
+}
 
 const EMPTY_CONTEXT: AtlasContext = {
   personalDNA: null,
@@ -30,6 +42,7 @@ const EMPTY_CONTEXT: AtlasContext = {
   upcomingEvents: [],
   relevantMemory: [],
   relationshipSignals: [],
+  peopleRoster: [],
   personalPatterns: [],
   recommendationInsights: [],
 };
@@ -56,11 +69,12 @@ export interface SystemPromptResult {
 // buildAtlasContext) so it stays unit-testable on its own — the Intelligence
 // Engine is pure, so this whole chain still needs no server-only import.
 export function buildSystemPrompt(context: AtlasContext = EMPTY_CONTEXT): SystemPromptResult {
+  const basePrompt = buildIdentityPrompt(context.peopleRoster);
   const signals = buildIntelligenceSignals(context);
   const ranked = rankSignals(signals);
   const formatted = formatSignalsForPrompt(ranked, MAX_CHAT_SIGNALS);
 
-  if (!formatted) return { prompt: BASE_SYSTEM_PROMPT, topSignals: [] };
+  if (!formatted) return { prompt: basePrompt, topSignals: [] };
 
   const conflicts = detectPriorityConflicts(ranked);
   const conflictNote =
@@ -71,7 +85,7 @@ export function buildSystemPrompt(context: AtlasContext = EMPTY_CONTEXT): System
       : "";
 
   const prompt =
-    `${BASE_SYSTEM_PROMPT}\n\nWhat Atlas currently knows about him, ranked by importance ` +
+    `${basePrompt}\n\nWhat Atlas currently knows about him, ranked by importance ` +
     `(highest-priority first — a "(ביטחון נמוך)" tag means treat it as a weaker signal, not a fact):\n${formatted}${conflictNote}`;
 
   return { prompt, topSignals: ranked };
