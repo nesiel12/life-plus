@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { X, SkipForward } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { ONBOARDING_QUESTIONS } from "@/lib/constants";
 import { Logo } from "@/components/ui/Logo";
@@ -20,9 +21,11 @@ function parseAnswer(fieldId: keyof PersonalDNA, raw: string): Partial<PersonalD
 
 // The honest fallback for Deep Onboarding (docs/ATLAS_ARCHITECTURE_VISION.md
 // §12): a fixed question list, used only when app/api/onboarding/message
-// reports no AI provider is configured. Unchanged from before that milestone
-// — same questions, same behavior — so the one path that must always work
-// (first-run setup) never depends on a live model call.
+// reports no AI provider is configured. Same questions as before that
+// milestone; now also skippable (a question's field is simply left unset
+// and the flow moves on), matching the real conversation's own skip
+// behavior, so the one path that must always work isn't the one path
+// without an escape hatch.
 function StaticOnboardingForm() {
   const updatePersonalDNA = useAtlasStore((s) => s.updatePersonalDNA);
   const completeOnboarding = useAtlasStore((s) => s.completeOnboarding);
@@ -34,15 +37,14 @@ function StaticOnboardingForm() {
   const isLast = step === ONBOARDING_QUESTIONS.length - 1;
 
   const { loading: saving, error: saveError, run: submitAnswer } = useApiCall(
-    async (patch: Partial<PersonalDNA>, finish: boolean) => {
-      await updatePersonalDNA(patch);
+    async (patch: Partial<PersonalDNA> | null, finish: boolean) => {
+      if (patch) await updatePersonalDNA(patch);
       if (finish) await completeOnboarding();
     }
   );
 
-  function handleNext() {
-    if (!answer.trim() || saving) return;
-    submitAnswer(parseAnswer(question.id, answer.trim()), isLast)
+  function advance(patch: Partial<PersonalDNA> | null) {
+    submitAnswer(patch, isLast)
       .then(() => {
         setAnswer("");
         if (!isLast) setStep((s) => s + 1);
@@ -52,14 +54,21 @@ function StaticOnboardingForm() {
       });
   }
 
+  function handleNext() {
+    if (!answer.trim() || saving) return;
+    advance(parseAnswer(question.id, answer.trim()));
+  }
+
+  function handleSkip() {
+    if (saving) return;
+    advance(null);
+  }
+
   return (
     <>
-      <div className="flex items-center gap-2">
-        <Logo size={22} />
-        <span className="text-sm text-muted">
-          שאלה {step + 1} מתוך {ONBOARDING_QUESTIONS.length}
-        </span>
-      </div>
+      <p className="text-sm text-muted">
+        שאלה {step + 1} מתוך {ONBOARDING_QUESTIONS.length}
+      </p>
 
       <AnimatePresence mode="wait">
         <motion.p
@@ -86,13 +95,27 @@ function StaticOnboardingForm() {
 
       {saveError && <p className="text-xs text-accent-family">{saveError}</p>}
 
-      <button
-        onClick={handleNext}
-        disabled={!answer.trim() || saving}
-        className="self-end rounded-lg bg-accent-faith/20 px-4 py-2 text-sm text-accent-faith transition-opacity disabled:opacity-40"
-      >
-        {saving ? "שומר…" : isLast ? "סיים" : "המשך"}
-      </button>
+      <div className="flex items-center justify-end gap-2">
+        <motion.button
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={handleSkip}
+          disabled={saving}
+          className="focus-ring flex items-center gap-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-muted transition-colors hover:bg-white/10 hover:text-foreground disabled:opacity-40"
+        >
+          <SkipForward size={14} />
+          דלג
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={handleNext}
+          disabled={!answer.trim() || saving}
+          className="focus-ring rounded-lg bg-accent-faith/20 px-4 py-2 text-sm text-accent-faith transition-colors hover:bg-accent-faith/30 disabled:opacity-40"
+        >
+          {saving ? "שומר…" : isLast ? "סיים" : "המשך"}
+        </motion.button>
+      </div>
     </>
   );
 }
@@ -100,16 +123,37 @@ function StaticOnboardingForm() {
 export function OnboardingFlow() {
   const onboardingComplete = useAtlasStore((s) => s.onboardingComplete);
   const [useStaticForm, setUseStaticForm] = useState(false);
+  // Closing hides the modal for now without marking onboarding complete —
+  // reloading the page (or just coming back later) brings it back exactly
+  // where the conversation left off, since DeepOnboardingChat's own
+  // localStorage-backed transcript and the server's real covered-topics
+  // state both survive independently of this flag.
+  const [dismissed, setDismissed] = useState(false);
 
   return (
     <Modal
-      open={!onboardingComplete}
+      open={!onboardingComplete && !dismissed}
+      onClose={() => setDismissed(true)}
       closeOnBackdropClick={false}
-      closeOnEscape={false}
+      closeOnEscape
       zIndex={Z_INDEX.onboarding}
       backdropClassName="items-center bg-black/60 pt-0"
       panelClassName="max-w-md flex flex-col gap-6 p-8"
     >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Logo size={22} />
+          <span className="text-sm font-medium text-foreground">היכרות ראשונית</span>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          aria-label="סגור, אמשיך מאוחר יותר"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
       {useStaticForm ? (
         <StaticOnboardingForm />
       ) : (

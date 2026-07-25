@@ -64,13 +64,17 @@ body {
     inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
 }
 
-/* Sidebar/panel chrome — slightly stronger blur than a content card since
-   it sits over shifting page content rather than the flat background. */
+/* Sidebar/panel chrome — stronger blur than a content card since it sits
+   over shifting page content rather than the flat background. Bumped
+   24px -> 34px for the "Liquid Glass" pass (urgent onboarding-modal fix):
+   higher blur reads as thicker, more fluid frosted glass rather than a
+   thin tinted sheet, with no change to the underlying tint/opacity (still
+   the same balanced-contrast --glass-bg-strong/--glass-bg tokens). */
 .glass-panel {
   background: linear-gradient(180deg, var(--glass-bg-strong), var(--glass-bg));
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(34px);
+  -webkit-backdrop-filter: blur(34px);
 }
 
 /* The Today Hero (UI/UX Revamp) — a soft, multi-hue wash behind the
@@ -97,13 +101,21 @@ body {
    ambient glow instead of a hard drop shadow — used by every Modal panel
    (components/ui/Modal.tsx) so the whole overlay/dialog system shares one
    consistent premium chrome. Two accent tones, not one, so it reads as
-   this app's palette rather than a single-brand-color glow. */
+   this app's palette rather than a single-brand-color glow.
+   "Liquid Glass" refinement (urgent onboarding-modal fix): the glow is
+   softer and more diffuse now (lower color-mix %, wider spread) rather
+   than a tight bright ring — reads as an ambient highlight, not a neon
+   outline — plus a subtle inner top highlight for the "soft highlight"
+   the liquid-glass look calls for. Foreground/background contrast itself
+   is untouched (still ~7.5:1, see the focus-ring comment below) — none of
+   this affects text legibility, only the panel chrome around it. */
 .glass-glow {
   box-shadow:
     0 16px 48px -16px rgba(0, 0, 0, 0.55),
     0 0 0 1px var(--glass-border),
-    0 0 64px -24px color-mix(in srgb, var(--accent-knowledge) 40%, transparent),
-    0 0 44px -20px color-mix(in srgb, var(--accent-family) 32%, transparent);
+    0 0 80px -28px color-mix(in srgb, var(--accent-knowledge) 28%, transparent),
+    0 0 56px -24px color-mix(in srgb, var(--accent-family) 22%, transparent),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 /* Consistent keyboard-focus indicator (design/motion/a11y audit). Every
