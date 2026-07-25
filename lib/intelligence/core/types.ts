@@ -8,6 +8,7 @@ export type SignalCategory =
   | "goal"
   | "lifeArea"
   | "upcomingEvent"
+  | "scheduledEvent"
   | "relationship"
   | "memory"
   | "recommendation";

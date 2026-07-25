@@ -25,6 +25,7 @@ function context(patch: Partial<AtlasContext>): AtlasContext {
     activeGoals: [],
     lifeAreas: [],
     upcomingEvents: [],
+    scheduledEvents: [],
     relevantMemory: [],
     relationshipSignals: [],
     peopleRoster: [],
@@ -68,6 +69,7 @@ describe("buildIntelligenceSignals", () => {
         activeGoals: ["יעד"],
         lifeAreas: [{ key: "faith", label: "אמונה", score: 60, colorVar: "--accent-faith" }],
         upcomingEvents: ["אירוע"],
+        scheduledEvents: ["פגישה"],
         relationshipSignals: ["קשר"],
         relevantMemory: ["זיכרון"],
         personalPatterns: ["דפוס"],
@@ -76,7 +78,16 @@ describe("buildIntelligenceSignals", () => {
     );
     const categories = signals.map((s) => s.category).sort();
     expect(categories).toEqual(
-      ["goal", "lifeArea", "memory", "personalPattern", "recommendation", "relationship", "upcomingEvent"].sort()
+      [
+        "goal",
+        "lifeArea",
+        "memory",
+        "personalPattern",
+        "recommendation",
+        "relationship",
+        "scheduledEvent",
+        "upcomingEvent",
+      ].sort()
     );
   });
 

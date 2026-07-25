@@ -28,6 +28,7 @@ function context(patch: Partial<AtlasContext>): AtlasContext {
     relevantMemory: [],
     relationshipSignals: [],
     peopleRoster: [],
+    scheduledEvents: [],
     personalPatterns: [],
     recommendationInsights: [],
     ...patch,

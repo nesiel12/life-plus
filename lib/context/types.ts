@@ -19,6 +19,13 @@ export interface AtlasContext {
   activeGoals: string[];
   lifeAreas: LifeArea[];
   upcomingEvents: string[];
+  // The user's real Google Calendar schedule, next 14 days (Smart Calendar
+  // & Google Calendar Integration) — distinct from upcomingEvents above
+  // (the curated "meaningful moments" concept). Always [] unless the
+  // caller passed it in via BuildContextOptions.scheduledEvents: fetching
+  // it needs the user's live Google access token, which this function
+  // doesn't have (it's only ever given a userId) — see buildAtlasContext.ts.
+  scheduledEvents: string[];
   relevantMemory: string[];
   relationshipSignals: string[];
   // Baseline "who's in his life," unconditional — unlike relationshipSignals
@@ -46,4 +53,10 @@ export interface BuildContextOptions {
   // no natural-language query to rank against).
   query?: string;
   memoryLimit?: number;
+  // Pre-fetched by the caller (app/api/chat/route.ts), already formatted
+  // ("Title (date, time)") — buildAtlasContext just includes whatever's
+  // passed, defaulting to [] when omitted (no token available, or the
+  // caller doesn't need calendar context, e.g. calendar suggestions
+  // itself already has its own freeBusy data).
+  scheduledEvents?: string[];
 }

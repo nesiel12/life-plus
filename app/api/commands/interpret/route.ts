@@ -12,6 +12,7 @@ import { buildCommandSystemPrompt } from "@/lib/commands/buildCommandPrompt";
 import { resolvePersonByName } from "@/lib/commands/resolvePerson";
 import { buildCommandTimeWindow } from "@/lib/commands/timeWindow";
 import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
+import { fetchGoogleCalendarEvents } from "@/lib/googleCalendar/fetchEvents";
 
 export const runtime = "nodejs";
 
@@ -30,16 +31,6 @@ const PERIOD_LABEL: Record<(typeof COMMAND_PERIODS)[number], string> = {
   evening: "הערב",
   night: "הלילה",
 };
-
-interface GoogleEventItem {
-  id: string;
-  summary?: string;
-  start?: { dateTime?: string; date?: string };
-  end?: { dateTime?: string; date?: string };
-}
-interface GoogleEventsListResponse {
-  items?: GoogleEventItem[];
-}
 
 // The AI Command Panel (docs/ATLAS_ARCHITECTURE_VISION.md §12): interprets
 // a free-text Hebrew command into one of a small, bounded set of real
@@ -147,26 +138,18 @@ export async function POST(request: NextRequest) {
       const { period, day } = result.clearCalendarRange;
       const { timeMin, timeMax } = buildCommandTimeWindow(period, day, new Date());
 
-      const eventsRes = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(
-          timeMin
-        )}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-
-      if (!eventsRes.ok) {
+      let events: { googleEventId: string; title: string; start: string; end: string }[];
+      try {
+        const rawEvents = await fetchGoogleCalendarEvents(accessToken, timeMin, timeMax);
+        events = rawEvents.map((event) => ({
+          googleEventId: event.id,
+          title: event.title,
+          start: event.start,
+          end: event.end,
+        }));
+      } catch {
         return NextResponse.json({ reply: FRIENDLY_ERROR, proposal: null });
       }
-
-      const data = (await eventsRes.json()) as GoogleEventsListResponse;
-      const events = (data.items ?? [])
-        .filter((item) => item.start?.dateTime && item.end?.dateTime)
-        .map((item) => ({
-          googleEventId: item.id,
-          title: item.summary ?? "(ללא כותרת)",
-          start: item.start?.dateTime as string,
-          end: item.end?.dateTime as string,
-        }));
 
       const recommendationEventId = await createRecommendationEvent(user.id, {
         type: "command_clear_calendar",

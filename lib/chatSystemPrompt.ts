@@ -40,6 +40,7 @@ const EMPTY_CONTEXT: AtlasContext = {
   activeGoals: [],
   lifeAreas: [],
   upcomingEvents: [],
+  scheduledEvents: [],
   relevantMemory: [],
   relationshipSignals: [],
   peopleRoster: [],

@@ -74,6 +74,8 @@ export async function buildAtlasContext(
       .map(toUpcomingEvent)
       .slice(0, MAX_UPCOMING_EVENTS)
       .map((event) => `${event.title} (${event.date})`),
+    // Pass-through only — see BuildContextOptions.scheduledEvents.
+    scheduledEvents: options.scheduledEvents ?? [],
     relevantMemory,
     // Proactive CRM Actions (docs/ATLAS_ARCHITECTURE_VISION.md §13): two
     // real, independent reasons a person can surface here — a stale

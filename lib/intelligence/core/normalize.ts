@@ -23,6 +23,10 @@ export const CATEGORY_DEFAULTS: Record<SignalCategory, { importance: number; con
   goal: { importance: 0.7, confidence: 1 },
   lifeArea: { importance: 0.5, confidence: 1 },
   upcomingEvent: { importance: 0.75, confidence: 1 },
+  // A real Google Calendar entry — distinct from upcomingEvent (the
+  // curated "meaningful moments" concept, e.g. birthdays): this is the
+  // literal schedule, so confidence is maximal, importance close to it.
+  scheduledEvent: { importance: 0.7, confidence: 1 },
   relationship: { importance: 0.65, confidence: 1 },
   memory: { importance: 0.5, confidence: 0.7 },
   recommendation: { importance: 0.45, confidence: 0.8 },
@@ -123,6 +127,14 @@ export function buildIntelligenceSignals(context: AtlasContext): IntelligenceSig
 
   for (const event of context.upcomingEvents) {
     signals.push(makeSignal(nextId("event"), "upcomingEvent", "upcoming-events", "אירוע קרוב", event));
+  }
+
+  // Smart Calendar & Google Calendar Integration: the user's real schedule
+  // (next 14 days), only ever present when a caller (app/api/chat) fetched
+  // it with a real Google access token — see buildAtlasContext.ts for why
+  // this is a pass-through option rather than fetched here directly.
+  for (const event of context.scheduledEvents) {
+    signals.push(makeSignal(nextId("scheduled"), "scheduledEvent", "google-calendar", "אירוע ביומן", event));
   }
 
   for (const relationship of context.relationshipSignals) {
