@@ -73,7 +73,7 @@ export default function TimelinePage() {
   let cardIndex = 0;
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
+    <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <h1 className="mb-1 text-2xl font-medium tracking-tight">ציר הזמן</h1>
       <p className="mb-6 text-sm text-muted">
         הסיפור של החיים שלך — רגעים, יעדים והישגים במקום אחד. ⌘K בכל מקום כדי להוסיף רגע חדש.

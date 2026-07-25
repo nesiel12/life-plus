@@ -17,7 +17,7 @@ export default function CalendarPage() {
   const upcomingEvents = useAtlasStore((s) => s.upcomingEvents);
 
   return (
-    <main className="hero-gradient relative mx-auto min-h-screen max-w-3xl px-6 py-16">
+    <main className="hero-gradient relative min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}

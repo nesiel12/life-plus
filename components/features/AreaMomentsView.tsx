@@ -41,7 +41,7 @@ export function AreaMomentsView({ title, description, areaKey }: AreaMomentsView
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
+    <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <h1 className="mb-1 text-2xl font-medium tracking-tight">{title}</h1>
       <p className="mb-10 text-sm text-muted">{description}</p>
 

@@ -43,36 +43,34 @@ export default function Home() {
           not just a heading — the same real, non-fabricated signals
           (EnergyLevelBadge/ScreenTimeWidget) that used to sit as plain
           text lines now read as a small pill row under the greeting. */}
-      <div className="hero-gradient border-b border-glass-border px-6 pb-10 pt-14 sm:pt-20">
-        <div className="mx-auto max-w-4xl">
-          <div className="mb-2 flex items-center gap-3">
-            {session?.user?.image && (
-              <Image
-                src={session.user.image}
-                alt={displayName}
-                width={48}
-                height={48}
-                className="rounded-full ring-1 ring-glass-border"
-              />
-            )}
-            <motion.h1
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="text-3xl font-medium tracking-tight sm:text-4xl"
-            >
-              {greeting ?? "שלום"}, <span className="gradient-text">{displayName}</span>
-            </motion.h1>
-          </div>
-          <p className="mb-4 text-muted">{user.lifeStage}</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <EnergyLevelBadge />
-            <ScreenTimeWidget />
-          </div>
+      <div className="hero-gradient glass-panel px-6 pb-10 pt-14 sm:px-10 sm:pt-20 lg:px-16">
+        <div className="mb-2 flex items-center gap-3">
+          {session?.user?.image && (
+            <Image
+              src={session.user.image}
+              alt={displayName}
+              width={48}
+              height={48}
+              className="rounded-full ring-1 ring-glass-border"
+            />
+          )}
+          <motion.h1
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="text-3xl font-medium tracking-tight sm:text-4xl"
+          >
+            {greeting ?? "שלום"}, <span className="gradient-text">{displayName}</span>
+          </motion.h1>
+        </div>
+        <p className="mb-4 text-muted">{user.lifeStage}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <EnergyLevelBadge />
+          <ScreenTimeWidget />
         </div>
       </div>
 
-      <div className="mx-auto max-w-4xl px-6 py-10">
+      <div className="px-6 py-10 sm:px-10 lg:px-16">
         <div className="flex flex-col gap-6">
           <AIBriefing />
 

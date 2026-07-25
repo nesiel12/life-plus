@@ -12,7 +12,9 @@
      washed out. */
   --glass-bg: rgba(255, 255, 255, 0.045);
   --glass-bg-strong: rgba(255, 255, 255, 0.07);
-  --glass-border: rgba(255, 255, 255, 0.12);
+  /* Bumped 0.12 -> 0.16 for the "Liquid Glass" pass: a more visible,
+     fluid-glass edge, still comfortably short of a harsh white outline. */
+  --glass-border: rgba(255, 255, 255, 0.16);
 
   /* Life-area accents */
   --accent-faith: #f2b84e; /* warm gold */
@@ -46,6 +48,30 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+/* Global Liquid Glass background wash (UI/UX Revamp, full-width pass): a
+   fixed, full-viewport gradient behind every page and every glass
+   surface — not just the per-page Hero band's own (stronger)
+   .hero-gradient. Every .glass-card/.glass-panel element is translucent
+   specifically so this shows through consistently everywhere (Sidebar,
+   AI Companion, page cards), which is the actual point of a "fixed
+   background that fills the screen" — a wash confined to one band at the
+   top of one page wouldn't read as one coherent atmosphere. Toned down
+   from .hero-gradient's own percentages since this is always visible
+   everywhere, not a one-time accent; pointer-events: none + negative
+   z-index so it never interferes with real content or clicks. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 8% -10%, color-mix(in srgb, var(--accent-family) 16%, transparent), transparent 55%),
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--accent-knowledge) 14%, transparent), transparent 55%),
+    radial-gradient(100% 80% at 50% 110%, color-mix(in srgb, var(--accent-faith) 10%, transparent), transparent 55%);
 }
 
 /* Escape hatch for embedding LTR content (numbers, English, code) inside RTL layout */
@@ -54,27 +80,49 @@ body {
   unicode-bidi: isolate;
 }
 
+/* Every page card (GlassCard.tsx — AIBriefing, GoalsPanel, calendar event
+   cards, area/family cards, everything) goes through this one class, so
+   "apply Liquid Glass across the board" means tuning it once here, not
+   editing every consumer. Blur bumped 20px -> 28px and the shadow now
+   carries a touch of real color (not pure black) for the same soft-glow
+   depth every other glass surface has, at a gentler intensity than
+   .glass-glow since a card is a smaller, more frequent element than a
+   modal or the sidebar.
+   IMPORTANT: only the unprefixed `backdrop-filter` is written here, not a
+   manual `-webkit-backdrop-filter` pair — a real bug was found and fixed
+   here: Tailwind v4's Lightning CSS build step collapses a manually
+   duplicated backdrop-filter/-webkit-backdrop-filter pair down to *only*
+   the vendor-prefixed one, which this Chromium-based browser doesn't
+   apply at all (confirmed via computed style: backdrop-filter measured
+   literally "none" on a live element until this was fixed). Lightning CSS
+   adds whatever prefixes the target browserslist actually needs on its
+   own — writing the prefix by hand is what broke it. */
 .glass-card {
   background: linear-gradient(155deg, var(--glass-bg-strong), var(--glass-bg));
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(28px);
   box-shadow:
     0 12px 40px -12px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+    0 0 36px -20px color-mix(in srgb, var(--accent-knowledge) 20%, transparent),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
 }
 
-/* Sidebar/panel chrome — stronger blur than a content card since it sits
-   over shifting page content rather than the flat background. Bumped
-   24px -> 34px for the "Liquid Glass" pass (urgent onboarding-modal fix):
-   higher blur reads as thicker, more fluid frosted glass rather than a
-   thin tinted sheet, with no change to the underlying tint/opacity (still
-   the same balanced-contrast --glass-bg-strong/--glass-bg tokens). */
+/* Sidebar/AI Companion chrome — stronger blur than a content card since it
+   sits over shifting page content rather than the flat background.
+   Bumped again (34px -> 46px) for the "Liquid Glass" full-width/global
+   pass: real "backdrop-blur-2xl+" territory, thick fluid frosted glass.
+   Now carries its own soft glow + inner highlight directly (previously
+   glass-panel had no shadow of its own at all — only Modal's separate
+   .glass-glow class did, which never applied to the Sidebar), so every
+   .glass-panel surface gets real depth without needing a second class. */
 .glass-panel {
   background: linear-gradient(180deg, var(--glass-bg-strong), var(--glass-bg));
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(34px);
-  -webkit-backdrop-filter: blur(34px);
+  backdrop-filter: blur(46px);
+  box-shadow:
+    0 16px 48px -16px rgba(0, 0, 0, 0.5),
+    0 0 48px -24px color-mix(in srgb, var(--accent-knowledge) 22%, transparent),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
 }
 
 /* The Today Hero (UI/UX Revamp) — a soft, multi-hue wash behind the

@@ -28,11 +28,11 @@ export default function AreasPage() {
     : lifeAreas.map((a) => a.key);
 
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
+    <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <h1 className="mb-1 text-2xl font-medium tracking-tight">תחומי חיים</h1>
       <p className="mb-10 text-sm text-muted">המפה המרכזית של החיים שלך.</p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {orderedKeys.map((key, i) => (
           <AreaHealthCard key={key} meta={LIFE_AREAS[key]} insight={insightByKey.get(key)} delay={Math.min(i * 0.06, 0.3)} />
         ))}

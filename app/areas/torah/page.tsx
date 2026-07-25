@@ -134,7 +134,7 @@ export default function TorahSpacePage() {
   const relatedSessions = extracted ? findRelatedSessions(extracted.topic, knowledgeEntries) : [];
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
+    <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <h1 className="mb-1 text-2xl font-medium tracking-tight">מרחב תורה</h1>
       <p className="mb-10 text-sm text-muted">ספריית הידע שלך — שיעורים, סיכומים, ותרגול לזיכרון.</p>
 

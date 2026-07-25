@@ -112,11 +112,11 @@ export default function FamilyCarePage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
+    <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <h1 className="mb-1 text-2xl font-medium tracking-tight">לוח הקשבה משפחתי</h1>
       <p className="mb-10 text-sm text-muted">לא CRM — פשוט מקום לזכור את מי שחשוב.</p>
 
-      <div className="mb-10 flex flex-col gap-2 sm:flex-row">
+      <div className="mb-10 flex max-w-xl flex-col gap-2 sm:flex-row">
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
@@ -149,7 +149,7 @@ export default function FamilyCarePage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {orderedPeople.map((person, i) => (
           <PersonRelationshipCard
             key={person.id}
