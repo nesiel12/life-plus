@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { PersonRelationshipCard } from "@/components/features/PersonRelationshipCard";
+import { EditPersonModal } from "@/components/features/EditPersonModal";
 import { useApiCall } from "@/hooks/useApiCall";
 import { useInsights } from "@/hooks/useInsights";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import type { PersonInsight } from "@/lib/family/types";
+import type { Person } from "@/types";
 
 // Family Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §10): a
 // relationship workspace, not a contacts list. Score/note/birthday still
@@ -28,6 +30,7 @@ export default function FamilyCarePage() {
   const [newName, setNewName] = useState("");
   const [newRelation, setNewRelation] = useState("");
   const { loading: addingPerson, error: addPersonError, run: createPerson } = useApiCall(addPerson);
+  const [editingPerson, setEditingPerson] = useState<Person | null>(null);
 
   const { data, setData, refresh: refreshInsights } = useInsights<{ people: PersonInsight[] }>(
     "/api/family/insights",
@@ -161,9 +164,12 @@ export default function FamilyCarePage() {
             onDismissAction={handleDismissAction}
             onSaveBirthday={handleSaveBirthday}
             onSaveAnniversary={handleSaveAnniversary}
+            onEdit={setEditingPerson}
           />
         ))}
       </div>
+
+      <EditPersonModal person={editingPerson} onClose={() => setEditingPerson(null)} />
     </main>
   );
 }

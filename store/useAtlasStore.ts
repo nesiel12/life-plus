@@ -6,6 +6,8 @@ import {
   logPersonInteractionAction,
   setPersonBirthdayAction,
   setPersonAnniversaryAction,
+  updatePersonAction,
+  deletePersonAction,
 } from "@/app/actions/people";
 import { addChatMessageAction } from "@/app/actions/chat";
 import { addInsightAction } from "@/app/actions/insights";
@@ -71,6 +73,8 @@ interface AtlasState extends HydratedState {
   logPersonInteraction: (personId: string, note?: string) => Promise<void>;
   setPersonBirthday: (personId: string, birthday: string) => Promise<void>;
   setPersonAnniversary: (personId: string, anniversary: string) => Promise<void>;
+  updatePerson: (personId: string, patch: Partial<Person>) => Promise<void>;
+  deletePerson: (personId: string) => Promise<void>;
   addChatMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => Promise<ChatMessage>;
   addInsight: (content: string) => Promise<void>;
   addKnowledgeEntry: (entry: Omit<KnowledgeEntry, "id">) => Promise<void>;
@@ -155,6 +159,20 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     const updated = await setPersonAnniversaryAction(personId, anniversary);
     set((state) => ({
       people: state.people.map((p) => (p.id === personId ? updated : p)),
+    }));
+  },
+
+  updatePerson: async (personId, patch) => {
+    const updated = await updatePersonAction(personId, patch);
+    set((state) => ({
+      people: state.people.map((p) => (p.id === personId ? updated : p)),
+    }));
+  },
+
+  deletePerson: async (personId) => {
+    await deletePersonAction(personId);
+    set((state) => ({
+      people: state.people.filter((p) => p.id !== personId),
     }));
   },
 

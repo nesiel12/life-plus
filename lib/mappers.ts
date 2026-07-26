@@ -21,6 +21,7 @@ import type { GoalWithMilestones } from "@/lib/db/goals";
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
 type LifeAreaScoreRow = Database["public"]["Tables"]["life_area_scores"]["Row"];
 type PersonRow = Database["public"]["Tables"]["people"]["Row"];
+type PersonUpdate = Database["public"]["Tables"]["people"]["Update"];
 type MomentRow = Database["public"]["Tables"]["moments"]["Row"];
 type UpcomingEventRow = Database["public"]["Tables"]["upcoming_events"]["Row"];
 type KnowledgeEntryRow = Database["public"]["Tables"]["knowledge_entries"]["Row"];
@@ -59,7 +60,26 @@ export function toPerson(row: PersonRow): Person {
     birthday: row.birthday ?? undefined,
     anniversary: row.anniversary ?? undefined,
     note: row.note ?? undefined,
+    phone: row.phone ?? undefined,
+    avatarUrl: row.avatar_url ?? undefined,
   };
+}
+
+// Shared by app/actions/people.ts's updatePersonAction — same camelCase-
+// patch-to-snake_case-Update-row pattern as toPersonalDnaPatch, only
+// including keys the caller actually provided so a partial edit (e.g. just
+// the phone number) never clobbers fields it didn't touch.
+export function toPersonPatch(patch: Partial<Person>): PersonUpdate {
+  const row: PersonUpdate = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.hebrewName !== undefined) row.hebrew_name = patch.hebrewName || null;
+  if (patch.relation !== undefined) row.relation = patch.relation;
+  if (patch.birthday !== undefined) row.birthday = patch.birthday || null;
+  if (patch.anniversary !== undefined) row.anniversary = patch.anniversary || null;
+  if (patch.note !== undefined) row.note = patch.note || null;
+  if (patch.phone !== undefined) row.phone = patch.phone || null;
+  if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl || null;
+  return row;
 }
 
 export function toMoment(row: MomentRow): Moment {

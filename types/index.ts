@@ -17,6 +17,8 @@ export interface Person {
   birthday?: string; // "MM-DD"
   anniversary?: string; // "MM-DD"
   note?: string;
+  phone?: string;
+  avatarUrl?: string; // a data: URL (client-side-resized), not a storage path — see the migration for why
 }
 
 export type MomentCategory = LifeAreaKey | "general";

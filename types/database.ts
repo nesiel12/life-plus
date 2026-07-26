@@ -80,6 +80,8 @@ export interface Database {
           birthday: string | null;
           anniversary: string | null;
           note: string | null;
+          phone: string | null;
+          avatar_url: string | null;
           created_at: string;
           updated_at: string;
         },
@@ -93,6 +95,8 @@ export interface Database {
           birthday?: string | null;
           anniversary?: string | null;
           note?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
         },
         {
           id?: string;
@@ -104,6 +108,8 @@ export interface Database {
           birthday?: string | null;
           anniversary?: string | null;
           note?: string | null;
+          phone?: string | null;
+          avatar_url?: string | null;
         }
       >;
       moments: TableDef<

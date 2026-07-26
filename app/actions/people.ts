@@ -2,8 +2,9 @@
 
 import { getCurrentUserId } from "@/lib/currentUser";
 import { peopleRepo } from "@/lib/db/people";
-import { toPerson } from "@/lib/mappers";
+import { toPerson, toPersonPatch } from "@/lib/mappers";
 import type { Database } from "@/types/database";
+import type { Person } from "@/types";
 
 type PersonUpdate = Database["public"]["Tables"]["people"]["Update"];
 
@@ -44,4 +45,21 @@ export async function setPersonAnniversaryAction(personId: string, anniversary: 
   const userId = await getCurrentUserId();
   const row = await peopleRepo.update(userId, personId, { anniversary });
   return toPerson(row);
+}
+
+// The Family CRM edit modal's one save action — covers every editable
+// field (name, relation, birthday, anniversary, note, phone, avatar) in
+// one call instead of one action per field. The existing single-field
+// actions above (birthday/anniversary/interaction) stay as they are for
+// the card's own inline "add a date" quick-affordance — this is additive,
+// not a replacement.
+export async function updatePersonAction(personId: string, patch: Partial<Person>) {
+  const userId = await getCurrentUserId();
+  const row = await peopleRepo.update(userId, personId, toPersonPatch(patch));
+  return toPerson(row);
+}
+
+export async function deletePersonAction(personId: string) {
+  const userId = await getCurrentUserId();
+  await peopleRepo.remove(userId, personId);
 }
