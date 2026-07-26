@@ -9,6 +9,7 @@ export type ChatRoleDb = "user" | "assistant" | "system";
 export type RecommendationStatusDb = "pending" | "accepted" | "rejected" | "modified" | "expired";
 export type LearningTopicStatusDb = "planning" | "active" | "completed";
 export type LearningResourceTypeDb = "youtube" | "podcast" | "article" | "equipment" | "summary";
+export type MealTypeDb = "breakfast" | "lunch" | "dinner" | "snack" | "post-workout";
 
 // The Supabase client's generics require every table to carry a
 // `Relationships` array (foreign-key metadata used for `.select()` joins).
@@ -457,6 +458,59 @@ export interface Database {
           url?: string | null;
           notes?: string | null;
           is_completed?: boolean;
+        }
+      >;
+      meals: TableDef<
+        {
+          id: string;
+          user_id: string;
+          description: string;
+          eaten_at: string;
+          type: MealTypeDb;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          description: string;
+          eaten_at?: string;
+          type: MealTypeDb;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          description?: string;
+          eaten_at?: string;
+          type?: MealTypeDb;
+        }
+      >;
+      workouts: TableDef<
+        {
+          id: string;
+          user_id: string;
+          title: string;
+          start_time: string;
+          end_time: string | null;
+          routine_details: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          title: string;
+          start_time?: string;
+          end_time?: string | null;
+          routine_details?: string | null;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          start_time?: string;
+          end_time?: string | null;
+          routine_details?: string | null;
         }
       >;
       recommendation_events: TableDef<

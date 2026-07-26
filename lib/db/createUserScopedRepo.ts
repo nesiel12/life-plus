@@ -4,9 +4,9 @@ import type { Database } from "@/types/database";
 
 // Covers every table shaped like (id uuid pk, user_id uuid, ...): people,
 // moments, upcoming_events, knowledge_entries, goals, chat_messages, insights,
-// learning_topics, learning_resources. Tables with a different shape
-// (composite keys, single-row-per-user) get their own small module in
-// lib/db/ instead of being forced through this.
+// learning_topics, learning_resources, meals, workouts. Tables with a
+// different shape (composite keys, single-row-per-user) get their own
+// small module in lib/db/ instead of being forced through this.
 type UserScopedTableName =
   | "people"
   | "moments"
@@ -16,7 +16,9 @@ type UserScopedTableName =
   | "chat_messages"
   | "insights"
   | "learning_topics"
-  | "learning_resources";
+  | "learning_resources"
+  | "meals"
+  | "workouts";
 
 export function createUserScopedRepo<T extends UserScopedTableName>(table: T) {
   type Row = Database["public"]["Tables"][T]["Row"];

@@ -12,11 +12,13 @@ import type {
   LearningResource,
   LearningTopic,
   LifeArea,
+  Meal,
   Moment,
   PersonalDNA,
   Person,
   UpcomingEvent,
   UserContext,
+  Workout,
 } from "@/types";
 import type { GoalWithMilestones } from "@/lib/db/goals";
 
@@ -35,6 +37,10 @@ type LearningTopicRow = Database["public"]["Tables"]["learning_topics"]["Row"];
 type LearningTopicUpdate = Database["public"]["Tables"]["learning_topics"]["Update"];
 type LearningResourceRow = Database["public"]["Tables"]["learning_resources"]["Row"];
 type LearningResourceUpdate = Database["public"]["Tables"]["learning_resources"]["Update"];
+type MealRow = Database["public"]["Tables"]["meals"]["Row"];
+type MealUpdate = Database["public"]["Tables"]["meals"]["Update"];
+type WorkoutRow = Database["public"]["Tables"]["workouts"]["Row"];
+type WorkoutUpdate = Database["public"]["Tables"]["workouts"]["Update"];
 
 export function toUserContext(row: UserRow): UserContext {
   return {
@@ -207,6 +213,44 @@ export function toLearningResourcePatch(patch: Partial<LearningResource>): Learn
   if (patch.url !== undefined) row.url = patch.url || null;
   if (patch.notes !== undefined) row.notes = patch.notes || null;
   if (patch.isCompleted !== undefined) row.is_completed = patch.isCompleted;
+  return row;
+}
+
+export function toMeal(row: MealRow): Meal {
+  return {
+    id: row.id,
+    description: row.description,
+    eatenAt: row.eaten_at,
+    type: row.type,
+    createdAt: row.created_at,
+  };
+}
+
+export function toMealPatch(patch: Partial<Meal>): MealUpdate {
+  const row: MealUpdate = {};
+  if (patch.description !== undefined) row.description = patch.description;
+  if (patch.eatenAt !== undefined) row.eaten_at = patch.eatenAt;
+  if (patch.type !== undefined) row.type = patch.type;
+  return row;
+}
+
+export function toWorkout(row: WorkoutRow): Workout {
+  return {
+    id: row.id,
+    title: row.title,
+    startTime: row.start_time,
+    endTime: row.end_time ?? undefined,
+    routineDetails: row.routine_details ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export function toWorkoutPatch(patch: Partial<Workout>): WorkoutUpdate {
+  const row: WorkoutUpdate = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.startTime !== undefined) row.start_time = patch.startTime;
+  if (patch.endTime !== undefined) row.end_time = patch.endTime ?? null;
+  if (patch.routineDetails !== undefined) row.routine_details = patch.routineDetails || null;
   return row;
 }
 

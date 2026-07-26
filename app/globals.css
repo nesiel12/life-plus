@@ -23,6 +23,7 @@
   --accent-health: #43d19e; /* vivid mint green */
   --accent-career: #a78bfa; /* vivid violet */
   --accent-learning: #6366f1; /* vivid indigo — Learning & Knowledge Space (Phase 7), distinct from --accent-career's softer violet and --accent-knowledge's sky blue */
+  --accent-fitness: #ff6b4a; /* vibrant coral/active-orange — Health & Fitness Space (Phase 8) meals/workouts UI specifically; the pre-existing --accent-health (mint) stays untouched everywhere it's already used (life-area score, Sidebar nav, etc.) */
 }
 
 @theme inline {
@@ -38,6 +39,7 @@
   --color-accent-health: var(--accent-health);
   --color-accent-career: var(--accent-career);
   --color-accent-learning: var(--accent-learning);
+  --color-accent-fitness: var(--accent-fitness);
   --font-sans: var(--font-heebo);
 }
 

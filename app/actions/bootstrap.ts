@@ -13,6 +13,7 @@ import { personalDnaRepo } from "@/lib/db/personalDna";
 import { goalsRepo } from "@/lib/db/goals";
 import { dailyIntentionsRepo } from "@/lib/db/dailyIntentions";
 import { learningResourcesRepo, learningTopicsRepo } from "@/lib/db/learning";
+import { mealsRepo, workoutsRepo } from "@/lib/db/health";
 import { analyzePersonalDNA } from "@/lib/intelligence/personalDNA";
 import {
   toUserContext,
@@ -27,6 +28,8 @@ import {
   toGoal,
   toLearningTopic,
   toLearningResource,
+  toMeal,
+  toWorkout,
 } from "@/lib/mappers";
 
 // The one Server Action every page hydrates from on load — replaces the
@@ -48,6 +51,8 @@ export async function getInitialState() {
     todayIntention,
     learningTopicRows,
     learningResourceRows,
+    mealRows,
+    workoutRows,
   ] = await Promise.all([
     lifeAreaScoresRepo.list(userId),
     peopleRepo.list(userId),
@@ -61,6 +66,8 @@ export async function getInitialState() {
     dailyIntentionsRepo.getForToday(userId),
     learningTopicsRepo.list(userId),
     learningResourcesRepo.list(userId),
+    mealsRepo.list(userId),
+    workoutsRepo.list(userId),
   ]);
 
   // Self-learning loop trigger, v1 (docs/ATLAS_ARCHITECTURE_VISION.md §3):
@@ -90,5 +97,7 @@ export async function getInitialState() {
     todayIntention,
     learningTopics: learningTopicRows.map(toLearningTopic),
     learningResources: learningResourceRows.map(toLearningResource),
+    meals: mealRows.map(toMeal),
+    workouts: workoutRows.map(toWorkout),
   };
 }

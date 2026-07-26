@@ -94,6 +94,25 @@ export interface LearningResource {
   createdAt: string;
 }
 
+export type MealType = "breakfast" | "lunch" | "dinner" | "snack" | "post-workout";
+
+export interface Meal {
+  id: string;
+  description: string;
+  eatenAt: string; // ISO datetime
+  type: MealType;
+  createdAt: string;
+}
+
+export interface Workout {
+  id: string;
+  title: string;
+  startTime: string; // ISO datetime
+  endTime?: string; // ISO datetime
+  routineDetails?: string;
+  createdAt: string;
+}
+
 export interface UpcomingEvent {
   id: string;
   title: string;

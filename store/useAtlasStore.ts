@@ -24,6 +24,14 @@ import {
   updateLearningResourceAction,
   updateLearningTopicAction,
 } from "@/app/actions/learning";
+import {
+  addMealAction,
+  addWorkoutAction,
+  deleteMealAction,
+  deleteWorkoutAction,
+  updateMealAction,
+  updateWorkoutAction,
+} from "@/app/actions/health";
 import { addUpcomingEventAction } from "@/app/actions/upcomingEvents";
 import { setTodayIntentionAction } from "@/app/actions/dailyIntention";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
@@ -36,6 +44,8 @@ import type {
   LearningResourceType,
   LearningTopic,
   LifeArea,
+  Meal,
+  MealType,
   Moment,
   MomentCategory,
   PersonalDNA,
@@ -43,6 +53,7 @@ import type {
   SuggestedAction,
   UpcomingEvent,
   UserContext,
+  Workout,
 } from "@/types";
 
 // Everything hydrate() accepts — the shape getInitialState() (app/actions/
@@ -62,6 +73,8 @@ export interface HydratedState {
   todayIntention: string;
   learningTopics: LearningTopic[];
   learningResources: LearningResource[];
+  meals: Meal[];
+  workouts: Workout[];
 }
 
 interface AtlasState extends HydratedState {
@@ -110,6 +123,19 @@ interface AtlasState extends HydratedState {
   deleteLearningResource: (resourceId: string) => Promise<void>;
   generateLearningPath: (topicId: string, topicTitle: string) => Promise<void>;
 
+  addMeal: (meal: { description: string; type: MealType; eatenAt?: string }) => Promise<void>;
+  updateMeal: (mealId: string, patch: Partial<Meal>) => Promise<void>;
+  deleteMeal: (mealId: string) => Promise<void>;
+
+  addWorkout: (workout: {
+    title: string;
+    startTime?: string;
+    endTime?: string;
+    routineDetails?: string;
+  }) => Promise<void>;
+  updateWorkout: (workoutId: string, patch: Partial<Workout>) => Promise<void>;
+  deleteWorkout: (workoutId: string) => Promise<void>;
+
   updatePersonalDNA: (patch: Partial<PersonalDNA>) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   // Local-only, no network call: app/api/onboarding/message already
@@ -148,6 +174,8 @@ const EMPTY_STATE: HydratedState = {
   todayIntention: "",
   learningTopics: [],
   learningResources: [],
+  meals: [],
+  workouts: [],
 };
 
 export const useAtlasStore = create<AtlasState>((set, get) => ({
@@ -277,6 +305,36 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   generateLearningPath: async (topicId, topicTitle) => {
     const created = await generateLearningPathAction(topicId, topicTitle);
     set((state) => ({ learningResources: [...state.learningResources, ...created] }));
+  },
+
+  addMeal: async (meal) => {
+    const created = await addMealAction(meal);
+    set((state) => ({ meals: [created, ...state.meals] }));
+  },
+
+  updateMeal: async (mealId, patch) => {
+    const updated = await updateMealAction(mealId, patch);
+    set((state) => ({ meals: state.meals.map((m) => (m.id === mealId ? updated : m)) }));
+  },
+
+  deleteMeal: async (mealId) => {
+    await deleteMealAction(mealId);
+    set((state) => ({ meals: state.meals.filter((m) => m.id !== mealId) }));
+  },
+
+  addWorkout: async (workout) => {
+    const created = await addWorkoutAction(workout);
+    set((state) => ({ workouts: [created, ...state.workouts] }));
+  },
+
+  updateWorkout: async (workoutId, patch) => {
+    const updated = await updateWorkoutAction(workoutId, patch);
+    set((state) => ({ workouts: state.workouts.map((w) => (w.id === workoutId ? updated : w)) }));
+  },
+
+  deleteWorkout: async (workoutId) => {
+    await deleteWorkoutAction(workoutId);
+    set((state) => ({ workouts: state.workouts.filter((w) => w.id !== workoutId) }));
   },
 
   updatePersonalDNA: async (patch) => {
