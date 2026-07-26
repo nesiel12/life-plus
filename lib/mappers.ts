@@ -9,6 +9,8 @@ import type {
   Goal,
   Insight,
   KnowledgeEntry,
+  LearningResource,
+  LearningTopic,
   LifeArea,
   Moment,
   PersonalDNA,
@@ -29,6 +31,10 @@ type ChatMessageRow = Database["public"]["Tables"]["chat_messages"]["Row"];
 type InsightRow = Database["public"]["Tables"]["insights"]["Row"];
 type PersonalDnaRow = Database["public"]["Tables"]["personal_dna"]["Row"];
 type PersonalDnaUpdate = Database["public"]["Tables"]["personal_dna"]["Update"];
+type LearningTopicRow = Database["public"]["Tables"]["learning_topics"]["Row"];
+type LearningTopicUpdate = Database["public"]["Tables"]["learning_topics"]["Update"];
+type LearningResourceRow = Database["public"]["Tables"]["learning_resources"]["Row"];
+type LearningResourceUpdate = Database["public"]["Tables"]["learning_resources"]["Update"];
 
 export function toUserContext(row: UserRow): UserContext {
   return {
@@ -160,6 +166,47 @@ export function toPersonalDnaPatch(patch: Partial<PersonalDNA>): PersonalDnaUpda
   if (patch.sleepNotes !== undefined) row.sleep_notes = patch.sleepNotes;
   if (patch.careerNotes !== undefined) row.career_notes = patch.careerNotes;
   if (patch.motivationTriggers !== undefined) row.motivation_triggers = patch.motivationTriggers;
+  return row;
+}
+
+export function toLearningTopic(row: LearningTopicRow): LearningTopic {
+  return {
+    id: row.id,
+    title: row.title,
+    category: row.category ?? undefined,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
+export function toLearningTopicPatch(patch: Partial<LearningTopic>): LearningTopicUpdate {
+  const row: LearningTopicUpdate = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.category !== undefined) row.category = patch.category || null;
+  if (patch.status !== undefined) row.status = patch.status;
+  return row;
+}
+
+export function toLearningResource(row: LearningResourceRow): LearningResource {
+  return {
+    id: row.id,
+    topicId: row.topic_id,
+    type: row.type,
+    title: row.title,
+    url: row.url ?? undefined,
+    notes: row.notes ?? undefined,
+    isCompleted: row.is_completed,
+    createdAt: row.created_at,
+  };
+}
+
+export function toLearningResourcePatch(patch: Partial<LearningResource>): LearningResourceUpdate {
+  const row: LearningResourceUpdate = {};
+  if (patch.type !== undefined) row.type = patch.type;
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.url !== undefined) row.url = patch.url || null;
+  if (patch.notes !== undefined) row.notes = patch.notes || null;
+  if (patch.isCompleted !== undefined) row.is_completed = patch.isCompleted;
   return row;
 }
 

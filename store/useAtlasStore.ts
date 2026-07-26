@@ -15,6 +15,15 @@ import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/acti
 import { updateLifeAreaScoreAction } from "@/app/actions/lifeAreas";
 import { updatePersonalDNAAction, completeOnboardingAction } from "@/app/actions/personalDna";
 import { addGoalAction, toggleMilestoneAction, removeGoalAction } from "@/app/actions/goals";
+import {
+  addLearningResourceAction,
+  addLearningTopicAction,
+  deleteLearningResourceAction,
+  deleteLearningTopicAction,
+  generateLearningPathAction,
+  updateLearningResourceAction,
+  updateLearningTopicAction,
+} from "@/app/actions/learning";
 import { addUpcomingEventAction } from "@/app/actions/upcomingEvents";
 import { setTodayIntentionAction } from "@/app/actions/dailyIntention";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
@@ -23,6 +32,9 @@ import type {
   Goal,
   Insight,
   KnowledgeEntry,
+  LearningResource,
+  LearningResourceType,
+  LearningTopic,
   LifeArea,
   Moment,
   MomentCategory,
@@ -48,6 +60,8 @@ export interface HydratedState {
   onboardingComplete: boolean;
   goals: Goal[];
   todayIntention: string;
+  learningTopics: LearningTopic[];
+  learningResources: LearningResource[];
 }
 
 interface AtlasState extends HydratedState {
@@ -80,6 +94,21 @@ interface AtlasState extends HydratedState {
   addKnowledgeEntry: (entry: Omit<KnowledgeEntry, "id">) => Promise<void>;
   markKnowledgeReviewed: (entryId: string) => Promise<void>;
   updateLifeAreaScore: (key: LifeArea["key"], score: number) => Promise<void>;
+
+  addLearningTopic: (topic: { title: string; category?: string }) => Promise<void>;
+  updateLearningTopic: (topicId: string, patch: Partial<LearningTopic>) => Promise<void>;
+  deleteLearningTopic: (topicId: string) => Promise<void>;
+
+  addLearningResource: (resource: {
+    topicId: string;
+    type: LearningResourceType;
+    title: string;
+    url?: string;
+    notes?: string;
+  }) => Promise<void>;
+  updateLearningResource: (resourceId: string, patch: Partial<LearningResource>) => Promise<void>;
+  deleteLearningResource: (resourceId: string) => Promise<void>;
+  generateLearningPath: (topicId: string, topicTitle: string) => Promise<void>;
 
   updatePersonalDNA: (patch: Partial<PersonalDNA>) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -117,6 +146,8 @@ const EMPTY_STATE: HydratedState = {
   onboardingComplete: false,
   goals: [],
   todayIntention: "",
+  learningTopics: [],
+  learningResources: [],
 };
 
 export const useAtlasStore = create<AtlasState>((set, get) => ({
@@ -204,6 +235,48 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     set((state) => ({
       lifeAreas: state.lifeAreas.map((a) => (a.key === key ? updated : a)),
     }));
+  },
+
+  addLearningTopic: async (topic) => {
+    const created = await addLearningTopicAction(topic);
+    set((state) => ({ learningTopics: [created, ...state.learningTopics] }));
+  },
+
+  updateLearningTopic: async (topicId, patch) => {
+    const updated = await updateLearningTopicAction(topicId, patch);
+    set((state) => ({
+      learningTopics: state.learningTopics.map((t) => (t.id === topicId ? updated : t)),
+    }));
+  },
+
+  deleteLearningTopic: async (topicId) => {
+    await deleteLearningTopicAction(topicId);
+    set((state) => ({
+      learningTopics: state.learningTopics.filter((t) => t.id !== topicId),
+      learningResources: state.learningResources.filter((r) => r.topicId !== topicId),
+    }));
+  },
+
+  addLearningResource: async (resource) => {
+    const created = await addLearningResourceAction(resource);
+    set((state) => ({ learningResources: [...state.learningResources, created] }));
+  },
+
+  updateLearningResource: async (resourceId, patch) => {
+    const updated = await updateLearningResourceAction(resourceId, patch);
+    set((state) => ({
+      learningResources: state.learningResources.map((r) => (r.id === resourceId ? updated : r)),
+    }));
+  },
+
+  deleteLearningResource: async (resourceId) => {
+    await deleteLearningResourceAction(resourceId);
+    set((state) => ({ learningResources: state.learningResources.filter((r) => r.id !== resourceId) }));
+  },
+
+  generateLearningPath: async (topicId, topicTitle) => {
+    const created = await generateLearningPathAction(topicId, topicTitle);
+    set((state) => ({ learningResources: [...state.learningResources, ...created] }));
   },
 
   updatePersonalDNA: async (patch) => {

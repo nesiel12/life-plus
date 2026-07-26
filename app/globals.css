@@ -22,6 +22,7 @@
   --accent-knowledge: #4f9dfb; /* vivid sky blue */
   --accent-health: #43d19e; /* vivid mint green */
   --accent-career: #a78bfa; /* vivid violet */
+  --accent-learning: #6366f1; /* vivid indigo — Learning & Knowledge Space (Phase 7), distinct from --accent-career's softer violet and --accent-knowledge's sky blue */
 }
 
 @theme inline {
@@ -36,6 +37,7 @@
   --color-accent-knowledge: var(--accent-knowledge);
   --color-accent-health: var(--accent-health);
   --color-accent-career: var(--accent-career);
+  --color-accent-learning: var(--accent-learning);
   --font-sans: var(--font-heebo);
 }
 

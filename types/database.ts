@@ -7,6 +7,8 @@ export type LifeAreaKeyDb = "faith" | "family" | "knowledge" | "health" | "caree
 export type MomentCategoryDb = LifeAreaKeyDb | "general";
 export type ChatRoleDb = "user" | "assistant" | "system";
 export type RecommendationStatusDb = "pending" | "accepted" | "rejected" | "modified" | "expired";
+export type LearningTopicStatusDb = "planning" | "active" | "completed";
+export type LearningResourceTypeDb = "youtube" | "podcast" | "article" | "equipment" | "summary";
 
 // The Supabase client's generics require every table to carry a
 // `Relationships` array (foreign-key metadata used for `.select()` joins).
@@ -396,6 +398,65 @@ export interface Database {
           confidence?: number;
           evidence_count?: number;
           source?: string;
+        }
+      >;
+      learning_topics: TableDef<
+        {
+          id: string;
+          user_id: string;
+          title: string;
+          category: string | null;
+          status: LearningTopicStatusDb;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          title: string;
+          category?: string | null;
+          status?: LearningTopicStatusDb;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          category?: string | null;
+          status?: LearningTopicStatusDb;
+        }
+      >;
+      learning_resources: TableDef<
+        {
+          id: string;
+          user_id: string;
+          topic_id: string;
+          type: LearningResourceTypeDb;
+          title: string;
+          url: string | null;
+          notes: string | null;
+          is_completed: boolean;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          topic_id: string;
+          type: LearningResourceTypeDb;
+          title: string;
+          url?: string | null;
+          notes?: string | null;
+          is_completed?: boolean;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          topic_id?: string;
+          type?: LearningResourceTypeDb;
+          title?: string;
+          url?: string | null;
+          notes?: string | null;
+          is_completed?: boolean;
         }
       >;
       recommendation_events: TableDef<

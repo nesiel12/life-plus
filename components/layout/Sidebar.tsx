@@ -36,7 +36,7 @@ interface NavItem {
 // matching how a wordmark conventionally behaves.
 const NAV_ITEMS: NavItem[] = [
   { href: "/calendar", label: "יומן חכם", icon: CalendarClock, colorVar: "--accent-career" },
-  { href: "/areas/learning", label: "למידה", icon: Lightbulb, colorVar: "--accent-knowledge" },
+  { href: "/areas/learning", label: "למידה", icon: Lightbulb, colorVar: "--accent-learning" },
   { href: "/areas/torah", label: "מרחב תורה", icon: BookOpen, colorVar: "--accent-faith" },
   { href: "/areas/family", label: "משפחה וחברים", icon: HeartHandshake, colorVar: "--accent-family" },
   { href: "/areas/health", label: "בריאות", icon: HeartPulse, colorVar: "--accent-health" },

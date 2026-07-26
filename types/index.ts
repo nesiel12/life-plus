@@ -71,6 +71,29 @@ export interface KnowledgeEntry {
   reviewQuestions?: string[];
 }
 
+export type LearningTopicStatus = "planning" | "active" | "completed";
+
+export interface LearningTopic {
+  id: string;
+  title: string;
+  category?: string;
+  status: LearningTopicStatus;
+  createdAt: string;
+}
+
+export type LearningResourceType = "youtube" | "podcast" | "article" | "equipment" | "summary";
+
+export interface LearningResource {
+  id: string;
+  topicId: string;
+  type: LearningResourceType;
+  title: string;
+  url?: string;
+  notes?: string;
+  isCompleted: boolean;
+  createdAt: string;
+}
+
 export interface UpcomingEvent {
   id: string;
   title: string;
