@@ -7,6 +7,8 @@ export type LifeAreaKeyDb = "faith" | "family" | "knowledge" | "health" | "caree
 export type MomentCategoryDb = LifeAreaKeyDb | "general";
 export type ChatRoleDb = "user" | "assistant" | "system";
 export type RecommendationStatusDb = "pending" | "accepted" | "rejected" | "modified" | "expired";
+export type TaskStatusDb = "todo" | "in-progress" | "done";
+export type TransactionTypeDb = "income" | "expense";
 export type LearningTopicStatusDb = "planning" | "active" | "completed";
 export type LearningResourceTypeDb = "youtube" | "podcast" | "article" | "equipment" | "summary";
 export type MealTypeDb = "breakfast" | "lunch" | "dinner" | "snack" | "post-workout";
@@ -399,6 +401,163 @@ export interface Database {
           confidence?: number;
           evidence_count?: number;
           source?: string;
+        }
+      >;
+      tasks: TableDef<
+        {
+          id: string;
+          user_id: string;
+          title: string;
+          description: string | null;
+          status: TaskStatusDb;
+          due_date: string | null;
+          is_high_priority: boolean;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          title: string;
+          description?: string | null;
+          status?: TaskStatusDb;
+          due_date?: string | null;
+          is_high_priority?: boolean;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          description?: string | null;
+          status?: TaskStatusDb;
+          due_date?: string | null;
+          is_high_priority?: boolean;
+        }
+      >;
+      habits: TableDef<
+        {
+          id: string;
+          user_id: string;
+          title: string;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          title: string;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          title?: string;
+        }
+      >;
+      habit_logs: TableDef<
+        {
+          id: string;
+          user_id: string;
+          habit_id: string;
+          completed_date: string;
+          created_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          habit_id: string;
+          completed_date: string;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          habit_id?: string;
+          completed_date?: string;
+        }
+      >;
+      transactions: TableDef<
+        {
+          id: string;
+          user_id: string;
+          amount: number;
+          type: TransactionTypeDb;
+          title: string;
+          category: string;
+          transaction_date: string;
+          note: string | null;
+          is_shift: boolean;
+          hourly_rate: number | null;
+          shift_start: string | null;
+          shift_end: string | null;
+          employer: string | null;
+          is_recurring: boolean;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          amount: number;
+          type: TransactionTypeDb;
+          title: string;
+          category: string;
+          transaction_date?: string;
+          note?: string | null;
+          is_shift?: boolean;
+          hourly_rate?: number | null;
+          shift_start?: string | null;
+          shift_end?: string | null;
+          employer?: string | null;
+          is_recurring?: boolean;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          amount?: number;
+          type?: TransactionTypeDb;
+          title?: string;
+          category?: string;
+          transaction_date?: string;
+          note?: string | null;
+          is_shift?: boolean;
+          hourly_rate?: number | null;
+          shift_start?: string | null;
+          shift_end?: string | null;
+          employer?: string | null;
+          is_recurring?: boolean;
+        }
+      >;
+      manual_events: TableDef<
+        {
+          id: string;
+          user_id: string;
+          title: string;
+          start_time: string;
+          end_time: string;
+          category: MomentCategoryDb | null;
+          reminder_minutes: number | null;
+          linked_contact_ids: string[];
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          title: string;
+          start_time: string;
+          end_time: string;
+          category?: MomentCategoryDb | null;
+          reminder_minutes?: number | null;
+          linked_contact_ids?: string[];
+        },
+        {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          start_time?: string;
+          end_time?: string;
+          category?: MomentCategoryDb | null;
+          reminder_minutes?: number | null;
+          linked_contact_ids?: string[];
         }
       >;
       learning_topics: TableDef<

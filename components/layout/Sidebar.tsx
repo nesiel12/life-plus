@@ -12,6 +12,7 @@ import {
   HeartHandshake,
   HeartPulse,
   History,
+  ListTodo,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/areas/torah", label: "מרחב תורה", icon: BookOpen, colorVar: "--accent-faith" },
   { href: "/areas/family", label: "משפחה וחברים", icon: HeartHandshake, colorVar: "--accent-family" },
   { href: "/areas/health", label: "בריאות", icon: HeartPulse, colorVar: "--accent-health" },
+  { href: "/areas/time", label: "זמן ומשימות", icon: ListTodo, colorVar: "--accent-time" },
   { href: "/timeline", label: "ציר זמן", icon: History, colorVar: "--muted" },
 ];
 

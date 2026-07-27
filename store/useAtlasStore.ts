@@ -12,9 +12,8 @@ import {
 import { addChatMessageAction } from "@/app/actions/chat";
 import { addInsightAction } from "@/app/actions/insights";
 import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/actions/knowledge";
-import { updateLifeAreaScoreAction } from "@/app/actions/lifeAreas";
-import { updatePersonalDNAAction, completeOnboardingAction } from "@/app/actions/personalDna";
-import { addGoalAction, toggleMilestoneAction, removeGoalAction } from "@/app/actions/goals";
+import { addTaskAction, updateTaskAction, deleteTaskAction } from "@/app/actions/tasks";
+import { addHabitAction, deleteHabitAction, toggleHabitCompletionAction } from "@/app/actions/habits";
 import {
   addLearningResourceAction,
   addLearningTopicAction,
@@ -24,6 +23,7 @@ import {
   updateLearningResourceAction,
   updateLearningTopicAction,
 } from "@/app/actions/learning";
+import { addTransactionAction, updateTransactionAction, deleteTransactionAction } from "@/app/actions/transactions";
 import {
   addMealAction,
   addWorkoutAction,
@@ -32,18 +32,30 @@ import {
   updateMealAction,
   updateWorkoutAction,
 } from "@/app/actions/health";
+import {
+  addManualEventAction,
+  updateManualEventAction,
+  deleteManualEventAction,
+} from "@/app/actions/calendar-events";
+import { updateLifeAreaScoreAction } from "@/app/actions/lifeAreas";
+import { updatePersonalDNAAction, completeOnboardingAction } from "@/app/actions/personalDna";
+import { addGoalAction, toggleMilestoneAction, removeGoalAction } from "@/app/actions/goals";
 import { addUpcomingEventAction } from "@/app/actions/upcomingEvents";
 import { setTodayIntentionAction } from "@/app/actions/dailyIntention";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import type {
   ChatMessage,
+  DailyRecommendation,
   Goal,
+  Habit,
+  HabitLog,
   Insight,
   KnowledgeEntry,
   LearningResource,
   LearningResourceType,
   LearningTopic,
   LifeArea,
+  ManualEvent,
   Meal,
   MealType,
   Moment,
@@ -51,6 +63,8 @@ import type {
   PersonalDNA,
   Person,
   SuggestedAction,
+  Task,
+  Transaction,
   UpcomingEvent,
   UserContext,
   Workout,
@@ -71,6 +85,11 @@ export interface HydratedState {
   onboardingComplete: boolean;
   goals: Goal[];
   todayIntention: string;
+  tasks: Task[];
+  habits: Habit[];
+  habitLogs: HabitLog[];
+  transactions: Transaction[];
+  manualEvents: ManualEvent[];
   learningTopics: LearningTopic[];
   learningResources: LearningResource[];
   meals: Meal[];
@@ -80,6 +99,11 @@ export interface HydratedState {
 interface AtlasState extends HydratedState {
   hydrated: boolean;
   suggestedActions: SuggestedAction[];
+  // Session-lived cache only, keyed by date string ("2026-07-26") — not
+  // part of HydratedState/bootstrap since it's never persisted server-side,
+  // purely to avoid re-calling /api/ai/daily-recommendations when the user
+  // swipes back to a day already analyzed this session.
+  dailyRecommendations: Record<string, DailyRecommendation[]>;
 
   hydrate: (state: HydratedState) => void;
 
@@ -107,6 +131,42 @@ interface AtlasState extends HydratedState {
   addKnowledgeEntry: (entry: Omit<KnowledgeEntry, "id">) => Promise<void>;
   markKnowledgeReviewed: (entryId: string) => Promise<void>;
   updateLifeAreaScore: (key: LifeArea["key"], score: number) => Promise<void>;
+
+  addTask: (task: { title: string; description?: string; dueDate?: string }) => Promise<void>;
+  updateTask: (taskId: string, patch: Partial<Task>) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
+
+  addHabit: (habit: { title: string }) => Promise<void>;
+  deleteHabit: (habitId: string) => Promise<void>;
+  toggleHabitCompletion: (habitId: string, dateString: string, isCompleted: boolean) => Promise<void>;
+
+  addTransaction: (transaction: {
+    amount: number;
+    type: Transaction["type"];
+    title: string;
+    category: string;
+    date?: string;
+    note?: string;
+    isShift?: boolean;
+    hourlyRate?: number;
+    shiftStart?: string;
+    shiftEnd?: string;
+    employer?: string;
+    isRecurring?: boolean;
+  }) => Promise<void>;
+  updateTransaction: (transactionId: string, patch: Partial<Transaction>) => Promise<void>;
+  deleteTransaction: (transactionId: string) => Promise<void>;
+
+  addManualEvent: (event: {
+    title: string;
+    startTime: string;
+    endTime: string;
+    category?: MomentCategory;
+    reminderMinutes?: number;
+    linkedContactIds?: string[];
+  }) => Promise<void>;
+  updateManualEvent: (eventId: string, patch: Partial<ManualEvent>) => Promise<void>;
+  deleteManualEvent: (eventId: string) => Promise<void>;
 
   addLearningTopic: (topic: { title: string; category?: string }) => Promise<void>;
   updateLearningTopic: (topicId: string, patch: Partial<LearningTopic>) => Promise<void>;
@@ -157,6 +217,8 @@ interface AtlasState extends HydratedState {
   setSuggestedActions: (actions: SuggestedAction[]) => void;
   acceptSuggestion: (id: string) => Promise<void>;
   dismissSuggestion: (id: string) => void;
+
+  setDailyRecommendations: (dateKey: string, recommendations: DailyRecommendation[]) => void;
 }
 
 const EMPTY_STATE: HydratedState = {
@@ -172,6 +234,11 @@ const EMPTY_STATE: HydratedState = {
   onboardingComplete: false,
   goals: [],
   todayIntention: "",
+  tasks: [],
+  habits: [],
+  habitLogs: [],
+  transactions: [],
+  manualEvents: [],
   learningTopics: [],
   learningResources: [],
   meals: [],
@@ -182,6 +249,7 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   ...EMPTY_STATE,
   hydrated: false,
   suggestedActions: [],
+  dailyRecommendations: {},
 
   hydrate: (state) => set({ ...state, hydrated: true }),
 
@@ -263,6 +331,93 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     set((state) => ({
       lifeAreas: state.lifeAreas.map((a) => (a.key === key ? updated : a)),
     }));
+  },
+
+  addTask: async (task) => {
+    const created = await addTaskAction(task);
+    set((state) => ({ tasks: [created, ...state.tasks] }));
+  },
+
+  updateTask: async (taskId, patch) => {
+    const updated = await updateTaskAction(taskId, patch);
+    set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? updated : t)) }));
+  },
+
+  deleteTask: async (taskId) => {
+    await deleteTaskAction(taskId);
+    set((state) => ({ tasks: state.tasks.filter((t) => t.id !== taskId) }));
+  },
+
+  addHabit: async (habit) => {
+    const created = await addHabitAction(habit);
+    set((state) => ({ habits: [created, ...state.habits] }));
+  },
+
+  deleteHabit: async (habitId) => {
+    await deleteHabitAction(habitId);
+    set((state) => ({
+      habits: state.habits.filter((h) => h.id !== habitId),
+      habitLogs: state.habitLogs.filter((l) => l.habitId !== habitId),
+    }));
+  },
+
+  // Optimistic on purpose — a habit checkbox needs to feel instant, not
+  // wait on a round trip. Rolls back to the pre-toggle log list if the
+  // Server Action throws, so the UI never silently drifts from the DB.
+  // The optimistic log's own `id` is never read anywhere (matching is
+  // always by habitId + completedDate), so a synthetic placeholder is
+  // fine even though it's never reconciled with the real DB row's id.
+  toggleHabitCompletion: async (habitId, dateString, isCompleted) => {
+    const previousLogs = get().habitLogs;
+
+    set((state) => ({
+      habitLogs: isCompleted
+        ? state.habitLogs.some((l) => l.habitId === habitId && l.completedDate === dateString)
+          ? state.habitLogs
+          : [...state.habitLogs, { id: `optimistic-${habitId}-${dateString}`, habitId, completedDate: dateString }]
+        : state.habitLogs.filter((l) => !(l.habitId === habitId && l.completedDate === dateString)),
+    }));
+
+    try {
+      await toggleHabitCompletionAction(habitId, dateString, isCompleted);
+    } catch (err) {
+      set({ habitLogs: previousLogs });
+      throw err;
+    }
+  },
+
+  addTransaction: async (transaction) => {
+    const created = await addTransactionAction(transaction);
+    set((state) => ({ transactions: [created, ...state.transactions] }));
+  },
+
+  updateTransaction: async (transactionId, patch) => {
+    const updated = await updateTransactionAction(transactionId, patch);
+    set((state) => ({
+      transactions: state.transactions.map((t) => (t.id === transactionId ? updated : t)),
+    }));
+  },
+
+  deleteTransaction: async (transactionId) => {
+    await deleteTransactionAction(transactionId);
+    set((state) => ({ transactions: state.transactions.filter((t) => t.id !== transactionId) }));
+  },
+
+  addManualEvent: async (event) => {
+    const created = await addManualEventAction(event);
+    set((state) => ({ manualEvents: [...state.manualEvents, created] }));
+  },
+
+  updateManualEvent: async (eventId, patch) => {
+    const updated = await updateManualEventAction(eventId, patch);
+    set((state) => ({
+      manualEvents: state.manualEvents.map((e) => (e.id === eventId ? updated : e)),
+    }));
+  },
+
+  deleteManualEvent: async (eventId) => {
+    await deleteManualEventAction(eventId);
+    set((state) => ({ manualEvents: state.manualEvents.filter((e) => e.id !== eventId) }));
   },
 
   addLearningTopic: async (topic) => {
@@ -390,6 +545,9 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   },
 
   setSuggestedActions: (actions) => set({ suggestedActions: actions }),
+
+  setDailyRecommendations: (dateKey, recommendations) =>
+    set((state) => ({ dailyRecommendations: { ...state.dailyRecommendations, [dateKey]: recommendations } })),
 
   // Deliberately does NOT optimistically remove the suggestion up front:
   // "accept" now means a real Google Calendar event gets created (see

@@ -71,6 +71,72 @@ export interface KnowledgeEntry {
   reviewQuestions?: string[];
 }
 
+export type TaskStatus = "todo" | "in-progress" | "done";
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  dueDate?: string; // ISO datetime
+  isHighPriority: boolean;
+  createdAt: string;
+}
+
+export type DailyRecommendationIcon = "coffee" | "heart" | "alert-circle" | "calendar-clock";
+
+export interface DailyRecommendation {
+  title: string;
+  message: string;
+  iconName: DailyRecommendationIcon;
+}
+
+export interface Habit {
+  id: string;
+  title: string;
+  createdAt: string;
+}
+
+export interface HabitLog {
+  id: string;
+  habitId: string;
+  completedDate: string; // "YYYY-MM-DD"
+}
+
+export type TransactionType = "income" | "expense";
+
+export interface ManualEvent {
+  id: string;
+  title: string;
+  startTime: string; // ISO datetime
+  endTime: string; // ISO datetime
+  category?: MomentCategory;
+  reminderMinutes?: number;
+  linkedContactIds: string[];
+  createdAt: string;
+}
+
+export interface Transaction {
+  id: string;
+  amount: number;
+  type: TransactionType;
+  title: string;
+  category: string;
+  date: string; // "YYYY-MM-DD"
+  note?: string;
+  // Finances Pro: Work & Shifts — a shift is still a plain income
+  // transaction, just with this extra structure. amount is computed
+  // client-side (hourlyRate × hours worked) and saved like any other
+  // amount, never recomputed server-side.
+  isShift: boolean;
+  hourlyRate?: number;
+  shiftStart?: string; // ISO datetime
+  shiftEnd?: string; // ISO datetime
+  employer?: string;
+  isRecurring: boolean;
+  createdAt: string;
+}
+
 export type LearningTopicStatus = "planning" | "active" | "completed";
 
 export interface LearningTopic {

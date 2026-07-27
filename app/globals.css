@@ -22,6 +22,8 @@
   --accent-knowledge: #4f9dfb; /* vivid sky blue */
   --accent-health: #43d19e; /* vivid mint green */
   --accent-career: #a78bfa; /* vivid violet */
+  --accent-time: #22d3ee; /* vivid cyan — Time & Tasks Space (Phase 5), not one of the original five life areas */
+  --accent-finance: #22c55e; /* money green — used by work-shift rendering on the Time & Tasks Timeline, distinct from --accent-health's cooler mint */
   --accent-learning: #6366f1; /* vivid indigo — Learning & Knowledge Space (Phase 7), distinct from --accent-career's softer violet and --accent-knowledge's sky blue */
   --accent-fitness: #ff6b4a; /* vibrant coral/active-orange — Health & Fitness Space (Phase 8) meals/workouts UI specifically; the pre-existing --accent-health (mint) stays untouched everywhere it's already used (life-area score, Sidebar nav, etc.) */
 }
@@ -38,6 +40,8 @@
   --color-accent-knowledge: var(--accent-knowledge);
   --color-accent-health: var(--accent-health);
   --color-accent-career: var(--accent-career);
+  --color-accent-time: var(--accent-time);
+  --color-accent-finance: var(--accent-finance);
   --color-accent-learning: var(--accent-learning);
   --color-accent-fitness: var(--accent-fitness);
   --font-sans: var(--font-heebo);

@@ -7,15 +7,20 @@ import type { Database } from "@/types/database";
 import type {
   ChatMessage,
   Goal,
+  Habit,
+  HabitLog,
   Insight,
   KnowledgeEntry,
   LearningResource,
   LearningTopic,
   LifeArea,
+  ManualEvent,
   Meal,
   Moment,
   PersonalDNA,
   Person,
+  Task,
+  Transaction,
   UpcomingEvent,
   UserContext,
   Workout,
@@ -33,6 +38,14 @@ type ChatMessageRow = Database["public"]["Tables"]["chat_messages"]["Row"];
 type InsightRow = Database["public"]["Tables"]["insights"]["Row"];
 type PersonalDnaRow = Database["public"]["Tables"]["personal_dna"]["Row"];
 type PersonalDnaUpdate = Database["public"]["Tables"]["personal_dna"]["Update"];
+type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
+type TaskUpdate = Database["public"]["Tables"]["tasks"]["Update"];
+type HabitRow = Database["public"]["Tables"]["habits"]["Row"];
+type HabitLogRow = Database["public"]["Tables"]["habit_logs"]["Row"];
+type TransactionRow = Database["public"]["Tables"]["transactions"]["Row"];
+type TransactionUpdate = Database["public"]["Tables"]["transactions"]["Update"];
+type ManualEventRow = Database["public"]["Tables"]["manual_events"]["Row"];
+type ManualEventUpdate = Database["public"]["Tables"]["manual_events"]["Update"];
 type LearningTopicRow = Database["public"]["Tables"]["learning_topics"]["Row"];
 type LearningTopicUpdate = Database["public"]["Tables"]["learning_topics"]["Update"];
 type LearningResourceRow = Database["public"]["Tables"]["learning_resources"]["Row"];
@@ -172,6 +185,104 @@ export function toPersonalDnaPatch(patch: Partial<PersonalDNA>): PersonalDnaUpda
   if (patch.sleepNotes !== undefined) row.sleep_notes = patch.sleepNotes;
   if (patch.careerNotes !== undefined) row.career_notes = patch.careerNotes;
   if (patch.motivationTriggers !== undefined) row.motivation_triggers = patch.motivationTriggers;
+  return row;
+}
+
+export function toTask(row: TaskRow): Task {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? undefined,
+    status: row.status,
+    dueDate: row.due_date ?? undefined,
+    isHighPriority: row.is_high_priority,
+    createdAt: row.created_at,
+  };
+}
+
+export function toTaskPatch(patch: Partial<Task>): TaskUpdate {
+  const row: TaskUpdate = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.description !== undefined) row.description = patch.description || null;
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.dueDate !== undefined) row.due_date = patch.dueDate || null;
+  if (patch.isHighPriority !== undefined) row.is_high_priority = patch.isHighPriority;
+  return row;
+}
+
+export function toHabit(row: HabitRow): Habit {
+  return {
+    id: row.id,
+    title: row.title,
+    createdAt: row.created_at,
+  };
+}
+
+export function toHabitLog(row: HabitLogRow): HabitLog {
+  return {
+    id: row.id,
+    habitId: row.habit_id,
+    completedDate: row.completed_date,
+  };
+}
+
+export function toTransaction(row: TransactionRow): Transaction {
+  return {
+    id: row.id,
+    amount: row.amount,
+    type: row.type,
+    title: row.title,
+    category: row.category,
+    date: row.transaction_date,
+    note: row.note ?? undefined,
+    isShift: row.is_shift,
+    hourlyRate: row.hourly_rate ?? undefined,
+    shiftStart: row.shift_start ?? undefined,
+    shiftEnd: row.shift_end ?? undefined,
+    employer: row.employer ?? undefined,
+    isRecurring: row.is_recurring,
+    createdAt: row.created_at,
+  };
+}
+
+export function toTransactionPatch(patch: Partial<Transaction>): TransactionUpdate {
+  const row: TransactionUpdate = {};
+  if (patch.amount !== undefined) row.amount = patch.amount;
+  if (patch.type !== undefined) row.type = patch.type;
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.category !== undefined) row.category = patch.category;
+  if (patch.date !== undefined) row.transaction_date = patch.date;
+  if (patch.note !== undefined) row.note = patch.note || null;
+  if (patch.isShift !== undefined) row.is_shift = patch.isShift;
+  if (patch.hourlyRate !== undefined) row.hourly_rate = patch.hourlyRate ?? null;
+  if (patch.shiftStart !== undefined) row.shift_start = patch.shiftStart ?? null;
+  if (patch.shiftEnd !== undefined) row.shift_end = patch.shiftEnd ?? null;
+  if (patch.employer !== undefined) row.employer = patch.employer || null;
+  if (patch.isRecurring !== undefined) row.is_recurring = patch.isRecurring;
+  return row;
+}
+
+export function toManualEvent(row: ManualEventRow): ManualEvent {
+  return {
+    id: row.id,
+    title: row.title,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    category: row.category ?? undefined,
+    reminderMinutes: row.reminder_minutes ?? undefined,
+    linkedContactIds: row.linked_contact_ids ?? [],
+    createdAt: row.created_at,
+  };
+}
+
+export function toManualEventPatch(patch: Partial<ManualEvent>): ManualEventUpdate {
+  const row: ManualEventUpdate = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.startTime !== undefined) row.start_time = patch.startTime;
+  if (patch.endTime !== undefined) row.end_time = patch.endTime;
+  if (patch.category !== undefined) row.category = patch.category ?? null;
+  if (patch.reminderMinutes !== undefined) row.reminder_minutes = patch.reminderMinutes ?? null;
+  if (patch.linkedContactIds !== undefined) row.linked_contact_ids = patch.linkedContactIds;
   return row;
 }
 

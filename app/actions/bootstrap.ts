@@ -12,6 +12,10 @@ import { insightsRepo } from "@/lib/db/insights";
 import { personalDnaRepo } from "@/lib/db/personalDna";
 import { goalsRepo } from "@/lib/db/goals";
 import { dailyIntentionsRepo } from "@/lib/db/dailyIntentions";
+import { tasksRepo } from "@/lib/db/tasks";
+import { habitsRepo, habitLogsRepo } from "@/lib/db/habits";
+import { transactionsRepo } from "@/lib/db/transactions";
+import { manualEventsRepo } from "@/lib/db/manual-events";
 import { learningResourcesRepo, learningTopicsRepo } from "@/lib/db/learning";
 import { mealsRepo, workoutsRepo } from "@/lib/db/health";
 import { analyzePersonalDNA } from "@/lib/intelligence/personalDNA";
@@ -26,6 +30,11 @@ import {
   toInsight,
   toPersonalDNA,
   toGoal,
+  toTask,
+  toHabit,
+  toHabitLog,
+  toTransaction,
+  toManualEvent,
   toLearningTopic,
   toLearningResource,
   toMeal,
@@ -49,6 +58,11 @@ export async function getInitialState() {
     personalDnaRow,
     goalRows,
     todayIntention,
+    taskRows,
+    habitRows,
+    habitLogRows,
+    transactionRows,
+    manualEventRows,
     learningTopicRows,
     learningResourceRows,
     mealRows,
@@ -64,6 +78,11 @@ export async function getInitialState() {
     personalDnaRepo.get(userId),
     goalsRepo.listWithMilestones(userId),
     dailyIntentionsRepo.getForToday(userId),
+    tasksRepo.list(userId),
+    habitsRepo.list(userId),
+    habitLogsRepo.list(userId),
+    transactionsRepo.list(userId),
+    manualEventsRepo.list(userId),
     learningTopicsRepo.list(userId),
     learningResourcesRepo.list(userId),
     mealsRepo.list(userId),
@@ -95,6 +114,11 @@ export async function getInitialState() {
     onboardingComplete: personalDnaRow?.onboarding_complete ?? false,
     goals: goalRows.map(toGoal),
     todayIntention,
+    tasks: taskRows.map(toTask),
+    habits: habitRows.map(toHabit),
+    habitLogs: habitLogRows.map(toHabitLog),
+    transactions: transactionRows.map(toTransaction),
+    manualEvents: manualEventRows.map(toManualEvent),
     learningTopics: learningTopicRows.map(toLearningTopic),
     learningResources: learningResourceRows.map(toLearningResource),
     meals: mealRows.map(toMeal),
