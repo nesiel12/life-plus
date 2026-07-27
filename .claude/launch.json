@@ -6,6 +6,20 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "minecraft-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/Users/nesiel/Documents/minecraft-clone", "run", "dev"],
+      "port": 5173,
+      "autoPort": true
+    },
+    {
+      "name": "brawl-arena-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "C:/Users/nesiel/Documents/brawl-arena", "-p", "8091", "-c-1"],
+      "port": 8091,
+      "autoPort": true
     }
   ]
 }

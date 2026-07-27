@@ -1,16 +1,18 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useSession } from "next-auth/react";
-import { Sparkles, X, Send, Info } from "lucide-react";
+import { Check, Copy, Eraser, ListTodo, Pin, PinOff, Sparkles, Trash2, X, Send, Info } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
+import { useApiCall } from "@/hooks/useApiCall";
 import { Logo } from "@/components/ui/Logo";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
 import { BriefingSignalList, type BriefingSignal } from "@/components/features/BriefingSignalList";
 import { CommandPanel } from "@/components/features/CommandPanel";
 import { decodeBasedOnHeader } from "@/lib/api/basedOnHeader";
 import { cn } from "@/lib/utils";
+import type { ChatMessage } from "@/types";
 
 interface Briefing {
   signals: BriefingSignal[];
@@ -37,6 +39,10 @@ export function AICompanion() {
   const user = useAtlasStore((s) => s.user);
   const chatHistory = useAtlasStore((s) => s.chatHistory);
   const addChatMessage = useAtlasStore((s) => s.addChatMessage);
+  const deleteChatMessage = useAtlasStore((s) => s.deleteChatMessage);
+  const clearChatHistory = useAtlasStore((s) => s.clearChatHistory);
+  const togglePinChatMessage = useAtlasStore((s) => s.togglePinChatMessage);
+  const addTask = useAtlasStore((s) => s.addTask);
   const scrollRef = useRef<HTMLDivElement>(null);
   const displayName = session?.user?.name ?? user.hebrewName;
 
@@ -46,6 +52,31 @@ export function AICompanion() {
   const [expandedReasoning, setExpandedReasoning] = useState<Set<string>>(new Set());
 
   const [briefing, setBriefing] = useState<Briefing | null>(null);
+
+  // Message management (Phase 10): delete/clear/pin/convert-to-task/copy.
+  // Delete uses the same click-twice-to-confirm inline pattern every other
+  // delete affordance in this app uses (TaskCard, EditBookModal, etc.) —
+  // "Clear chat" gets a real confirmation overlay instead since wiping the
+  // whole conversation is a bigger, less-recoverable action than removing
+  // one message.
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [taskAddedId, setTaskAddedId] = useState<string | null>(null);
+
+  const { error: deleteError, run: runDeleteMessage } = useApiCall(deleteChatMessage);
+  const { error: clearError, loading: clearing, run: runClearChat } = useApiCall(clearChatHistory);
+  const { error: pinError, run: runTogglePin } = useApiCall(togglePinChatMessage);
+  const { error: taskError, run: runAddTask } = useApiCall(addTask);
+
+  useEffect(() => {
+    if (!clearConfirmOpen) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setClearConfirmOpen(false);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [clearConfirmOpen]);
 
   // Proactive opener: fetched once, only while there's no conversation yet
   // — a live conversation already has its own continuity; re-showing the
@@ -130,7 +161,64 @@ export function AICompanion() {
     });
   }
 
+  function handleDeleteClick(messageId: string) {
+    if (confirmingDeleteId !== messageId) {
+      setConfirmingDeleteId(messageId);
+      return;
+    }
+    setConfirmingDeleteId(null);
+    runDeleteMessage(messageId).catch(() => {
+      // error is already captured in deleteError for display below
+    });
+  }
+
+  function handleClearConfirmed() {
+    runClearChat()
+      .then(() => setClearConfirmOpen(false))
+      .catch(() => {
+        // error is already captured in clearError for display below
+      });
+  }
+
+  async function handleCopy(message: ChatMessage) {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopiedId(message.id);
+      setTimeout(() => setCopiedId((id) => (id === message.id ? null : id)), 1500);
+    } catch {
+      // clipboard permission denied/unavailable — the button just won't
+      // show the success checkmark, nothing else to do about it here
+    }
+  }
+
+  // "Extracts the core action" as a real, honest first pass: the message's
+  // first sentence (capped so a task title never balloons to a full
+  // paragraph), not an AI round-trip — this is a one-tap action meant to
+  // feel instant, not a second "analyzing…" wait on top of the reply that
+  // already streamed in. The full message is kept as the task's
+  // description, so nothing is lost even when the title gets truncated.
+  function extractTaskTitle(content: string): string {
+    const firstLine = content.trim().split("\n")[0] ?? "";
+    const sentenceEnd = firstLine.search(/[.!?](\s|$)/);
+    const core = sentenceEnd > 0 ? firstLine.slice(0, sentenceEnd + 1) : firstLine;
+    return core.length > 100 ? `${core.slice(0, 97)}…` : core;
+  }
+
+  function handleConvertToTask(message: ChatMessage) {
+    runAddTask({ title: extractTaskTitle(message.content), description: message.content })
+      .then(() => {
+        setTaskAddedId(message.id);
+        setTimeout(() => setTaskAddedId((id) => (id === message.id ? null : id)), 2000);
+      })
+      .catch(() => {
+        // error is already captured in taskError for display below
+      });
+  }
+
   const showProactiveOpener = chatHistory.length === 0 && streamingReply === null;
+  const pinnedMessages = chatHistory
+    .filter((m) => m.pinnedAt)
+    .sort((a, b) => (b.pinnedAt ?? "").localeCompare(a.pinnedAt ?? ""));
 
   return (
     <>
@@ -153,13 +241,24 @@ export function AICompanion() {
             <Logo size={22} />
             <span className="text-sm font-medium text-foreground">מרחב ההשתקפות</span>
           </div>
-          <button
-            onClick={() => setOpen(false)}
-            className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
-            aria-label="סגור"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            {mode === "chat" && chatHistory.length > 0 && (
+              <button
+                onClick={() => setClearConfirmOpen(true)}
+                className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-white/5 hover:text-accent-family"
+                aria-label="נקה היסטוריית שיחה"
+              >
+                <Eraser size={16} />
+              </button>
+            )}
+            <button
+              onClick={() => setOpen(false)}
+              className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+              aria-label="סגור"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* AI Command Panel (docs/ATLAS_ARCHITECTURE_VISION.md §12): a
@@ -191,6 +290,38 @@ export function AICompanion() {
 
         {mode === "chat" && (
         <>
+        {/* Pinned messages sit outside the scrolling list entirely — always
+            visible regardless of scroll position, matching "stick to the
+            top" literally rather than just sorting them first inside the
+            same scroll container. The message still also renders in its
+            normal chronological spot below (same convention Telegram/Slack
+            pins use), so nothing disappears from the conversation's flow. */}
+        {pinnedMessages.length > 0 && (
+          <div className="glass-glow border-b border-glass-border bg-accent-faith/5 px-4 py-2.5">
+            <p className="mb-1.5 flex items-center gap-1 text-[10px] font-medium text-accent-faith">
+              <Pin size={10} aria-hidden />
+              נעוץ
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {pinnedMessages.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-start justify-between gap-2 rounded-lg bg-accent-faith/10 px-2.5 py-1.5 ring-1 ring-accent-faith/30"
+                >
+                  <p className="line-clamp-2 flex-1 text-xs leading-relaxed text-foreground/90">{m.content}</p>
+                  <button
+                    onClick={() => runTogglePin(m.id).catch(() => {})}
+                    aria-label="בטל נעיצה"
+                    className="focus-ring shrink-0 text-accent-faith/70 transition-colors hover:text-accent-faith"
+                  >
+                    <PinOff size={12} aria-hidden />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
           {showProactiveOpener && (
             <div className="flex flex-col gap-3">
@@ -225,38 +356,127 @@ export function AICompanion() {
             </div>
           )}
 
-          {chatHistory.map((m) => (
-            <div key={m.id}>
-              <div
-                className={cn(
-                  "max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed",
-                  m.role === "user"
-                    ? "mr-auto bg-accent-knowledge/15 text-foreground"
-                    : "ml-auto bg-white/5 text-foreground"
-                )}
-              >
-                {m.content}
-              </div>
-              {m.role === "assistant" && basedOnByMessageId[m.id] && (
-                <div className="mb-1 ml-auto max-w-[85%]">
-                  <button
-                    onClick={() => toggleReasoning(m.id)}
-                    className="focus-ring flex items-center gap-1 rounded-lg px-1 text-xs text-muted transition-colors hover:text-foreground"
+          <AnimatePresence initial={false}>
+            {chatHistory.map((m) => {
+              const isUser = m.role === "user";
+              const isPinned = Boolean(m.pinnedAt);
+              const isConfirmingDelete = confirmingDeleteId === m.id;
+              return (
+                <motion.div
+                  key={m.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  className="group"
+                >
+                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed",
+                      isUser ? "mr-auto bg-accent-knowledge/15 text-foreground" : "ml-auto bg-white/5 text-foreground",
+                      isPinned && "ring-1 ring-accent-faith/50"
+                    )}
                   >
-                    <Info size={11} aria-hidden />
-                    מבוסס על
-                  </button>
-                  {expandedReasoning.has(m.id) && (
-                    <ul className="mt-1 flex flex-col gap-0.5 rounded-lg bg-white/5 p-2 text-xs text-foreground/70">
-                      {basedOnByMessageId[m.id].map((line, i) => (
-                        <li key={i}>{line}</li>
-                      ))}
-                    </ul>
+                    {m.content}
+                  </div>
+
+                  {/* Action row: subtle by default (low opacity, always
+                      tappable — this is what covers touch devices, since
+                      there's no hover state to reveal them there), a
+                      little more visible on hover/focus-within for desktop.
+                      Copy/convert-to-task/pin are assistant-only per spec;
+                      delete applies to any message. */}
+                  <div className={cn("mt-1 flex max-w-[85%] items-center gap-0.5", isUser ? "mr-auto" : "ml-auto")}>
+                    {!isUser && (
+                      <>
+                        <button
+                          onClick={() => handleCopy(m)}
+                          aria-label="העתק הודעה"
+                          className="focus-ring rounded-lg p-1 text-muted opacity-40 transition-all hover:opacity-100 hover:text-foreground group-hover:opacity-70"
+                        >
+                          {copiedId === m.id ? (
+                            <Check size={12} className="text-accent-time" aria-hidden />
+                          ) : (
+                            <Copy size={12} aria-hidden />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleConvertToTask(m)}
+                          aria-label="הפוך למשימה"
+                          className="focus-ring rounded-lg p-1 text-muted opacity-40 transition-all hover:opacity-100 hover:text-foreground group-hover:opacity-70"
+                        >
+                          {taskAddedId === m.id ? (
+                            <Check size={12} className="text-accent-time" aria-hidden />
+                          ) : (
+                            <ListTodo size={12} aria-hidden />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => runTogglePin(m.id).catch(() => {})}
+                          aria-label={isPinned ? "בטל נעיצה" : "נעץ הודעה"}
+                          className={cn(
+                            "focus-ring rounded-lg p-1 transition-all hover:opacity-100 group-hover:opacity-70",
+                            isPinned ? "text-accent-faith opacity-100" : "text-muted opacity-40 hover:text-foreground"
+                          )}
+                        >
+                          {isPinned ? <PinOff size={12} aria-hidden /> : <Pin size={12} aria-hidden />}
+                        </button>
+                      </>
+                    )}
+
+                    {isConfirmingDelete ? (
+                      <span className="flex items-center gap-1.5 text-[10px]">
+                        <button
+                          onClick={() => handleDeleteClick(m.id)}
+                          className="focus-ring rounded-lg bg-accent-family/20 px-1.5 py-0.5 font-medium text-accent-family transition-opacity hover:opacity-80"
+                        >
+                          מחק
+                        </button>
+                        <button
+                          onClick={() => setConfirmingDeleteId(null)}
+                          className="focus-ring text-muted transition-colors hover:text-foreground"
+                        >
+                          ביטול
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleDeleteClick(m.id)}
+                        aria-label="מחק הודעה"
+                        className="focus-ring rounded-lg p-1 text-muted opacity-40 transition-all hover:opacity-100 hover:text-accent-family group-hover:opacity-70"
+                      >
+                        <Trash2 size={12} aria-hidden />
+                      </button>
+                    )}
+                  </div>
+
+                  {m.role === "assistant" && basedOnByMessageId[m.id] && (
+                    <div className="mb-1 ml-auto max-w-[85%]">
+                      <button
+                        onClick={() => toggleReasoning(m.id)}
+                        className="focus-ring flex items-center gap-1 rounded-lg px-1 text-xs text-muted transition-colors hover:text-foreground"
+                      >
+                        <Info size={11} aria-hidden />
+                        מבוסס על
+                      </button>
+                      {expandedReasoning.has(m.id) && (
+                        <ul className="mt-1 flex flex-col gap-0.5 rounded-lg bg-white/5 p-2 text-xs text-foreground/70">
+                          {basedOnByMessageId[m.id].map((line, i) => (
+                            <li key={i}>{line}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
-            </div>
-          ))}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+
+          {(deleteError || pinError || taskError) && (
+            <p className="text-xs text-accent-family">{deleteError ?? pinError ?? taskError}</p>
+          )}
 
           {streamingReply !== null && (
             <div className="ml-auto max-w-[85%] rounded-xl bg-white/5 px-3 py-2 text-sm leading-relaxed text-foreground">
@@ -285,6 +505,67 @@ export function AICompanion() {
         </div>
         </>
         )}
+
+        {/* Clear-chat confirmation — a real overlay (not the click-twice
+            inline pattern every other delete in this app uses) since
+            wiping the whole conversation is a bigger, less-recoverable
+            action. Implemented as an absolutely-positioned overlay within
+            this same panel rather than a second nested <Modal> instance:
+            Modal's own focus-trap effect keys off its own `open` state and
+            registers a window keydown listener for the duration it's
+            mounted — nesting a second live Modal while this one stays open
+            would register two independent Tab-trapping listeners at once
+            with no coordination between them. */}
+        <AnimatePresence>
+          {clearConfirmOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              role="alertdialog"
+              aria-modal="true"
+              aria-label="אישור ניקוי היסטוריית שיחה"
+              className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 p-6 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="glass-panel glass-glow w-full max-w-xs rounded-2xl p-5"
+              >
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-family/15 text-accent-family">
+                    <Trash2 size={18} aria-hidden />
+                  </span>
+                  <div>
+                    <p className="font-medium text-foreground">לנקות את כל השיחה?</p>
+                    <p className="mt-0.5 text-xs text-muted">הפעולה לא ניתנת לביטול.</p>
+                  </div>
+                </div>
+
+                {clearError && <p className="mb-3 text-xs text-accent-family">{clearError}</p>}
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setClearConfirmOpen(false)}
+                    disabled={clearing}
+                    className="focus-ring rounded-lg px-3 py-1.5 text-sm text-muted transition-colors hover:text-foreground disabled:opacity-40"
+                  >
+                    ביטול
+                  </button>
+                  <button
+                    onClick={handleClearConfirmed}
+                    disabled={clearing}
+                    className="focus-ring rounded-lg bg-accent-family/20 px-4 py-2 text-sm font-medium text-accent-family transition-opacity hover:opacity-80 disabled:opacity-40"
+                  >
+                    {clearing ? "מנקה…" : "נקה הכל"}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Modal>
 
       <motion.button

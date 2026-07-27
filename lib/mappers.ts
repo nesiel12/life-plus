@@ -157,6 +157,7 @@ export function toChatMessage(row: ChatMessageRow): ChatMessage {
     role: row.role,
     content: row.content,
     timestamp: row.created_at,
+    pinnedAt: row.pinned_at ?? undefined,
   };
 }
 

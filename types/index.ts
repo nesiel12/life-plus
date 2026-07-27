@@ -39,6 +39,7 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   timestamp: string;
+  pinnedAt?: string; // ISO datetime; set only once the user pins the message
 }
 
 export interface Insight {

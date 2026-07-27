@@ -9,7 +9,12 @@ import {
   updatePersonAction,
   deletePersonAction,
 } from "@/app/actions/people";
-import { addChatMessageAction } from "@/app/actions/chat";
+import {
+  addChatMessageAction,
+  clearChatAction,
+  deleteChatMessageAction,
+  setChatMessagePinnedAction,
+} from "@/app/actions/chat";
 import { addInsightAction } from "@/app/actions/insights";
 import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/actions/knowledge";
 import { addBookAction, updateBookAction, deleteBookAction } from "@/app/actions/books";
@@ -136,6 +141,9 @@ interface AtlasState extends HydratedState {
   updatePerson: (personId: string, patch: Partial<Person>) => Promise<void>;
   deletePerson: (personId: string) => Promise<void>;
   addChatMessage: (message: Omit<ChatMessage, "id" | "timestamp">) => Promise<ChatMessage>;
+  deleteChatMessage: (messageId: string) => Promise<void>;
+  clearChatHistory: () => Promise<void>;
+  togglePinChatMessage: (messageId: string) => Promise<void>;
   addInsight: (content: string) => Promise<void>;
   addKnowledgeEntry: (entry: Omit<KnowledgeEntry, "id">) => Promise<void>;
   markKnowledgeReviewed: (entryId: string) => Promise<void>;
@@ -328,6 +336,52 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     const created = await addChatMessageAction(message.role, message.content);
     set((state) => ({ chatHistory: [...state.chatHistory, created] }));
     return created;
+  },
+
+  // Optimistic with rollback (same shape as toggleHabitCompletion) — a
+  // message delete needs to feel instant, but a failed server call
+  // shouldn't leave the UI silently out of sync with the DB.
+  deleteChatMessage: async (messageId) => {
+    const previous = get().chatHistory;
+    set((state) => ({ chatHistory: state.chatHistory.filter((m) => m.id !== messageId) }));
+    try {
+      await deleteChatMessageAction(messageId);
+    } catch (err) {
+      set({ chatHistory: previous });
+      throw err;
+    }
+  },
+
+  clearChatHistory: async () => {
+    const previous = get().chatHistory;
+    set({ chatHistory: [] });
+    try {
+      await clearChatAction();
+    } catch (err) {
+      set({ chatHistory: previous });
+      throw err;
+    }
+  },
+
+  togglePinChatMessage: async (messageId) => {
+    const current = get().chatHistory.find((m) => m.id === messageId);
+    if (!current) return;
+    const nextPinned = !current.pinnedAt;
+
+    const previous = get().chatHistory;
+    set((state) => ({
+      chatHistory: state.chatHistory.map((m) =>
+        m.id === messageId ? { ...m, pinnedAt: nextPinned ? new Date().toISOString() : undefined } : m
+      ),
+    }));
+
+    try {
+      const updated = await setChatMessagePinnedAction(messageId, nextPinned);
+      set((state) => ({ chatHistory: state.chatHistory.map((m) => (m.id === messageId ? updated : m)) }));
+    } catch (err) {
+      set({ chatHistory: previous });
+      throw err;
+    }
   },
 
   addInsight: async (content) => {

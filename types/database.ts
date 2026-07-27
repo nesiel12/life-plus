@@ -331,18 +331,21 @@ export interface Database {
           role: ChatRoleDb;
           content: string;
           created_at: string;
+          pinned_at: string | null;
         },
         {
           id?: string;
           user_id: string;
           role: ChatRoleDb;
           content: string;
+          pinned_at?: string | null;
         },
         {
           id?: string;
           user_id?: string;
           role?: ChatRoleDb;
           content?: string;
+          pinned_at?: string | null;
         }
       >;
       insights: TableDef<
