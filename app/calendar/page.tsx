@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { signIn } from "next-auth/react";
 import { CalendarClock, CalendarHeart, Clock } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -55,11 +56,29 @@ export default function CalendarPage() {
         <ScheduleSuggestions />
 
         {data && !data.connected ? (
-          <GlassCard delay={0.12}>
-            <p className="flex items-center gap-2 text-sm text-muted">
-              <CalendarClock size={16} className="text-accent-career" aria-hidden />
-              היומן שלך לא מחובר, אז אין כאן עדיין אירועים אמיתיים להציג.
-            </p>
+          <GlassCard delay={0.12} className="flex flex-col items-center gap-3 py-10 text-center">
+            <span className="flex size-12 items-center justify-center rounded-full bg-accent-career/15 text-accent-career">
+              <CalendarClock size={22} aria-hidden />
+            </span>
+            <div>
+              <p className="mb-1 font-medium text-foreground">היומן שלך עדיין לא מחובר</p>
+              <p className="text-sm text-muted">התחבר ליומן Google כדי לראות כאן את האירועים האמיתיים שלך.</p>
+            </div>
+            <button
+              onClick={() => signIn("google", { callbackUrl: "/calendar" })}
+              className="focus-ring mt-1 flex items-center gap-2 rounded-lg bg-accent-career/20 px-4 py-2 text-sm font-medium text-accent-career transition-opacity hover:opacity-80"
+            >
+              <CalendarClock size={14} aria-hidden />
+              התחבר ליומן Google
+            </button>
+          </GlassCard>
+        ) : data && data.connected && groups.length === 0 ? (
+          <GlassCard delay={0.12} className="flex flex-col items-center gap-2 py-10 text-center">
+            <span className="flex size-12 items-center justify-center rounded-full bg-accent-career/15 text-accent-career">
+              <CalendarHeart size={22} aria-hidden />
+            </span>
+            <p className="font-medium text-foreground">היומן נקי לגמרי להיום</p>
+            <p className="text-sm text-muted">אין אירועים קרובים ביומן שלך.</p>
           </GlassCard>
         ) : (
           groups.map((group, gi) => (

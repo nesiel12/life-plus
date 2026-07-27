@@ -95,13 +95,22 @@ export const authOptions: NextAuthOptions = {
       return ALLOWED_SIGNIN_EMAILS.has(user.email.toLowerCase());
     },
     async jwt({ token, account }) {
-      // Initial sign-in: Google just issued fresh tokens.
+      // Initial sign-in: Google just issued fresh tokens. Explicitly
+      // clears any `error` left over from a previous failed refresh —
+      // without this, a stale RefreshAccessTokenError survived a brand
+      // new, successful sign-in (the `...token` spread doesn't touch
+      // `error`), which made every /api/calendar/* route treat a freshly
+      // reconnected session as still disconnected until the new token
+      // itself expired ~an hour later. This was the actual "Connect
+      // Google Calendar loops back but still says not connected" bug —
+      // not a missing scope.
       if (account) {
         return {
           ...token,
           accessToken: account.access_token,
           refreshToken: account.refresh_token,
           accessTokenExpires: account.expires_at ? account.expires_at * 1000 : undefined,
+          error: undefined,
         };
       }
 

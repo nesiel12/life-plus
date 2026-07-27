@@ -35,7 +35,14 @@ export async function fetchGoogleCalendarEvents(
     )}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
-  if (!res.ok) throw new Error("Google Calendar request failed");
+  if (!res.ok) {
+    // TEMPORARY: surface Google's actual status/body (401 invalid token,
+    // 403 insufficient scope, etc.) instead of a generic message — the
+    // caller's catch block logs this, and right now that reason is
+    // exactly what's missing to diagnose a real connect failure.
+    const body = await res.text().catch(() => "");
+    throw new Error(`Google Calendar request failed: ${res.status} ${res.statusText} — ${body}`);
+  }
 
   const data = (await res.json()) as RawGoogleEventsResponse;
   return (data.items ?? [])

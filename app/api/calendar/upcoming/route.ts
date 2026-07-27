@@ -26,8 +26,16 @@ export async function GET(request: NextRequest) {
   const limited = rateLimitResponse(`calendar-upcoming:${token.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // TEMPORARY debug logging (Smart Calendar empty-screen investigation) —
+  // remove once real events are confirmed flowing end to end. Never logs
+  // the token value itself, only its presence/shape.
+  console.log(
+    `[calendar-debug] /api/calendar/upcoming user=${token.email} tokenError=${token.error ?? "none"} hasAccessToken=${Boolean(token.accessToken)}`
+  );
+
   const accessToken = token.error ? undefined : token.accessToken;
   if (!accessToken) {
+    console.log(`[calendar-debug] /api/calendar/upcoming user=${token.email} -> not connected (no usable access token)`);
     return NextResponse.json({ connected: false, events: [] });
   }
 
@@ -36,8 +44,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const events = await fetchGoogleCalendarEvents(accessToken, now.toISOString(), until.toISOString());
+    console.log(`[calendar-debug] /api/calendar/upcoming user=${token.email} -> fetched ${events.length} event(s)`);
     return NextResponse.json({ connected: true, events });
-  } catch {
-    return NextResponse.json({ connected: true, events: [] });
+  } catch (err) {
+    // A real Google API failure (expired token, a grant that predates a
+    // later scope change and never got re-consented, network error, etc.)
+    // is NOT "connected with a genuinely empty calendar" — reporting it as
+    // connected:true previously masked exactly this kind of problem.
+    // Treat any real fetch failure the same as "not connected" so the
+    // frontend can offer to reconnect instead of showing a misleadingly
+    // clean empty calendar.
+    console.error(`[calendar-debug] /api/calendar/upcoming user=${token.email} -> Google Calendar fetch failed:`, err);
+    return NextResponse.json({ connected: false, events: [] });
   }
 }
