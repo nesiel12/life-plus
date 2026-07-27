@@ -71,6 +71,28 @@ export interface KnowledgeEntry {
   reviewQuestions?: string[];
 }
 
+export interface Book {
+  id: string;
+  title: string;
+  author?: string;
+  category?: string;
+  notes?: string;
+}
+
+export interface Rabbi {
+  id: string;
+  name: string;
+  title?: string;
+  notes?: string;
+}
+
+export interface Summary {
+  id: string;
+  title: string;
+  content: string;
+  date: string; // ISO date
+}
+
 export type TaskStatus = "todo" | "in-progress" | "done";
 
 export interface Task {

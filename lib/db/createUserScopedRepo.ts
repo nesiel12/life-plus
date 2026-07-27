@@ -4,10 +4,10 @@ import type { Database } from "@/types/database";
 
 // Covers every table shaped like (id uuid pk, user_id uuid, ...): people,
 // moments, upcoming_events, knowledge_entries, goals, chat_messages, insights,
-// tasks, habits, habit_logs, transactions, manual_events, learning_topics,
-// learning_resources, meals, workouts. Tables with a different shape
-// (composite keys, single-row-per-user) get their own small module in
-// lib/db/ instead of being forced through this.
+// books, rabbis, summaries, tasks, habits, habit_logs, transactions,
+// manual_events, learning_topics, learning_resources, meals, workouts.
+// Tables with a different shape (composite keys, single-row-per-user) get
+// their own small module in lib/db/ instead of being forced through this.
 type UserScopedTableName =
   | "people"
   | "moments"
@@ -16,6 +16,9 @@ type UserScopedTableName =
   | "goals"
   | "chat_messages"
   | "insights"
+  | "books"
+  | "rabbis"
+  | "summaries"
   | "tasks"
   | "habits"
   | "habit_logs"

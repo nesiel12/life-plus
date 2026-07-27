@@ -12,6 +12,9 @@ import {
 import { addChatMessageAction } from "@/app/actions/chat";
 import { addInsightAction } from "@/app/actions/insights";
 import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/actions/knowledge";
+import { addBookAction, updateBookAction, deleteBookAction } from "@/app/actions/books";
+import { addRabbiAction, updateRabbiAction, deleteRabbiAction } from "@/app/actions/rabbis";
+import { addSummaryAction, deleteSummaryAction } from "@/app/actions/summaries";
 import { addTaskAction, updateTaskAction, deleteTaskAction } from "@/app/actions/tasks";
 import { addHabitAction, deleteHabitAction, toggleHabitCompletionAction } from "@/app/actions/habits";
 import {
@@ -44,6 +47,7 @@ import { addUpcomingEventAction } from "@/app/actions/upcomingEvents";
 import { setTodayIntentionAction } from "@/app/actions/dailyIntention";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import type {
+  Book,
   ChatMessage,
   DailyRecommendation,
   Goal,
@@ -62,6 +66,8 @@ import type {
   MomentCategory,
   PersonalDNA,
   Person,
+  Rabbi,
+  Summary,
   SuggestedAction,
   Task,
   Transaction,
@@ -85,6 +91,9 @@ export interface HydratedState {
   onboardingComplete: boolean;
   goals: Goal[];
   todayIntention: string;
+  books: Book[];
+  rabbis: Rabbi[];
+  summaries: Summary[];
   tasks: Task[];
   habits: Habit[];
   habitLogs: HabitLog[];
@@ -131,6 +140,15 @@ interface AtlasState extends HydratedState {
   addKnowledgeEntry: (entry: Omit<KnowledgeEntry, "id">) => Promise<void>;
   markKnowledgeReviewed: (entryId: string) => Promise<void>;
   updateLifeAreaScore: (key: LifeArea["key"], score: number) => Promise<void>;
+
+  addBook: (book: { title: string; author?: string; category?: string; notes?: string }) => Promise<void>;
+  updateBook: (bookId: string, patch: Partial<Book>) => Promise<void>;
+  deleteBook: (bookId: string) => Promise<void>;
+  addRabbi: (rabbi: { name: string; title?: string; notes?: string }) => Promise<void>;
+  updateRabbi: (rabbiId: string, patch: Partial<Rabbi>) => Promise<void>;
+  deleteRabbi: (rabbiId: string) => Promise<void>;
+  addSummary: (summary: { title: string; content: string }) => Promise<void>;
+  deleteSummary: (summaryId: string) => Promise<void>;
 
   addTask: (task: { title: string; description?: string; dueDate?: string }) => Promise<void>;
   updateTask: (taskId: string, patch: Partial<Task>) => Promise<void>;
@@ -234,6 +252,9 @@ const EMPTY_STATE: HydratedState = {
   onboardingComplete: false,
   goals: [],
   todayIntention: "",
+  books: [],
+  rabbis: [],
+  summaries: [],
   tasks: [],
   habits: [],
   habitLogs: [],
@@ -331,6 +352,46 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     set((state) => ({
       lifeAreas: state.lifeAreas.map((a) => (a.key === key ? updated : a)),
     }));
+  },
+
+  addBook: async (book) => {
+    const created = await addBookAction(book);
+    set((state) => ({ books: [created, ...state.books] }));
+  },
+
+  updateBook: async (bookId, patch) => {
+    const updated = await updateBookAction(bookId, patch);
+    set((state) => ({ books: state.books.map((b) => (b.id === bookId ? updated : b)) }));
+  },
+
+  deleteBook: async (bookId) => {
+    await deleteBookAction(bookId);
+    set((state) => ({ books: state.books.filter((b) => b.id !== bookId) }));
+  },
+
+  addRabbi: async (rabbi) => {
+    const created = await addRabbiAction(rabbi);
+    set((state) => ({ rabbis: [created, ...state.rabbis] }));
+  },
+
+  updateRabbi: async (rabbiId, patch) => {
+    const updated = await updateRabbiAction(rabbiId, patch);
+    set((state) => ({ rabbis: state.rabbis.map((r) => (r.id === rabbiId ? updated : r)) }));
+  },
+
+  deleteRabbi: async (rabbiId) => {
+    await deleteRabbiAction(rabbiId);
+    set((state) => ({ rabbis: state.rabbis.filter((r) => r.id !== rabbiId) }));
+  },
+
+  addSummary: async (summary) => {
+    const created = await addSummaryAction(summary);
+    set((state) => ({ summaries: [created, ...state.summaries] }));
+  },
+
+  deleteSummary: async (summaryId) => {
+    await deleteSummaryAction(summaryId);
+    set((state) => ({ summaries: state.summaries.filter((s) => s.id !== summaryId) }));
   },
 
   addTask: async (task) => {

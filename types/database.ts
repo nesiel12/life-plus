@@ -403,6 +403,84 @@ export interface Database {
           source?: string;
         }
       >;
+      books: TableDef<
+        {
+          id: string;
+          user_id: string;
+          title: string;
+          author: string | null;
+          category: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          title: string;
+          author?: string | null;
+          category?: string | null;
+          notes?: string | null;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          author?: string | null;
+          category?: string | null;
+          notes?: string | null;
+        }
+      >;
+      rabbis: TableDef<
+        {
+          id: string;
+          user_id: string;
+          name: string;
+          title: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          name: string;
+          title?: string | null;
+          notes?: string | null;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          title?: string | null;
+          notes?: string | null;
+        }
+      >;
+      summaries: TableDef<
+        {
+          id: string;
+          user_id: string;
+          title: string;
+          content: string;
+          summary_date: string;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          title: string;
+          content: string;
+          summary_date?: string;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          content?: string;
+          summary_date?: string;
+        }
+      >;
       tasks: TableDef<
         {
           id: string;

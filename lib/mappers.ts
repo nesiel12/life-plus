@@ -5,6 +5,7 @@
 import { LIFE_AREAS } from "@/lib/lifeAreas";
 import type { Database } from "@/types/database";
 import type {
+  Book,
   ChatMessage,
   Goal,
   Habit,
@@ -19,6 +20,8 @@ import type {
   Moment,
   PersonalDNA,
   Person,
+  Rabbi,
+  Summary,
   Task,
   Transaction,
   UpcomingEvent,
@@ -38,6 +41,12 @@ type ChatMessageRow = Database["public"]["Tables"]["chat_messages"]["Row"];
 type InsightRow = Database["public"]["Tables"]["insights"]["Row"];
 type PersonalDnaRow = Database["public"]["Tables"]["personal_dna"]["Row"];
 type PersonalDnaUpdate = Database["public"]["Tables"]["personal_dna"]["Update"];
+type BookRow = Database["public"]["Tables"]["books"]["Row"];
+type BookUpdate = Database["public"]["Tables"]["books"]["Update"];
+type RabbiRow = Database["public"]["Tables"]["rabbis"]["Row"];
+type RabbiUpdate = Database["public"]["Tables"]["rabbis"]["Update"];
+type SummaryRow = Database["public"]["Tables"]["summaries"]["Row"];
+type SummaryUpdate = Database["public"]["Tables"]["summaries"]["Update"];
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 type TaskUpdate = Database["public"]["Tables"]["tasks"]["Update"];
 type HabitRow = Database["public"]["Tables"]["habits"]["Row"];
@@ -185,6 +194,62 @@ export function toPersonalDnaPatch(patch: Partial<PersonalDNA>): PersonalDnaUpda
   if (patch.sleepNotes !== undefined) row.sleep_notes = patch.sleepNotes;
   if (patch.careerNotes !== undefined) row.career_notes = patch.careerNotes;
   if (patch.motivationTriggers !== undefined) row.motivation_triggers = patch.motivationTriggers;
+  return row;
+}
+
+export function toBook(row: BookRow): Book {
+  return {
+    id: row.id,
+    title: row.title,
+    author: row.author ?? undefined,
+    category: row.category ?? undefined,
+    notes: row.notes ?? undefined,
+  };
+}
+
+// Same partial-patch convention as toPersonPatch: only keys the caller
+// actually provided are included, so a partial edit never clobbers a field
+// it didn't touch.
+export function toBookPatch(patch: Partial<Book>): BookUpdate {
+  const row: BookUpdate = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.author !== undefined) row.author = patch.author || null;
+  if (patch.category !== undefined) row.category = patch.category || null;
+  if (patch.notes !== undefined) row.notes = patch.notes || null;
+  return row;
+}
+
+export function toRabbi(row: RabbiRow): Rabbi {
+  return {
+    id: row.id,
+    name: row.name,
+    title: row.title ?? undefined,
+    notes: row.notes ?? undefined,
+  };
+}
+
+export function toRabbiPatch(patch: Partial<Rabbi>): RabbiUpdate {
+  const row: RabbiUpdate = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.title !== undefined) row.title = patch.title || null;
+  if (patch.notes !== undefined) row.notes = patch.notes || null;
+  return row;
+}
+
+export function toSummary(row: SummaryRow): Summary {
+  return {
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    date: row.summary_date,
+  };
+}
+
+export function toSummaryPatch(patch: Partial<Summary>): SummaryUpdate {
+  const row: SummaryUpdate = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.content !== undefined) row.content = patch.content;
+  if (patch.date !== undefined) row.summary_date = patch.date;
   return row;
 }
 

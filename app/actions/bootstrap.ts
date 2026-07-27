@@ -12,6 +12,9 @@ import { insightsRepo } from "@/lib/db/insights";
 import { personalDnaRepo } from "@/lib/db/personalDna";
 import { goalsRepo } from "@/lib/db/goals";
 import { dailyIntentionsRepo } from "@/lib/db/dailyIntentions";
+import { booksRepo } from "@/lib/db/books";
+import { rabbisRepo } from "@/lib/db/rabbis";
+import { summariesRepo } from "@/lib/db/summaries";
 import { tasksRepo } from "@/lib/db/tasks";
 import { habitsRepo, habitLogsRepo } from "@/lib/db/habits";
 import { transactionsRepo } from "@/lib/db/transactions";
@@ -30,6 +33,9 @@ import {
   toInsight,
   toPersonalDNA,
   toGoal,
+  toBook,
+  toRabbi,
+  toSummary,
   toTask,
   toHabit,
   toHabitLog,
@@ -58,6 +64,9 @@ export async function getInitialState() {
     personalDnaRow,
     goalRows,
     todayIntention,
+    bookRows,
+    rabbiRows,
+    summaryRows,
     taskRows,
     habitRows,
     habitLogRows,
@@ -78,6 +87,9 @@ export async function getInitialState() {
     personalDnaRepo.get(userId),
     goalsRepo.listWithMilestones(userId),
     dailyIntentionsRepo.getForToday(userId),
+    booksRepo.list(userId),
+    rabbisRepo.list(userId),
+    summariesRepo.list(userId),
     tasksRepo.list(userId),
     habitsRepo.list(userId),
     habitLogsRepo.list(userId),
@@ -114,6 +126,9 @@ export async function getInitialState() {
     onboardingComplete: personalDnaRow?.onboarding_complete ?? false,
     goals: goalRows.map(toGoal),
     todayIntention,
+    books: bookRows.map(toBook),
+    rabbis: rabbiRows.map(toRabbi),
+    summaries: summaryRows.map(toSummary),
     tasks: taskRows.map(toTask),
     habits: habitRows.map(toHabit),
     habitLogs: habitLogRows.map(toHabitLog),
