@@ -14,6 +14,7 @@ import {
   History,
   ListTodo,
   LogOut,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
@@ -42,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/areas/family", label: "משפחה וחברים", icon: HeartHandshake, colorVar: "--accent-family" },
   { href: "/areas/health", label: "בריאות", icon: HeartPulse, colorVar: "--accent-health" },
   { href: "/areas/time", label: "זמן ומשימות", icon: ListTodo, colorVar: "--accent-time" },
+  { href: "/areas/finances", label: "כספים", icon: Wallet, colorVar: "--accent-finance" },
   { href: "/timeline", label: "ציר זמן", icon: History, colorVar: "--muted" },
 ];
 
