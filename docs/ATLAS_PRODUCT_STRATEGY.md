@@ -1,5 +1,8 @@
 # Atlas Product Strategy
 
+> **⚠️ SUPERSEDED (2026-08-31).** Early, narrower "reflection-partner" framing. Product scope is now the
+> full LifeOS — see `docs/ATLAS_BIBLE.md` §1–§3. Kept for historical context only.
+
 **Core hypothesis:** Atlas is not a place to store memories. Atlas is a personal AI reflection system that helps ambitious people discover patterns, lessons, and blind spots in their own life. Memory is infrastructure, not the product — it exists only to make insight possible.
 
 ## 1. Refined Problem Statement

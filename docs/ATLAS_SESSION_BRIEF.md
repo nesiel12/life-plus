@@ -1,9 +1,12 @@
 # Atlas — Session Brief & Build Directive
 
-> **How to use this file.** Paste this entire document as your first message to Claude Code, or tell
-> Claude Code: *"Read `docs/ATLAS_SESSION_BRIEF.md` and begin."* It is the single source of truth for
-> what Atlas is, what already exists, what is missing, and what to build next. Read it fully before
-> touching code. Then read `docs/ATLAS_ARCHITECTURE_VISION.md` and `docs/BACKLOG.md`.
+> **Canonical source of truth is now `docs/ATLAS_BIBLE.md`** (created in M1, 2026‑08‑31). This brief is
+> the session kickoff checklist + current‑state snapshot; the BIBLE holds the vision, principles,
+> architecture map, roadmap, Definition of Done, and the rules. Read the BIBLE first, then this, then
+> `docs/ATLAS_ARCHITECTURE_VISION.md` and `docs/BACKLOG.md`.
+>
+> **Status:** M0 done (bar the in‑browser Google sign‑in + git remote). M1 done. **M2 (Proactive
+> Engine) in progress** — design in `docs/PROACTIVE_ENGINE.md`.
 
 ---
 

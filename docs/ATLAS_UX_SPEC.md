@@ -1,5 +1,9 @@
 # Atlas UX Spec
 
+> **⚠️ SUPERSEDED (2026-08-31).** Early, narrower "reflection-partner" framing. Product scope is now the
+> full LifeOS — see `docs/ATLAS_BIBLE.md` §1–§3. The design philosophy here (calm, restrained,
+> synthesis-first) still holds; the screen inventory does not. Kept for historical context.
+
 Builds on ATLAS_PRODUCT_STRATEGY.md and ATLAS_MVP_PRODUCT_SPEC.md. Covers experience and interface only — no implementation detail.
 
 ## 1. Design Philosophy

@@ -1,5 +1,8 @@
 # Atlas MVP Product Spec
 
+> **⚠️ SUPERSEDED (2026-08-31).** Early, narrower "reflection-partner" framing. Product scope is now the
+> full LifeOS — see `docs/ATLAS_BIBLE.md` §1–§3. Kept for historical context only.
+
 Builds on ATLAS_PRODUCT_STRATEGY.md. This document defines the exact first version to build — nothing more.
 
 ## 1. Core User Promise
