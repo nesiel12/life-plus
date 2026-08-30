@@ -192,6 +192,18 @@ server boots clean; every `/api/*` returns 401 unauthenticated. **Still open:** 
 Google sign‑in click‑through (needs the founder — the assistant cannot enter Google credentials); the
 git remote + push.
 
+**M1 done (2026‑08‑31):** this document created as the canonical source of truth; narrow‑MVP docs
+banner‑marked SUPERSEDED.
+
+**M2 in progress (2026‑08‑31):** design in `docs/PROACTIVE_ENGINE.md`. Landed: migration
+`20260831000000_proactive_engine.sql` (`job_runs`, `notifications`, `notification_preferences` — live,
+verified); `lib/proactive/*` (pure helpers `quietHours`/`dedupe`/`schedule` + 12 tests; `runJob`
+orchestrator with idempotency + per‑user fan‑out + an empty `JOBS` registry); repos
+`lib/db/{notifications,notificationPreferences,jobRuns}.ts`; `POST /api/cron/[job]` (Bearer
+`CRON_SECRET`); `notification_preferences` row auto‑created on sign‑in. **Next in M2:** implement the 5
+jobs; the notification centre UI + email channel; Personal DNA → ranking/chat wiring; semantic chat
+memory; WhatsApp/Second‑Brain/Screen‑Time scaffolds.
+
 **Lost work (failed machine sync, post‑Phase‑10, uncommitted):** an **Academy** feature (courses,
 stages, exams, certification, trivia), **Daily/Weekly Wrap‑up + Reminders Hub**, **Smart Calendar v2**
 (`twin-ai`, `torah-info`, `/calendar/smart`), a **"Museum of Life" Timeline** redesign, a **Voice
@@ -309,7 +321,7 @@ external credential is required. Keeps `/docs` current: this file, `BACKLOG.md`,
 | `BACKLOG.md` | Living task list — what's open, by priority. |
 | `ATLAS_SESSION_BRIEF.md` | Session kickoff checklist + current‑state snapshot. |
 | `ROADMAP_V2.md` | Infra phases 0–6 (historical framing; the live roadmap is §7 here). |
-| `PROACTIVE_ENGINE.md` | M2 design doc (created in M2). |
+| `PROACTIVE_ENGINE.md` | M2 design doc — job ledger, notifications, channels, scheduling, DNA wiring, integration layers. |
 | `recovery/LIVE_SCHEMA_SNAPSHOT.sql` | DB schema snapshot — reference for the lost‑WIP tables. |
 | `PROJECT_ANALYSIS.md`, `ARCHITECTURE_AUDIT.md`, `TECH_DEBT.md`, `FEATURE_GAP_ANALYSIS.md` | Point‑in‑time audit, 2026‑07‑20, pre‑persistence. **Historical.** |
 | `ATLAS_PRODUCT_STRATEGY.md`, `ATLAS_UX_SPEC.md`, `ATLAS_MVP_PRODUCT_SPEC.md` | Early narrow "reflection‑partner" framing. **Superseded by §1–§3 here** — kept for history. |

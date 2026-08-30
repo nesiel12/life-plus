@@ -4,6 +4,14 @@ import type { Database } from "@/types/database";
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
 
+/** Every user id — used by the Proactive Engine to fan a per-user job out. */
+export async function listAllUserIds(): Promise<string[]> {
+  const client = getSupabaseClient();
+  const { data, error } = await client.from("users").select("id");
+  if (error) throw error;
+  return (data ?? []).map((r) => r.id);
+}
+
 export async function getUserByEmail(email: string): Promise<UserRow | null> {
   const client = getSupabaseClient();
   const { data, error } = await client

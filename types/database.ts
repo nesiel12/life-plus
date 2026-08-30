@@ -12,6 +12,14 @@ export type TransactionTypeDb = "income" | "expense";
 export type LearningTopicStatusDb = "planning" | "active" | "completed";
 export type LearningResourceTypeDb = "youtube" | "podcast" | "article" | "equipment" | "summary";
 export type MealTypeDb = "breakfast" | "lunch" | "dinner" | "snack" | "post-workout";
+export type JobRunStatusDb = "running" | "succeeded" | "failed" | "skipped";
+export type NotificationStatusDb =
+  | "pending"
+  | "sent"
+  | "read"
+  | "acted"
+  | "dismissed"
+  | "expired";
 
 // The Supabase client's generics require every table to carry a
 // `Relationships` array (foreign-key metadata used for `.select()` joins).
@@ -784,6 +792,123 @@ export interface Database {
           status?: RecommendationStatusDb;
           metadata?: Record<string, unknown>;
           responded_at?: string | null;
+        }
+      >;
+      // Proactive Engine (M2) — see supabase/migrations/20260831000000_proactive_engine.sql
+      job_runs: TableDef<
+        {
+          id: string;
+          job_name: string;
+          scope_key: string;
+          run_date: string;
+          status: JobRunStatusDb;
+          items_produced: number;
+          detail: Record<string, unknown>;
+          started_at: string;
+          finished_at: string | null;
+        },
+        {
+          id?: string;
+          job_name: string;
+          scope_key: string;
+          run_date: string;
+          status?: JobRunStatusDb;
+          items_produced?: number;
+          detail?: Record<string, unknown>;
+          finished_at?: string | null;
+        },
+        {
+          status?: JobRunStatusDb;
+          items_produced?: number;
+          detail?: Record<string, unknown>;
+          started_at?: string;
+          finished_at?: string | null;
+        }
+      >;
+      notifications: TableDef<
+        {
+          id: string;
+          user_id: string;
+          kind: string;
+          title: string;
+          body: string;
+          reason: string | null;
+          action: Record<string, unknown> | null;
+          channels: string[];
+          dedupe_key: string;
+          status: NotificationStatusDb;
+          scheduled_for: string;
+          sent_at: string | null;
+          read_at: string | null;
+          acted_at: string | null;
+          expires_at: string | null;
+          created_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          kind: string;
+          title: string;
+          body: string;
+          reason?: string | null;
+          action?: Record<string, unknown> | null;
+          channels?: string[];
+          dedupe_key: string;
+          status?: NotificationStatusDb;
+          scheduled_for?: string;
+          sent_at?: string | null;
+          read_at?: string | null;
+          acted_at?: string | null;
+          expires_at?: string | null;
+        },
+        {
+          kind?: string;
+          title?: string;
+          body?: string;
+          reason?: string | null;
+          action?: Record<string, unknown> | null;
+          channels?: string[];
+          status?: NotificationStatusDb;
+          scheduled_for?: string;
+          sent_at?: string | null;
+          read_at?: string | null;
+          acted_at?: string | null;
+          expires_at?: string | null;
+        }
+      >;
+      notification_preferences: TableDef<
+        {
+          user_id: string;
+          quiet_hours_start: number;
+          quiet_hours_end: number;
+          channel_email: boolean;
+          channel_push: boolean;
+          channel_whatsapp: boolean;
+          muted_kinds: string[];
+          whatsapp_number: string | null;
+          max_per_day: number;
+          updated_at: string;
+        },
+        {
+          user_id: string;
+          quiet_hours_start?: number;
+          quiet_hours_end?: number;
+          channel_email?: boolean;
+          channel_push?: boolean;
+          channel_whatsapp?: boolean;
+          muted_kinds?: string[];
+          whatsapp_number?: string | null;
+          max_per_day?: number;
+        },
+        {
+          quiet_hours_start?: number;
+          quiet_hours_end?: number;
+          channel_email?: boolean;
+          channel_push?: boolean;
+          channel_whatsapp?: boolean;
+          muted_kinds?: string[];
+          whatsapp_number?: string | null;
+          max_per_day?: number;
         }
       >;
     };

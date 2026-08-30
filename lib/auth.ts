@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import { getOrCreateUserByEmail } from "@/lib/db/users";
 import { lifeAreaScoresRepo } from "@/lib/db/lifeAreaScores";
 import { personalDnaRepo } from "@/lib/db/personalDna";
+import { notificationPreferencesRepo } from "@/lib/db/notificationPreferences";
 
 // calendar.events (not calendar.readonly) — accepting a schedule suggestion
 // now creates a real event via the Calendar API (see app/api/calendar/events),
@@ -144,6 +145,7 @@ export const authOptions: NextAuthOptions = {
       await Promise.all([
         lifeAreaScoresRepo.ensureDefaultsForUser(dbUser.id),
         personalDnaRepo.upsert(dbUser.id, {}),
+        notificationPreferencesRepo.upsert(dbUser.id, {}),
       ]);
     },
   },
