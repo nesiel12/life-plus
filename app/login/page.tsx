@@ -3,7 +3,7 @@
 import { signIn } from "next-auth/react";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
-import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
 
 function GoogleIcon() {
   return (
@@ -41,7 +41,6 @@ export default function LoginPage() {
 
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-medium tracking-tight">{APP_NAME}</h1>
-          <p className="text-sm text-foreground/60">{APP_TAGLINE}</p>
         </div>
 
         <button
@@ -52,7 +51,7 @@ export default function LoginPage() {
           המשך עם Google
         </button>
 
-        <p className="text-xs text-muted">האטלס שלך מחכה, רק תיכנס.</p>
+        <p className="text-xs text-muted">Life Plus מחכה לך, רק תיכנס.</p>
       </motion.div>
     </main>
   );

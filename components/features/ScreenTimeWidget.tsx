@@ -60,7 +60,7 @@ export function ScreenTimeWidget() {
   return (
     <p className="mb-6 flex items-center gap-1.5 text-xs text-muted">
       <Clock size={12} aria-hidden />
-      {minutes < 1 ? "פחות מדקה באטלס היום" : `${minutes} דקות באטלס היום`}
+      {minutes < 1 ? "פחות מדקה ב-Life Plus היום" : `${minutes} דקות ב-Life Plus היום`}
     </p>
   );
 }

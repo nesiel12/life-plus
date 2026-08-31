@@ -167,7 +167,7 @@ export function DeepOnboardingChat({ onUnavailable }: { onUnavailable: () => voi
   return (
     <div className="flex flex-col gap-4">
       <div ref={scrollRef} className="flex max-h-72 flex-col gap-3 overflow-y-auto">
-        {turns.length === 0 && sending && <p className="text-sm leading-relaxed text-muted">אטלס חושב…</p>}
+        {turns.length === 0 && sending && <p className="text-sm leading-relaxed text-muted">Life Plus חושב…</p>}
         {turns.map((turn, i) => (
           <motion.p
             key={i}
@@ -194,7 +194,7 @@ export function DeepOnboardingChat({ onUnavailable }: { onUnavailable: () => voi
             autoFocus
             disabled={sending}
             placeholder="הקלד תשובה..."
-            aria-label="תשובה לאטלס"
+            aria-label="תשובה ל-Life Plus"
             className="focus-ring w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted disabled:opacity-60"
           />
           <div className="flex items-center justify-end gap-2">

@@ -11,7 +11,7 @@ import { notify } from "@/lib/notify";
 import { buildDedupeKey } from "@/lib/proactive/dedupe";
 import type { Job } from "@/lib/proactive/types";
 
-const SYSTEM_PROMPT = `את/ה אטלס — עוזר/ת אישי/ת פרואקטיבי/ת שמכיר/ה את המשתמש לעומק.
+const SYSTEM_PROMPT = `את/ה Life Plus — עוזר/ת אישי/ת פרואקטיבי/ת שמכיר/ה את המשתמש לעומק.
 כתוב/י תובנה יומית אחת קצרה (2–3 משפטים), בעברית טבעית וחמה, בגוף שני.
 התבסס/י אך ורק על הנתונים שסופקו. אל תמציא/י עובדות. בלי כותרת, בלי רשימות — פסקה אחת.`;
 

@@ -55,7 +55,7 @@ export async function fetchMemoryCandidates(userId: string): Promise<MemoryCandi
         id: `chat:${c.id}`,
         text: c.content,
         timestamp: c.timestamp,
-        label: `שיחה קודמת (${c.role === "user" ? "את/ה" : "אטלס"}, ${c.timestamp.slice(0, 10)}): ${c.content}`,
+        label: `שיחה קודמת (${c.role === "user" ? "את/ה" : "Life Plus"}, ${c.timestamp.slice(0, 10)}): ${c.content}`,
       })
     ),
   ];

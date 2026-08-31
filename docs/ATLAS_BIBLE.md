@@ -1,6 +1,12 @@
-# ATLAS BIBLE — the canonical source of truth
+# LIFE PLUS BIBLE — the canonical source of truth
 
-> This is the permanent, continuously‑maintained source of truth for Atlas: what it is, the principles
+> **Naming (2026‑09‑01):** the product is now **Life Plus** (formerly *Atlas*). All user‑facing copy,
+> the AI persona, `APP_NAME`, `package.json`, and the dev launch config use *Life Plus*. Internal code
+> identifiers (`useAtlasStore`, `buildAtlasContext`, `AtlasContext`, `AtlasState`) and the
+> `docs/ATLAS_*.md` filenames deliberately still carry *Atlas* — renaming ~250 references and the doc
+> filenames was scoped out. When you read "Atlas" in code, comments, or these docs, it means Life Plus.
+>
+> This is the permanent, continuously‑maintained source of truth for Life Plus: what it is, the principles
 > it is built on, how the system is shaped, where things live, what is done, what is next, and the
 > rules that must never be broken. Read this first, every session. For the detailed architecture and
 > the running build log, read `docs/ATLAS_ARCHITECTURE_VISION.md` (§1–§19). For the day‑to‑day task

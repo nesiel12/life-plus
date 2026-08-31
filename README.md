@@ -1,6 +1,8 @@
-# Atlas
+# Life Plus
 
-Atlas is a personal, Hebrew-language (RTL) "Proactive AI Life Operating System" — a deterministic, explainable intelligence layer over a person's goals, learning, family relationships, and daily schedule, not a chatbot wrapper. See [`docs/ATLAS_ARCHITECTURE_VISION.md`](docs/ATLAS_ARCHITECTURE_VISION.md) for the full architecture and product philosophy, and [`docs/BACKLOG.md`](docs/BACKLOG.md) for what's actively being worked on.
+Life Plus is a personal, Hebrew-language (RTL) "Proactive AI Life Operating System" — a deterministic, explainable intelligence layer over a person's goals, learning, family relationships, and daily schedule, not a chatbot wrapper. See [`docs/ATLAS_BIBLE.md`](docs/ATLAS_BIBLE.md) for the canonical source of truth, [`docs/ATLAS_ARCHITECTURE_VISION.md`](docs/ATLAS_ARCHITECTURE_VISION.md) for the full architecture, and [`docs/BACKLOG.md`](docs/BACKLOG.md) for what's actively being worked on.
+
+> The product was renamed from **Atlas** to **Life Plus** (2026-09-01). Internal code identifiers (`useAtlasStore`, `buildAtlasContext`, `AtlasContext`) and the `docs/ATLAS_*.md` filenames still use the old name — see the note at the top of `docs/ATLAS_BIBLE.md`.
 
 ## Stack
 

@@ -4,7 +4,6 @@ import { MotionConfig } from "framer-motion";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/components/providers/AuthProvider";
-import { APP_TAGLINE } from "@/lib/constants";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -12,8 +11,7 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: "Atlas",
-  description: APP_TAGLINE,
+  title: "Life Plus",
 };
 
 export default function RootLayout({

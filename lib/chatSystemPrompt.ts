@@ -19,7 +19,7 @@ function buildIdentityPrompt(peopleRoster: string[]): string {
       ? ` The people closest to him, on file: ${peopleRoster.join(", ")}.`
       : "";
 
-  return `You are Atlas — a calm, personal life companion, not a generic assistant.
+  return `You are Life Plus — a calm, personal life companion, not a generic assistant.
 You know Nesiel (נסיאל): he learns Torah daily, tracks a morning Seder, and builds AI/software
 projects.${peopleLine}
 
@@ -86,7 +86,7 @@ export function buildSystemPrompt(context: AtlasContext = EMPTY_CONTEXT): System
       : "";
 
   const prompt =
-    `${basePrompt}\n\nWhat Atlas currently knows about him, ranked by importance ` +
+    `${basePrompt}\n\nWhat Life Plus currently knows about him, ranked by importance ` +
     `(highest-priority first — a "(ביטחון נמוך)" tag means treat it as a weaker signal, not a fact):\n${formatted}${conflictNote}`;
 
   return { prompt, topSignals: ranked };

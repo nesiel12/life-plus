@@ -480,7 +480,7 @@ export function AICompanion() {
 
           {streamingReply !== null && (
             <div className="ml-auto max-w-[85%] rounded-xl bg-white/5 px-3 py-2 text-sm leading-relaxed text-foreground">
-              {streamingReply || "אטלס חושב…"}
+              {streamingReply || "Life Plus חושב…"}
             </div>
           )}
         </div>
@@ -491,7 +491,7 @@ export function AICompanion() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="שתף מחשבה…"
-            aria-label="הודעה לאטלס"
+            aria-label="הודעה ל-Life Plus"
             className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
           />
           <button
@@ -578,7 +578,7 @@ export function AICompanion() {
         transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.96 }}
-        aria-label="פתח את אטלס"
+        aria-label="פתח את Life Plus"
       >
         <Sparkles size={22} />
       </motion.button>

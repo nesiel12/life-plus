@@ -65,7 +65,7 @@ export function ScheduleSuggestions() {
       <GlassCard delay={0.2}>
         <p className="mb-1 flex items-center gap-2 text-sm font-medium text-muted">
           <CalendarClock size={16} />
-          הצעות מאטלס ללו״ז
+          הצעות מ-Life Plus ללו״ז
         </p>
         <p className="text-xs text-muted">
           חבר יומן Google (דרך ההתחברות) כדי לקבל הצעות מבוססות זמן פנוי אמיתי.
@@ -80,7 +80,7 @@ export function ScheduleSuggestions() {
     <GlassCard delay={0.2}>
       <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
         <CalendarClock size={16} />
-        הצעות מאטלס ללו״ז
+        הצעות מ-Life Plus ללו״ז
       </p>
       <ul className="flex flex-col gap-4">
         {suggestions.map((s, i) => (

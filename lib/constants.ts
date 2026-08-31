@@ -1,7 +1,6 @@
 import type { OnboardingQuestion } from "@/types";
 
-export const APP_NAME = "Atlas";
-export const APP_TAGLINE = "The system that holds your world.";
+export const APP_NAME = "Life Plus";
 
 export const ONBOARDING_QUESTIONS: OnboardingQuestion[] = [
   {

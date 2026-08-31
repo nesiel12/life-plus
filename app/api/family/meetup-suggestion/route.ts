@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       personName: displayName,
       slots,
       locationSuggestion,
-      note: `אלה הזמנים הפנויים שלך — אטלס לא יכול לבדוק את היומן של ${displayName}, אז זו לא בדיקת זמינות הדדית אמיתית.`,
+      note: `אלה הזמנים הפנויים שלך — Life Plus לא יכול לבדוק את היומן של ${displayName}, אז זו לא בדיקת זמינות הדדית אמיתית.`,
     });
   } catch {
     return NextResponse.json({

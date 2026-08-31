@@ -116,7 +116,7 @@ function formatTranscript(history: OnboardingChatTurn[]): string {
   if (history.length === 0) {
     return "(השיחה עוד לא התחילה — זו הפנייה הראשונה שלך אליו.)";
   }
-  return history.map((turn) => `${turn.role === "user" ? "המשתמש" : "אטלס"}: ${turn.content}`).join("\n");
+  return history.map((turn) => `${turn.role === "user" ? "המשתמש" : "Life Plus"}: ${turn.content}`).join("\n");
 }
 
 export function buildOnboardingSystemPrompt(params: {
@@ -132,7 +132,7 @@ export function buildOnboardingSystemPrompt(params: {
       ? `נושאים שעדיין לא נענו: ${remaining.map((topic) => TOPIC_LABEL[topic]).join(", ")}.`
       : "כל הנושאים כבר כוסו — אל תשאל עוד שאלות. הגב/י בהודעת סיום חמה וקצרה שמסכמת ומודה לו.";
 
-  return `את/ה אטלס — בן/בת לוויה אישי, רגוע/ה וחם/ה, שמדבר/ת עברית טבעית וזורמת בלבד (לעולם לא אנגלית).
+  return `את/ה Life Plus — בן/בת לוויה אישי, רגוע/ה וחם/ה, שמדבר/ת עברית טבעית וזורמת בלבד (לעולם לא אנגלית).
 את/ה מנהל/ת שיחת היכרות ראשונית עם ${params.displayName || "המשתמש"} כדי להכיר אותו/ה טוב יותר —
 לא למלא טופס.
 

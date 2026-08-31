@@ -45,7 +45,7 @@ function context(patch: Partial<AtlasContext>): AtlasContext {
 describe("buildSystemPrompt", () => {
   it("returns exactly the base prompt for an empty context, with no top signals", () => {
     const { prompt, topSignals } = buildSystemPrompt();
-    expect(prompt).toContain("You are Atlas");
+    expect(prompt).toContain("You are Life Plus");
     expect(prompt).not.toContain("ranked by importance");
     expect(topSignals).toEqual([]);
   });

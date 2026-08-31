@@ -152,7 +152,7 @@ export function CommandPanel() {
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <p className="text-sm leading-relaxed text-muted">
           תן/י פקודה בעברית חופשית — למשל &quot;נקה לי את הערב בשביל חברים&quot;, &quot;תרשום שסיימתי
-          X&quot;, או &quot;רשום שדיברתי עם אמא&quot;. אטלס יציע פעולה, ותאשר/י לפני שהיא מתבצעת.
+          X&quot;, או &quot;רשום שדיברתי עם אמא&quot;. Life Plus יציע פעולה, ותאשר/י לפני שהיא מתבצעת.
         </p>
 
         {turns.map((turn) => (
@@ -227,7 +227,7 @@ export function CommandPanel() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="פקודה חופשית…"
-          aria-label="פקודה לאטלס"
+          aria-label="פקודה ל-Life Plus"
           className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <button
