@@ -9,7 +9,10 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:migrate": "node --env-file=.env.local scripts/apply-migrations.mjs"
+    "db:migrate": "node --env-file=.env.local scripts/apply-migrations.mjs",
+    "cron": "node --conditions=react-server --env-file=.env.local --import tsx scripts/cron.ts",
+    "cron:daily-insight": "npm run cron -- daily_insight",
+    "cron:recommendation-expiry": "npm run cron -- recommendation_expiry"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.22",
@@ -40,6 +43,7 @@
     "eslint-config-next": "15.5.20",
     "pg": "^8.22.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

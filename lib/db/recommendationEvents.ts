@@ -46,6 +46,22 @@ export const recommendationEventsRepo = {
     return data;
   },
 
+  // The Proactive Engine's recommendation_expiry job: any event still
+  // `pending` past `olderThanIso` becomes `expired` (a weak negative signal,
+  // per the feedback model). Same pending-only guard as recordOutcome.
+  async expireStale(userId: string, olderThanIso: string): Promise<number> {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from("recommendation_events")
+      .update({ status: "expired", responded_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("status", "pending")
+      .lt("created_at", olderThanIso)
+      .select("id");
+    if (error) throw error;
+    return data?.length ?? 0;
+  },
+
   async list(userId: string, limit = 200): Promise<RecommendationEventRow[]> {
     const client = getSupabaseClient();
     const { data, error } = await client

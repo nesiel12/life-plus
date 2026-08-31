@@ -2,29 +2,25 @@ import "server-only";
 import { jobRunsRepo } from "@/lib/db/jobRuns";
 import { listAllUserIds } from "@/lib/db/users";
 import { logicalDayKey } from "@/lib/proactive/dedupe";
-import type { JobName, JobResult, JobScope } from "@/lib/proactive/types";
+import type { JobName, Job } from "@/lib/proactive/types";
 
-export interface JobContext {
-  /** Present only for `per_user` jobs. */
-  userId?: string;
-  /** YYYY-MM-DD the run is logically for. */
-  logicalDay: string;
-  now: Date;
-}
-
-export interface Job {
-  name: JobName;
-  scope: JobScope;
-  run(ctx: JobContext): Promise<JobResult>;
-}
+export type { Job, JobContext } from "@/lib/proactive/types";
 
 /**
- * The job registry. Each job is added here as it's implemented — see
- * docs/PROACTIVE_ENGINE.md §3. Deliberately empty at M2 scaffold time so the
- * plumbing (idempotency, fan-out, error capture) can be reviewed and tested
- * before any job logic lands.
+ * The job registry — lazy so running one job never loads another's dependency
+ * graph (daily_insight pulls in the whole Context Engine; recommendation_expiry
+ * touches two repos). Each job is added here as it's implemented — see
+ * docs/PROACTIVE_ENGINE.md §3.
  */
-export const JOBS: Partial<Record<JobName, Job>> = {};
+export const JOB_LOADERS: Partial<Record<JobName, () => Promise<Job>>> = {
+  recommendation_expiry: () =>
+    import("@/lib/proactive/jobs/recommendationExpiry").then((m) => m.recommendationExpiryJob),
+  daily_insight: () => import("@/lib/proactive/jobs/dailyInsight").then((m) => m.dailyInsightJob),
+  // morning_briefing, reminder_sweep, busy_week_scan — next in M2
+};
+
+/** The job names that currently have an implementation. */
+export const IMPLEMENTED_JOBS = Object.keys(JOB_LOADERS) as JobName[];
 
 export interface RunJobSummary {
   job: JobName;
@@ -42,10 +38,11 @@ export interface RunJobSummary {
  * `job_runs` unique index.
  */
 export async function runJob(name: JobName, now: Date = new Date()): Promise<RunJobSummary> {
-  const job = JOBS[name];
-  if (!job) {
+  const loader = JOB_LOADERS[name];
+  if (!loader) {
     return { job: name, scopesAttempted: 0, scopesRun: 0, scopesSkipped: 0, scopesFailed: 0, itemsProduced: 0 };
   }
+  const job = await loader();
 
   const logicalDay = logicalDayKey(now);
   const scopeKeys = job.scope === "global" ? ["global"] : await listAllUserIds();

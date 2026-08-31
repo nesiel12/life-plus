@@ -42,6 +42,32 @@ export const notificationsRepo = {
     return data;
   },
 
+  /** Sweep pending notifications whose expires_at has passed → 'expired'. Returns the count. */
+  async expireOverdue(userId: string): Promise<number> {
+    const { data, error } = await getSupabaseClient()
+      .from("notifications")
+      .update({ status: "expired" })
+      .eq("user_id", userId)
+      .eq("status", "pending")
+      .lt("expires_at", new Date().toISOString())
+      .not("expires_at", "is", null)
+      .select("id");
+    if (error) throw error;
+    return data?.length ?? 0;
+  },
+
+  /** How many proactive notifications have already gone out today (for the daily cap). */
+  async countSentSince(userId: string, sinceIso: string): Promise<number> {
+    const { count, error } = await getSupabaseClient()
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .not("sent_at", "is", null)
+      .gte("sent_at", sinceIso);
+    if (error) throw error;
+    return count ?? 0;
+  },
+
   async markStatus(
     userId: string,
     id: string,

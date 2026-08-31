@@ -69,3 +69,17 @@ export interface JobResult {
 }
 
 export type JobScope = "per_user" | "global";
+
+export interface JobContext {
+  /** Present only for `per_user` jobs. */
+  userId?: string;
+  /** YYYY-MM-DD the run is logically for. */
+  logicalDay: string;
+  now: Date;
+}
+
+export interface Job {
+  name: JobName;
+  scope: JobScope;
+  run(ctx: JobContext): Promise<JobResult>;
+}
