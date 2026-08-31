@@ -195,14 +195,25 @@ git remote + push.
 **M1 done (2026‑08‑31):** this document created as the canonical source of truth; narrow‑MVP docs
 banner‑marked SUPERSEDED.
 
-**M2 in progress (2026‑08‑31):** design in `docs/PROACTIVE_ENGINE.md`. Landed: migration
-`20260831000000_proactive_engine.sql` (`job_runs`, `notifications`, `notification_preferences` — live,
-verified); `lib/proactive/*` (pure helpers `quietHours`/`dedupe`/`schedule` + 12 tests; `runJob`
-orchestrator with idempotency + per‑user fan‑out + an empty `JOBS` registry); repos
-`lib/db/{notifications,notificationPreferences,jobRuns}.ts`; `POST /api/cron/[job]` (Bearer
-`CRON_SECRET`); `notification_preferences` row auto‑created on sign‑in. **Next in M2:** implement the 5
-jobs; the notification centre UI + email channel; Personal DNA → ranking/chat wiring; semantic chat
-memory; WhatsApp/Second‑Brain/Screen‑Time scaffolds.
+**M2 in progress (2026‑08‑31):** design in `docs/PROACTIVE_ENGINE.md`. Landed & verified against the
+live DB:
+- migration `20260831000000_proactive_engine.sql` (`job_runs`, `notifications`,
+  `notification_preferences`)
+- `lib/proactive/*` — pure helpers `quietHours`/`dedupe`/`schedule`/`withTimeout` (+16 tests); `runJob`
+  orchestrator (lazy `JOB_LOADERS`, idempotency incl. orphaned‑`running` reclaim, per‑user fan‑out,
+  never throws)
+- `lib/db/{notifications,notificationPreferences,jobRuns}.ts`; `lib/notify/*` (fan‑out + email/whatsapp
+  channel stubs)
+- **2 jobs live:** `recommendation_expiry` (ran: expired 8 stale events) and `daily_insight` (ran:
+  Intelligence Engine → Hebrew insight, AI‑with‑timeout→deterministic fallback, wrote an `insights`
+  row + a `daily_insight` notification; idempotent re‑run confirmed)
+- `POST /api/cron/[job]` (Bearer `CRON_SECRET`); local runner `npm run cron -- <job>`
+- `notification_preferences` row auto‑created on sign‑in; `.env.example` gains `CRON_SECRET`
+
+**Next in M2:** the 3 remaining jobs (`morning_briefing`, `reminder_sweep`, `busy_week_scan`); the
+notification centre UI + real email channel (Resend); Personal DNA → ranking/chat wiring; semantic
+chat memory; the WhatsApp / Second‑Brain / Screen‑Time scaffolds; private activation/retention
+instrumentation (`user_events`) per `docs/MONETIZATION_STRATEGY.md` §5.
 
 **Lost work (failed machine sync, post‑Phase‑10, uncommitted):** an **Academy** feature (courses,
 stages, exams, certification, trivia), **Daily/Weekly Wrap‑up + Reminders Hub**, **Smart Calendar v2**
@@ -274,8 +285,11 @@ each. Each milestone ends with green checks, a real verification, a `BACKLOG.md`
 - **M10 — Life Timeline v2 ("Museum of Life").** Visual scrollable multi‑year timeline.
 - **M11 — Friends CRM + Torah/Family deepening.** Friends distinct from Family; richer Torah library;
   relationship‑goal tracking.
-- **M12 — SaaS surface.** Account settings, data export, delete, privacy/ToS, PWA, notification prefs;
-  real RLS policies + open sign‑up (deliberate greenlit decision).
+- **M12 — SaaS surface + billing.** Account settings, data export, delete, privacy/ToS, PWA,
+  notification prefs; real RLS policies + open sign‑up. **Billing is gated on the retention bar in
+  `docs/MONETIZATION_STRATEGY.md` §5, not a date** — do not build a payment provider integration
+  before it's met. Tier architecture and the three upgrade triggers are designed in that doc now so
+  gating is a one‑line entitlement check later.
 
 ---
 
@@ -322,6 +336,7 @@ external credential is required. Keeps `/docs` current: this file, `BACKLOG.md`,
 | `ATLAS_SESSION_BRIEF.md` | Session kickoff checklist + current‑state snapshot. |
 | `ROADMAP_V2.md` | Infra phases 0–6 (historical framing; the live roadmap is §7 here). |
 | `PROACTIVE_ENGINE.md` | M2 design doc — job ledger, notifications, channels, scheduling, DNA wiring, integration layers. |
+| `MONETIZATION_STRATEGY.md` | Commercial architecture — tiers, feature gates, upgrade triggers, retention loops, and the "don't build billing until the §5 retention bar" sequencing argument. |
 | `recovery/LIVE_SCHEMA_SNAPSHOT.sql` | DB schema snapshot — reference for the lost‑WIP tables. |
 | `PROJECT_ANALYSIS.md`, `ARCHITECTURE_AUDIT.md`, `TECH_DEBT.md`, `FEATURE_GAP_ANALYSIS.md` | Point‑in‑time audit, 2026‑07‑20, pre‑persistence. **Historical.** |
 | `ATLAS_PRODUCT_STRATEGY.md`, `ATLAS_UX_SPEC.md`, `ATLAS_MVP_PRODUCT_SPEC.md` | Early narrow "reflection‑partner" framing. **Superseded by §1–§3 here** — kept for history. |
