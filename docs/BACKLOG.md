@@ -13,6 +13,8 @@ Each entry: what it is, why it's at that priority, where it lives, and what it d
 
 *(none open)*
 
+**Recently closed:** *Schema drift on `learning_topics` / `learning_resources` (fixed 2026-08-31, migration `20260831000001`).* The live tables had an older, incompatible shape (`user_id text`, no `topic_id`/`notes`/`is_completed`/`updated_at`) from a lost migration iteration; `apply-migrations.mjs` had skipped the canonical `20260726000007` because `_migrations` already recorded it. Every Learning Hub / AI Track Builder write failed at runtime with PostgREST `PGRST204 "Could not find the 'notes' column …"` — the `{code, details:null, hint:null, message}` error. Both tables were empty, so the fix drops + recreates them to the canonical shape. **`npm run check:schema`** (`scripts/check-schema-drift.mjs`) now detects this class of drift and exits non-zero — wire it into CI / pre-deploy.
+
 ## High Priority
 *Architectural improvements that should land before any real user besides the current one touches this.*
 

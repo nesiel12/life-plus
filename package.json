@@ -12,7 +12,8 @@
     "db:migrate": "node --env-file=.env.local scripts/apply-migrations.mjs",
     "cron": "node --conditions=react-server --env-file=.env.local --import tsx scripts/cron.ts",
     "cron:daily-insight": "npm run cron -- daily_insight",
-    "cron:recommendation-expiry": "npm run cron -- recommendation_expiry"
+    "cron:recommendation-expiry": "npm run cron -- recommendation_expiry",
+    "check:schema": "node --env-file=.env.local scripts/check-schema-drift.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.22",
