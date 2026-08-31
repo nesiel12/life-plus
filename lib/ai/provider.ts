@@ -19,15 +19,17 @@ import { resolveChatProvider, type ChatProvider } from "@/lib/ai/resolveChatProv
 // should change just because a Gemini key gets added later.
 const OPENAI_CHAT_MODEL_ID = "gpt-4o-mini";
 // A Google-maintained alias ("whatever flash model is currently
-// recommended for new users"), not a pinned dated model — deliberately,
-// after a pinned "gemini-2.5-flash" broke in production with "no longer
-// available to new users" (a 404, not a deprecation warning). Verified
-// directly against a real key/account before landing this: "gemini-2.5-flash"
-// and "gemini-2.5-flash-lite" both 404 the same way, "gemini-2.0-flash"
-// hits a zero-quota free-tier limit on this account, "gemini-flash-latest"
-// actually returns a real reply. Google re-points this alias as models
-// come and go, which is exactly what avoids re-hitting this class of bug.
-const GEMINI_CHAT_MODEL_ID = "gemini-flash-latest";
+// recommended"), not a pinned dated model — deliberately, after a pinned
+// "gemini-2.5-flash" broke in production with "no longer available to new
+// users" (a 404, not a deprecation warning). Re-verified 2026-08-31 against a
+// real key: "gemini-2.5-flash" / "gemini-2.0-flash" both 404 ("no longer
+// available"); "gemini-flash-latest" was returning 503 "high demand" on every
+// call; "gemini-flash-lite-latest" returned real Hebrew replies 3/3. Lite is
+// also cheaper/faster and more than enough for Atlas's short-generation
+// workload (insights, goal breakdown, structured extraction). If the AI SDK
+// starts erroring here again, check model availability with a direct REST
+// call before assuming it's the key — see docs/BACKLOG.md.
+const GEMINI_CHAT_MODEL_ID = "gemini-flash-lite-latest";
 const TRANSCRIPTION_MODEL_ID = "whisper-1";
 
 function currentChatProvider(): ChatProvider {

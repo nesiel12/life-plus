@@ -7,7 +7,8 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { buildTimelineEvents } from "@/lib/timeline/buildTimelineEvents";
 import { groupEventsByDate } from "@/lib/timeline/groupEvents";
 import type { TimelineEvent } from "@/lib/timeline/types";
-import { LIFE_AREAS, LIFE_AREA_LIST, momentCategoryColorVar } from "@/lib/lifeAreas";
+import { LIFE_AREA_LIST, momentCategoryColorVar } from "@/lib/lifeAreas";
+import { LIFE_AREA_ICONS } from "@/lib/lifeAreaIcons";
 import { cn } from "@/lib/utils";
 import type { MomentCategory } from "@/types";
 
@@ -22,7 +23,7 @@ function iconForEvent(event: TimelineEvent): LucideIcon {
   if (event.kind === "milestone_achieved") return Award;
   if (event.kind === "goal_started") return Target;
   if (event.category === "general") return Circle;
-  return LIFE_AREAS[event.category].icon;
+  return LIFE_AREA_ICONS[event.category];
 }
 
 interface FilterChipProps {

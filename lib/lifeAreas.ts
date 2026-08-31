@@ -1,18 +1,22 @@
-import { BookOpen, HeartHandshake, Lightbulb, HeartPulse, Briefcase, type LucideIcon } from "lucide-react";
 import type { LifeAreaKey, MomentCategory } from "@/types";
 
-// The single source of truth for life-area presentation. Previously this
-// mapping was independently duplicated in store/useAtlasStore.ts,
+// The single source of truth for life-area presentation *data*. Previously
+// this mapping was independently duplicated in store/useAtlasStore.ts,
 // components/features/QuickCapture.tsx, app/areas/page.tsx, and
 // app/timeline/page.tsx — see docs/TECH_DEBT.md #11. Add a 6th life area by
-// editing only this file.
+// editing this file (and lib/lifeAreaIcons.ts for its icon).
+//
+// Deliberately NO lucide-react import here: this module is pulled in
+// server-side via lib/mappers.ts -> lib/context/buildAtlasContext.ts, and a
+// React-component import would drag the React runtime into every server job
+// (it broke the standalone `npm run cron` runner). Icons live in the
+// client-only lib/lifeAreaIcons.ts.
 export interface LifeAreaMeta {
   key: LifeAreaKey;
   slug: string;
   label: string;
   pageTitle: string;
   colorVar: string;
-  icon: LucideIcon;
 }
 
 export const LIFE_AREAS: Record<LifeAreaKey, LifeAreaMeta> = {
@@ -22,7 +26,6 @@ export const LIFE_AREAS: Record<LifeAreaKey, LifeAreaMeta> = {
     label: "אמונה",
     pageTitle: "מרחב תורה",
     colorVar: "--accent-faith",
-    icon: BookOpen,
   },
   family: {
     key: "family",
@@ -30,7 +33,6 @@ export const LIFE_AREAS: Record<LifeAreaKey, LifeAreaMeta> = {
     label: "משפחה",
     pageTitle: "לוח משפחה",
     colorVar: "--accent-family",
-    icon: HeartHandshake,
   },
   knowledge: {
     key: "knowledge",
@@ -38,7 +40,6 @@ export const LIFE_AREAS: Record<LifeAreaKey, LifeAreaMeta> = {
     label: "ידע",
     pageTitle: "למידה",
     colorVar: "--accent-knowledge",
-    icon: Lightbulb,
   },
   health: {
     key: "health",
@@ -46,7 +47,6 @@ export const LIFE_AREAS: Record<LifeAreaKey, LifeAreaMeta> = {
     label: "בריאות",
     pageTitle: "בריאות",
     colorVar: "--accent-health",
-    icon: HeartPulse,
   },
   career: {
     key: "career",
@@ -54,7 +54,6 @@ export const LIFE_AREAS: Record<LifeAreaKey, LifeAreaMeta> = {
     label: "קריירה",
     pageTitle: "קריירה",
     colorVar: "--accent-career",
-    icon: Briefcase,
   },
 };
 

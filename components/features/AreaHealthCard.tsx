@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Target, Brain, Clock, type LucideIcon } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import type { LifeAreaMeta } from "@/lib/lifeAreas";
+import { LIFE_AREA_ICONS } from "@/lib/lifeAreaIcons";
 import type { AreaInsight, AttentionLevel } from "@/lib/areas/types";
 
 const ATTENTION_CONFIG: Record<AttentionLevel, { label: string; colorClass: string }> = {
@@ -50,7 +51,7 @@ interface AreaHealthCardProps {
 // same progressive-enhancement convention every other Experience Layer
 // screen already established.
 export function AreaHealthCard({ meta, insight, delay }: AreaHealthCardProps) {
-  const Icon = meta.icon;
+  const Icon = LIFE_AREA_ICONS[meta.key];
   const score = insight?.score ?? 0;
   const attention = insight ? ATTENTION_CONFIG[insight.attentionLevel] : null;
   const highlight = insight ? pickHighlight(insight) : null;

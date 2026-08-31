@@ -9,10 +9,7 @@ import { insightsRepo } from "@/lib/db/insights";
 import { generateChatText, isProviderConfigured } from "@/lib/ai";
 import { notify } from "@/lib/notify";
 import { buildDedupeKey } from "@/lib/proactive/dedupe";
-import { withTimeout } from "@/lib/proactive/withTimeout";
 import type { Job } from "@/lib/proactive/types";
-
-const AI_TIMEOUT_MS = 25_000;
 
 const SYSTEM_PROMPT = `את/ה אטלס — עוזר/ת אישי/ת פרואקטיבי/ת שמכיר/ה את המשתמש לעומק.
 כתוב/י תובנה יומית אחת קצרה (2–3 משפטים), בעברית טבעית וחמה, בגוף שני.
@@ -44,20 +41,18 @@ export const dailyInsightJob: Job = {
 
     if (isProviderConfigured()) {
       try {
+        // generateChatText carries its own 30s abort-timeout (lib/ai/service.ts).
         body = (
-          await withTimeout(
-            generateChatText({
-              system: SYSTEM_PROMPT,
-              prompt: `הנתונים הרלוונטיים כרגע:\n${formatted}\n\nכתוב/י את התובנה היומית.`,
-            }),
-            AI_TIMEOUT_MS,
-            "daily_insight generateChatText"
-          )
+          await generateChatText({
+            system: SYSTEM_PROMPT,
+            prompt: `הנתונים הרלוונטיים כרגע:\n${formatted}\n\nכתוב/י את התובנה היומית.`,
+          })
         ).trim();
         aiUsed = true;
       } catch {
-        // A slow/misconfigured provider must not wedge the nightly sweep —
-        // fall back to an honest deterministic rendering of the same signals.
+        // A slow/misconfigured/overloaded provider must not wedge the nightly
+        // sweep — fall back to an honest deterministic rendering of the same
+        // ranked signals.
         body = deterministicInsight(ranked);
       }
     } else {
