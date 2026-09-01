@@ -27,10 +27,23 @@ type KineticTextProps = React.HTMLAttributes<HTMLElement> & {
   animateOnLoad?: boolean
   /** Seconds before the first letter lands. */
   delay?: number
+  /** Keep words intact when the line wraps. The container is a wrapping flex
+   *  row, so a bare per-letter split lets a long heading break in the middle
+   *  of a word — fine for a short lockup, wrong for a sentence. Grouping by
+   *  word confines the hover neighbour effect to within each word, which is
+   *  the sane reading anyway. */
+  wordSafe?: boolean
 }
 
 const LETTER_CLASS =
   "[will-change:font-weight,-webkit-text-stroke-width,padding] [-webkit-text-stroke-color:transparent] [-webkit-text-stroke-width:var(--text-stroke-width)] [transition:font-weight_0.4s,_-webkit-text-stroke-color_0.4s,_padding_0.4s] hover:[padding-inline:var(--hover-padding)] hover:font-[900] hover:[-webkit-text-stroke-color:currentcolor] hover:[-webkit-text-stroke-width:calc(var(--text-stroke-width)*2)] has-[+span+span:hover]:font-[400] has-[+span:hover]:[padding-inline:var(--hover-padding)] has-[+span:hover]:font-[600] [:hover+&]:[padding-inline:var(--hover-padding)] [:hover+&]:font-[600] [:hover+span+&]:font-[400]"
+
+// Carries no animation of its own — it exists so framer-motion's variant
+// propagation reaches the letters nested inside each word.
+const WORD_VARIANTS: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.05 } },
+}
 
 const LETTER_VARIANTS: Variants = {
   hidden: { opacity: 0, y: "0.4em", filter: "blur(8px)" },
@@ -49,6 +62,7 @@ export function KineticText({
   style,
   animateOnLoad = false,
   delay = 0,
+  wordSafe = false,
   ...rest
 }: KineticTextProps) {
   const reduce = useReducedMotion()
@@ -60,18 +74,39 @@ export function KineticText({
     ...(style as React.CSSProperties | undefined),
   } as React.CSSProperties
 
-  const letters = text.split("").map((letter, i) => {
+  const renderLetter = (letter: string, key: string) => {
     const content = letter === " " ? "\u00A0" : letter
     return animate ? (
-      <motion.span key={i} aria-hidden="true" variants={LETTER_VARIANTS} className={LETTER_CLASS}>
+      <motion.span key={key} aria-hidden="true" variants={LETTER_VARIANTS} className={LETTER_CLASS}>
         {content}
       </motion.span>
     ) : (
-      <span key={i} aria-hidden="true" className={LETTER_CLASS}>
+      <span key={key} aria-hidden="true" className={LETTER_CLASS}>
         {content}
       </span>
     )
-  })
+  }
+
+  const letters = wordSafe
+    ? // Split on spaces but keep them, so the gaps stay real characters.
+      text.split(/(\s+)/).map((chunk, w) =>
+        /^\s+$/.test(chunk) ? (
+          renderLetter(" ", `s${w}`)
+        ) : animate ? (
+          <motion.span
+            key={`w${w}`}
+            variants={WORD_VARIANTS}
+            className="inline-flex whitespace-nowrap"
+          >
+            {chunk.split("").map((letter, i) => renderLetter(letter, `w${w}-${i}`))}
+          </motion.span>
+        ) : (
+          <span key={`w${w}`} className="inline-flex whitespace-nowrap">
+            {chunk.split("").map((letter, i) => renderLetter(letter, `w${w}-${i}`))}
+          </span>
+        )
+      )
+    : text.split("").map((letter, i) => renderLetter(letter, String(i)))
 
   const shared = {
     ...rest,

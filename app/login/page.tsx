@@ -3,7 +3,6 @@
 import { signIn } from "next-auth/react";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
-import { APP_NAME } from "@/lib/constants";
 
 function GoogleIcon() {
   return (
@@ -37,15 +36,9 @@ export default function LoginPage() {
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="glass-card flex w-full max-w-sm flex-col items-center gap-7 p-9"
       >
-        <Logo size={44} />
-
-        <div className="flex flex-col items-center gap-2.5">
-          <span
-            className="text-gold-gradient text-xl font-semibold uppercase leading-none"
-            style={{ letterSpacing: "0.24em" }}
-          >
-            {APP_NAME}
-          </span>
+        {/* The lockup artwork carries the wordmark, so no text beside it. */}
+        <div className="flex flex-col items-center gap-3">
+          <Logo size={72} />
           <span aria-hidden className="block h-px w-14 bg-[var(--gold-line)]" />
         </div>
 

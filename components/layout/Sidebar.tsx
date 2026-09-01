@@ -100,14 +100,9 @@ export function Sidebar() {
           className="focus-ring flex flex-col items-center gap-2.5 rounded-xl px-2 py-1"
           aria-label={APP_NAME}
         >
-          <Logo size={64} />
-          <span
-            dir="ltr"
-            className="text-gold-gradient hidden text-lg font-bold uppercase leading-none lg:inline"
-            style={{ letterSpacing: "0.32em" }}
-          >
-            {APP_NAME}
-          </span>
+          {/* The lockup artwork already contains the wordmark, so there's no
+              text beside it — the mark alone is the home link. */}
+          <Logo size={56} className="max-w-full" />
         </Link>
       </div>
 

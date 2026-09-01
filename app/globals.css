@@ -263,3 +263,37 @@ body::before {
     transform: translateX(calc(-100% - var(--gap)));
   }
 }
+
+/* ── Brand mark blending ───────────────────────────────────────────────────
+   The supplied lockup is a raster with a baked-in silver-gradient background
+   rather than transparency, so it arrives as an opaque rectangle.
+
+   Light theme: `multiply` composites that silver away almost entirely — white
+   and near-white multiply down to the backdrop while the gold wordmark and the
+   coloured ribbons survive. This one genuinely is seamless.
+
+   Dark theme: nothing can make a bright opaque plate vanish into near-black.
+   `multiply` would crush the whole mark away; `screen` would blow the silver
+   out further. So rather than fake it, dark theme *frames* it — rounded
+   corners and a gold hairline turn the rectangle into a deliberate brand tile
+   instead of a stray screenshot, and a slight knock-back keeps it from
+   out-shouting the page. A transparent-background export is the only real fix.
+
+   A transparent source (the gold SVG placeholder) is unaffected by either
+   path: multiply over white leaves gold untouched, and the dark-theme frame is
+   invisible without an opaque ground behind it. */
+.logo-mark {
+  mix-blend-mode: multiply;
+}
+:root[data-theme="dark"] .logo-mark {
+  mix-blend-mode: normal;
+  border-radius: 0.65rem;
+  opacity: 0.95;
+}
+/* Only an opaque mark gets the frame — a transparent SVG would show a ring
+   floating around nothing, so this rides on the raster's own file extension. */
+:root[data-theme="dark"] .logo-mark[src$=".png"],
+:root[data-theme="dark"] .logo-mark[src$=".webp"],
+:root[data-theme="dark"] .logo-mark[src$=".jpg"] {
+  box-shadow: 0 0 0 1px var(--gold-line);
+}

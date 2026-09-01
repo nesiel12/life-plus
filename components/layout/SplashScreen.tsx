@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
-import { KineticText } from "@/components/magicui/kinetic-text";
 import { APP_NAME } from "@/lib/constants";
 
 const SESSION_KEY = "lifeplus.splash.seen";
@@ -85,33 +84,18 @@ export function SplashScreen() {
               reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 120, damping: 16, mass: 0.9 }
             }
           >
-            <Logo size={240} className="max-h-[34vh] w-auto" />
+            <Logo size={240} className="max-h-[34vh]" />
           </motion.div>
 
-          <div className="flex flex-col items-center gap-4">
-            <motion.div
-              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, letterSpacing: "0.5em", y: 8 }}
-              animate={{ opacity: 1, letterSpacing: "0.24em", y: 0 }}
-              transition={
-                reduceMotion ? { duration: 0 } : { duration: 0.7, delay: 0.3, ease: "easeOut" }
-              }
-            >
-              <KineticText
-                as="span"
-                dir="ltr"
-                text="LIFE PLUS"
-                className="text-gold-gradient justify-center text-4xl font-bold tracking-[0.24em] uppercase sm:text-6xl lg:text-7xl"
-              />
-            </motion.div>
-
-            <motion.span
-              aria-hidden
-              className="block h-px bg-[var(--gold-line)]"
-              initial={reduceMotion ? { width: 180 } : { width: 0 }}
-              animate={{ width: 180 }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.5, ease: "easeOut" }}
-            />
-          </div>
+          {/* No wordmark here — the lockup artwork carries it. Just a rule
+              drawing itself under the mark as the hold plays out. */}
+          <motion.span
+            aria-hidden
+            className="block h-px bg-[var(--gold-line)]"
+            initial={reduceMotion ? { width: 180 } : { width: 0 }}
+            animate={{ width: 180 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.5, ease: "easeOut" }}
+          />
         </motion.div>
       )}
     </AnimatePresence>

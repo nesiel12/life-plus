@@ -104,40 +104,41 @@ export default function Home() {
         />
 
         <div className="relative mx-auto max-w-6xl">
-          {/* Brand kicker — the mark sitting directly beside the wordmark. */}
+          {/* Brand kicker — the lockup artwork, which carries the wordmark
+              itself, so no text sits beside it. */}
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, ease: "easeOut" }}
             className="mb-6 flex items-center gap-3 sm:gap-4"
           >
-            <Logo size={52} className="shrink-0" />
-            <KineticText
-              as="span"
-              dir="ltr"
-              text="LIFE PLUS"
-              animateOnLoad
-              delay={0.15}
-              className="text-gold-gradient text-xl font-bold uppercase leading-none tracking-[0.34em] sm:text-2xl"
-            />
+            <Logo size={56} className="shrink-0 sm:h-16" />
           </motion.div>
 
-          <motion.h1
-            initial={{ opacity: 0, scale: 0.96, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
-            className="max-w-4xl text-balance text-5xl font-bold leading-[1.06] tracking-tight text-foreground sm:text-6xl lg:text-7xl xl:text-8xl"
-          >
-            {greeting ?? "שלום"},{" "}
-            <motion.span
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="text-gold-gradient inline-block"
-            >
-              {displayName}
-            </motion.span>
-          </motion.h1>
+          {/* The greeting is the header text now that the wordmark lives in
+              the artwork, so KineticText carries it: letters stage in on load
+              and respond to the pointer. wordSafe keeps Hebrew words whole
+              when the line wraps. Keyed on the greeting so the letters
+              re-stage once the real time-of-day resolves after mount. */}
+          <h1 className="flex max-w-4xl flex-wrap items-baseline gap-x-[0.3em] text-5xl font-bold leading-[1.06] tracking-tight sm:text-6xl lg:text-7xl xl:text-8xl">
+            <KineticText
+              key={greeting ?? "pending"}
+              as="span"
+              text={`${greeting ?? "שלום"},`}
+              animateOnLoad
+              wordSafe
+              delay={0.1}
+              className="font-bold text-foreground"
+            />
+            <KineticText
+              as="span"
+              text={displayName}
+              animateOnLoad
+              wordSafe
+              delay={0.32}
+              className="text-gold-gradient font-bold"
+            />
+          </h1>
 
           <motion.div
             initial={{ opacity: 0, y: 10 }}
