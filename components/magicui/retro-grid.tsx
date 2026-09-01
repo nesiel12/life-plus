@@ -281,6 +281,12 @@ interface RetroGridProps extends HTMLAttributes<HTMLDivElement> {
    * @default "gray"
    */
   darkLineColor?: string
+  /**
+   * Skip the built-in bottom fade — for callers that mask the whole layer
+   * themselves (the dashboard hero does).
+   * @default false
+   */
+  noScrim?: boolean
 }
 
 interface ProgramInfo {
@@ -402,6 +408,19 @@ function getProgramInfo(
 function isDarkMode(colorScheme: MediaQueryList) {
   const root = document.documentElement
 
+  // LIFE PLUS marks the theme with [data-theme] on <html> (see
+  // components/providers/ThemeProvider). The upstream `dark`/`light` class
+  // check is kept as a fallback for the original MagicUI convention.
+  const dataTheme = root.getAttribute("data-theme")
+
+  if (dataTheme === "dark") {
+    return true
+  }
+
+  if (dataTheme === "light") {
+    return false
+  }
+
   if (root.classList.contains("dark")) {
     return true
   }
@@ -477,6 +496,7 @@ export function RetroGrid({
   opacity = 0.5,
   lightLineColor = "gray",
   darkLineColor = "gray",
+  noScrim = false,
   style,
   ...props
 }: RetroGridProps) {
@@ -760,7 +780,7 @@ export function RetroGrid({
       syncScene()
     })
     themeObserver.observe(document.documentElement, {
-      attributeFilter: ["class"],
+      attributeFilter: ["class", "data-theme"],
       attributes: true,
     })
 
@@ -863,7 +883,16 @@ export function RetroGrid({
           isWebGlReady ? "opacity-100" : "opacity-0"
         )}
       />
-      <div className="absolute inset-0 bg-linear-to-t from-white to-transparent to-90% dark:from-black" />
+      {!noScrim && (
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              "linear-gradient(to top, var(--background), transparent 90%)",
+          }}
+        />
+      )}
     </div>
   )
 }

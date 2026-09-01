@@ -8,6 +8,7 @@ import { useApiCall } from "@/hooks/useApiCall";
 import { useInsights } from "@/hooks/useInsights";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TaskCard } from "@/components/features/time/TaskCard";
+import { PinnedList } from "@/components/ui/PinnedList";
 import { NewTaskModal } from "@/components/features/time/NewTaskModal";
 import { NewManualEventModal } from "@/components/features/time/NewManualEventModal";
 import { TaskSuggestions } from "@/components/features/time/TaskSuggestions";
@@ -165,6 +166,15 @@ export default function TimeSpacePage() {
     });
   }
 
+  // Pinning *is* high priority — the same field the AI prioritizer writes
+  // (handlePrioritize below) and the same updateTask action the done-toggle
+  // uses, so a pin survives a reload instead of being a view-only flourish.
+  function handleTogglePin(task: Task) {
+    toggleTask(task.id, { isHighPriority: !task.isHighPriority }).catch(() => {
+      // error is already captured in toggleError for display below
+    });
+  }
+
   function handleDelete(taskId: string) {
     removeTask(taskId).catch(() => {
       // error is already captured in deleteError for display below
@@ -268,36 +278,46 @@ export default function TimeSpacePage() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         <section>
           <h3 className="mb-3 text-sm font-medium text-muted">לביצוע ({todoTasks.length})</h3>
-          <div className="flex flex-col gap-3">
-            {todoTasks.map((task, i) => (
+          <PinnedList
+            items={todoTasks}
+            getKey={(task) => task.id}
+            isPinned={(task) => task.isHighPriority}
+            onTogglePin={handleTogglePin}
+            empty={<p className="text-sm text-muted">אין משימות לביצוע. הוסף משימה חדשה כדי להתחיל.</p>}
+          >
+            {(task, { pinned, togglePin }) => (
               <TaskCard
-                key={task.id}
                 task={task}
-                delay={Math.min(i * 0.05, 0.3)}
+                delay={0}
                 onToggleDone={handleToggleDone}
                 onDelete={handleDelete}
+                pinned={pinned}
+                onTogglePin={togglePin}
               />
-            ))}
-            {todoTasks.length === 0 && (
-              <p className="text-sm text-muted">אין משימות לביצוע. הוסף משימה חדשה כדי להתחיל.</p>
             )}
-          </div>
+          </PinnedList>
         </section>
 
         <section>
           <h3 className="mb-3 text-sm font-medium text-muted">בוצע ({doneTasks.length})</h3>
-          <div className="flex flex-col gap-3">
-            {doneTasks.map((task, i) => (
+          <PinnedList
+            items={doneTasks}
+            getKey={(task) => task.id}
+            isPinned={(task) => task.isHighPriority}
+            onTogglePin={handleTogglePin}
+            empty={<p className="text-sm text-muted">עדיין לא הושלמו משימות.</p>}
+          >
+            {(task, { pinned, togglePin }) => (
               <TaskCard
-                key={task.id}
                 task={task}
-                delay={Math.min(i * 0.05, 0.3)}
+                delay={0}
                 onToggleDone={handleToggleDone}
                 onDelete={handleDelete}
+                pinned={pinned}
+                onTogglePin={togglePin}
               />
-            ))}
-            {doneTasks.length === 0 && <p className="text-sm text-muted">עדיין לא הושלמו משימות.</p>}
-          </div>
+            )}
+          </PinnedList>
         </section>
       </div>
 

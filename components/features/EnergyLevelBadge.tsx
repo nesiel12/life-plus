@@ -24,7 +24,7 @@ export function EnergyLevelBadge() {
   if (!data || data.level === "unknown") return null;
 
   return (
-    <p className="mb-6 flex items-center gap-1.5 text-xs text-muted">
+    <p className="inline-flex items-center gap-1.5 rounded-full border border-hairline-card bg-surface/70 px-3 py-1.5 text-xs text-muted">
       <Zap size={12} className={data.level === "peak" ? "text-accent-faith" : "text-muted"} aria-hidden />
       {data.rationale}
     </p>

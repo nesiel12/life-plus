@@ -17,7 +17,13 @@ interface Briefing {
 // established pattern as ScheduleSuggestions, so it doesn't add a query to
 // the initial page-load bootstrap for a card that's allowed to arrive a
 // beat after the rest of the page.
-export function AIBriefing() {
+interface AIBriefingProps {
+  /** Rendered inside another card (e.g. a dashboard BentoCard) — drop our own
+   * frame so the two don't nest. */
+  bare?: boolean;
+}
+
+export function AIBriefing({ bare = false }: AIBriefingProps = {}) {
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,7 +47,7 @@ export function AIBriefing() {
 
   if (loading) {
     return (
-      <GlassCard delay={0.05}>
+      <GlassCard delay={0.05} bare={bare}>
         <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
           <Sparkles size={16} className="text-accent-knowledge" />
           התדריך היומי
@@ -57,11 +63,24 @@ export function AIBriefing() {
 
   // Not gamified emptiness ("no data yet, keep going!") — just quietly
   // absent, the same way ScheduleSuggestions returns nothing rather than
-  // an empty-state card once there's genuinely nothing to say.
-  if (!briefing || briefing.signals.length === 0) return null;
+  // an empty-state card once there's genuinely nothing to say. In `bare`
+  // mode the surrounding card is already on the page, so disappearing would
+  // leave an empty frame — a single quiet line goes there instead.
+  if (!briefing || briefing.signals.length === 0) {
+    if (!bare) return null;
+    return (
+      <GlassCard delay={0.05} bare>
+        <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
+          <Sparkles size={16} className="text-accent-knowledge" />
+          התדריך היומי
+        </p>
+        <p className="text-xs text-muted">אין כרגע מה לדווח.</p>
+      </GlassCard>
+    );
+  }
 
   return (
-    <GlassCard delay={0.05}>
+    <GlassCard delay={0.05} bare={bare}>
       <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
         <Sparkles size={16} className="text-accent-knowledge" />
         התדריך היומי

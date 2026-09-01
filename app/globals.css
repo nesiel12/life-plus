@@ -19,6 +19,9 @@
   --foreground: #16151a; /* near-black ink — ~16:1 on white */
   --muted: #6b6a71; /* secondary text — ~5.2:1 on white */
   --hairline: #e8e6df; /* borders, dividers */
+  /* Card edge: a *dark* line at very low opacity rather than a light grey —
+     reads as a drawn hairline on white instead of a visible box. */
+  --hairline-card: rgba(16, 16, 20, 0.09);
 
   /* — Gold: the brand accent — */
   --gold: #b89355; /* decorative / large text / UI gold */
@@ -65,6 +68,7 @@
   --foreground: #f4f3f0;
   --muted: #a1a0a8;
   --hairline: #262629;
+  --hairline-card: rgba(255, 255, 255, 0.075);
   --gold: #d0aa66;
   --gold-ink: #e0c48c;
   --gold-soft: rgba(208, 170, 102, 0.12);
@@ -97,6 +101,7 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-hairline: var(--hairline);
+  --color-hairline-card: var(--hairline-card);
   --color-gold: var(--gold);
   --color-gold-ink: var(--gold-ink);
   --color-gold-soft: var(--gold-soft);

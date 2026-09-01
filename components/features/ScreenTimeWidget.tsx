@@ -58,7 +58,7 @@ export function ScreenTimeWidget() {
   const minutes = Math.floor(seconds / 60);
 
   return (
-    <p className="mb-6 flex items-center gap-1.5 text-xs text-muted">
+    <p className="inline-flex items-center gap-1.5 rounded-full border border-hairline-card bg-surface/70 px-3 py-1.5 text-xs text-muted">
       <Clock size={12} aria-hidden />
       {minutes < 1 ? "פחות מדקה ב-Life Plus היום" : `${minutes} דקות ב-Life Plus היום`}
     </p>

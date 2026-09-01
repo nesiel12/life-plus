@@ -100,10 +100,11 @@ export function Sidebar() {
           className="focus-ring flex flex-col items-center gap-2.5 rounded-xl px-2 py-1"
           aria-label={APP_NAME}
         >
-          <Logo size={60} />
+          <Logo size={64} />
           <span
-            className="text-gold-gradient hidden text-sm font-semibold uppercase leading-none lg:inline"
-            style={{ letterSpacing: "0.3em" }}
+            dir="ltr"
+            className="text-gold-gradient hidden text-lg font-bold uppercase leading-none lg:inline"
+            style={{ letterSpacing: "0.32em" }}
           >
             {APP_NAME}
           </span>

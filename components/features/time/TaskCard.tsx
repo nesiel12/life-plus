@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Check, Star, Trash2 } from "lucide-react";
+import { Calendar, Check, Pin, PinOff, Star, Trash2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/types";
@@ -12,6 +12,10 @@ interface TaskCardProps {
   delay: number;
   onToggleDone: (task: Task) => void;
   onDelete: (taskId: string) => void;
+  /** Supplied by PinnedList. Without it the card falls back to the plain
+   *  high-priority star and shows no pin affordance. */
+  pinned?: boolean;
+  onTogglePin?: () => void;
 }
 
 function formatDueDate(iso: string): string {
@@ -22,7 +26,7 @@ function formatDueDate(iso: string): string {
 // pass — 'in-progress' is a real status the schema and updateTask already
 // support (for the Personal DNA-driven auto-prioritization this phase
 // anticipates), just not surfaced as a third checkbox state yet.
-export function TaskCard({ task, delay, onToggleDone, onDelete }: TaskCardProps) {
+export function TaskCard({ task, delay, onToggleDone, onDelete, pinned, onTogglePin }: TaskCardProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const isDone = task.status === "done";
 
@@ -35,7 +39,10 @@ export function TaskCard({ task, delay, onToggleDone, onDelete }: TaskCardProps)
   }
 
   return (
-    <GlassCard delay={delay} className={cn("p-4", task.isHighPriority && "ring-1 ring-accent-time/50")}>
+    <GlassCard
+      delay={delay}
+      className={cn("group/task p-4", task.isHighPriority && !onTogglePin && "ring-1 ring-accent-time/50")}
+    >
       <div className="flex items-start gap-3">
         <button
           onClick={() => onToggleDone(task)}
@@ -52,7 +59,7 @@ export function TaskCard({ task, delay, onToggleDone, onDelete }: TaskCardProps)
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            {task.isHighPriority && (
+            {task.isHighPriority && !onTogglePin && (
               <motion.span
                 animate={{ opacity: [0.55, 1, 0.55] }}
                 transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -77,6 +84,30 @@ export function TaskCard({ task, delay, onToggleDone, onDelete }: TaskCardProps)
             </p>
           )}
         </div>
+
+        {onTogglePin && (
+          <button
+            onClick={onTogglePin}
+            aria-pressed={pinned}
+            aria-label={pinned ? `בטל נעיצה של ${task.title}` : `נעץ את ${task.title} לראש הרשימה`}
+            className={cn(
+              "focus-ring z-20 grid size-7 shrink-0 place-items-center rounded-lg transition-all duration-200",
+              pinned
+                ? "bg-gold-soft text-gold-ink"
+                : "text-muted opacity-0 hover:bg-fill-subtle hover:text-gold-ink focus-visible:opacity-100 group-hover/task:opacity-100"
+            )}
+          >
+            <motion.span
+              key={pinned ? "pinned" : "unpinned"}
+              initial={{ rotate: pinned ? -35 : 0, scale: 0.7 }}
+              animate={{ rotate: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 500, damping: 26 }}
+              className="grid place-items-center"
+            >
+              {pinned ? <Pin size={13} aria-hidden /> : <PinOff size={13} aria-hidden />}
+            </motion.span>
+          </button>
+        )}
 
         {confirmingDelete ? (
           <motion.div

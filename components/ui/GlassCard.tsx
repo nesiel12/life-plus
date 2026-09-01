@@ -12,9 +12,13 @@ interface GlassCardProps {
    * Rabbi card opening its profile) instead of relying on an inner button —
    * optional, existing callers with no onClick are unaffected. */
   onClick?: () => void;
+  /** Drops the card chrome (border, background, padding) and keeps only the
+   * entry animation — for panels rendered *inside* another card, e.g. a
+   * BentoCard on the dashboard, where nested frames read as clutter. */
+  bare?: boolean;
 }
 
-export function GlassCard({ children, className, delay = 0, onClick }: GlassCardProps) {
+export function GlassCard({ children, className, delay = 0, onClick, bare = false }: GlassCardProps) {
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (!onClick) return;
     if (e.key === "Enter" || e.key === " ") {
@@ -32,7 +36,11 @@ export function GlassCard({ children, className, delay = 0, onClick }: GlassCard
       onKeyDown={onClick ? handleKeyDown : undefined}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      className={cn("glass-card rounded-2xl p-6", onClick && "focus-ring cursor-pointer transition-transform hover:scale-[1.01]", className)}
+      className={cn(
+        bare ? "flex h-full w-full min-w-0 flex-col" : "glass-card rounded-2xl p-6",
+        onClick && "focus-ring cursor-pointer transition-transform hover:scale-[1.01]",
+        className
+      )}
     >
       {children}
     </motion.div>

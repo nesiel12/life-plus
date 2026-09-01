@@ -14,8 +14,9 @@ const HOLD_MS = 2100;
 // (sessionStorage); tap or any key skips it. Honors prefers-reduced-motion —
 // a brief static hold and a plain fade, nothing else.
 //
-// The <Logo> is the interim mark. Swap in the final logo asset (an <img> of
-// public/…) without touching this animation shell.
+// <Logo> resolves the artwork itself (public/life-plus-mark.png, falling back
+// to the gold SVG) — this shell never needs to change when the final file
+// lands.
 export function SplashScreen() {
   const reduceMotion = useReducedMotion();
   const [visible, setVisible] = useState(false);
@@ -56,14 +57,14 @@ export function SplashScreen() {
           role="status"
           aria-label={`${APP_NAME} נטען`}
           onClick={() => setVisible(false)}
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-7 bg-background"
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-8 bg-background px-6 sm:gap-10"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.55, ease: "easeInOut" } }}
         >
           {/* soft gold bloom behind the mark */}
           <motion.div
             aria-hidden
-            className="pointer-events-none absolute h-[46vmin] w-[46vmin] rounded-full"
+            className="pointer-events-none absolute h-[62vmin] w-[62vmin] rounded-full"
             style={{
               background:
                 "radial-gradient(circle, color-mix(in srgb, var(--gold) 24%, transparent), transparent 70%)",
@@ -84,10 +85,10 @@ export function SplashScreen() {
               reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 120, damping: 16, mass: 0.9 }
             }
           >
-            <Logo size={116} />
+            <Logo size={240} className="max-h-[34vh] w-auto" />
           </motion.div>
 
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-4">
             <motion.div
               initial={reduceMotion ? { opacity: 1 } : { opacity: 0, letterSpacing: "0.5em", y: 8 }}
               animate={{ opacity: 1, letterSpacing: "0.24em", y: 0 }}
@@ -99,15 +100,15 @@ export function SplashScreen() {
                 as="span"
                 dir="ltr"
                 text="LIFE PLUS"
-                className="text-gold-gradient justify-center text-2xl font-semibold tracking-[0.24em] uppercase"
+                className="text-gold-gradient justify-center text-4xl font-bold tracking-[0.24em] uppercase sm:text-6xl lg:text-7xl"
               />
             </motion.div>
 
             <motion.span
               aria-hidden
               className="block h-px bg-[var(--gold-line)]"
-              initial={reduceMotion ? { width: 96 } : { width: 0 }}
-              animate={{ width: 96 }}
+              initial={reduceMotion ? { width: 180 } : { width: 0 }}
+              animate={{ width: 180 }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.5, ease: "easeOut" }}
             />
           </div>

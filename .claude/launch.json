@@ -4,20 +4,35 @@
     {
       "name": "life-plus-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3000
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000,
+      "autoPort": false
     },
     {
       "name": "minecraft-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "C:/Users/nesiel/Documents/minecraft-clone", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "C:/Users/nesiel/Documents/minecraft-clone",
+        "run",
+        "dev"
+      ],
       "port": 5173,
       "autoPort": true
     },
     {
       "name": "brawl-arena-dev",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["http-server", "C:/Users/nesiel/Documents/brawl-arena", "-p", "8091", "-c-1"],
+      "runtimeArgs": [
+        "http-server",
+        "C:/Users/nesiel/Documents/brawl-arena",
+        "-p",
+        "8091",
+        "-c-1"
+      ],
       "port": 8091,
       "autoPort": true
     }

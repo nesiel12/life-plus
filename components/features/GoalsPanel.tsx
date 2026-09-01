@@ -13,7 +13,13 @@ import { LIFE_AREA_LIST } from "@/lib/lifeAreas";
 import type { LifeAreaKey } from "@/types";
 import type { GoalInsight } from "@/lib/goals/types";
 
-export function GoalsPanel() {
+interface GoalsPanelProps {
+  /** Rendered inside another card (e.g. a dashboard BentoCard) — drop our own
+   * frame so the two don't nest. */
+  bare?: boolean;
+}
+
+export function GoalsPanel({ bare = false }: GoalsPanelProps = {}) {
   const goals = useAtlasStore((s) => s.goals);
   const people = useAtlasStore((s) => s.people);
   const addGoal = useAtlasStore((s) => s.addGoal);
@@ -106,7 +112,7 @@ export function GoalsPanel() {
   }
 
   return (
-    <GlassCard delay={0.25}>
+    <GlassCard delay={0.25} bare={bare}>
       <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
         <Target size={16} />
         יעדים פעילים
