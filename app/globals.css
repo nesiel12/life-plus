@@ -207,6 +207,38 @@ body::before {
 }
 
 /* MagicUI component keyframes (Option B — integrated, no shadcn) */
+@keyframes blink-cursor {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.animate-blink-cursor {
+  animation: blink-cursor 1s step-end infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-blink-cursor {
+    animation: none;
+  }
+}
+
+/* Theme-toggle view transition — let the new theme wipe in over a static old
+   frame (the AnimatedThemeToggler drives the clip-path circle). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 2;
+}
+
 @keyframes lp-shimmer {
   0%,
   90%,

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
+import { KineticText } from "@/components/magicui/kinetic-text";
 import { APP_NAME } from "@/lib/constants";
 
 const SESSION_KEY = "lifeplus.splash.seen";
@@ -87,19 +88,19 @@ export function SplashScreen() {
           </motion.div>
 
           <div className="flex flex-col items-center gap-3">
-            <motion.span
-              className="text-gold-gradient text-2xl font-semibold uppercase leading-none"
-              style={{ letterSpacing: reduceMotion ? "0.24em" : undefined }}
-              initial={
-                reduceMotion ? { opacity: 1 } : { opacity: 0, letterSpacing: "0.55em", y: 8 }
-              }
+            <motion.div
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, letterSpacing: "0.5em", y: 8 }}
               animate={{ opacity: 1, letterSpacing: "0.24em", y: 0 }}
               transition={
                 reduceMotion ? { duration: 0 } : { duration: 0.7, delay: 0.3, ease: "easeOut" }
               }
             >
-              LIFE&nbsp;PLUS
-            </motion.span>
+              <KineticText
+                as="span"
+                text="LIFE PLUS"
+                className="text-gold-gradient justify-center text-2xl font-semibold tracking-[0.24em] uppercase"
+              />
+            </motion.div>
 
             <motion.span
               aria-hidden

@@ -18,6 +18,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
+import { AnimatedThemeToggler } from "@/components/magicui/animated-theme-toggler";
+import { useTheme } from "@/components/providers/ThemeProvider";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -83,13 +85,22 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { theme, setTheme } = useTheme();
 
   return (
     <aside className="glass-panel sticky top-0 hidden h-screen w-20 shrink-0 flex-col items-center border-s px-2 py-6 sm:flex lg:w-64 lg:items-stretch lg:px-4">
-      <Link href="/" className="focus-ring mb-8 flex items-center justify-center gap-2 rounded-xl px-2 py-1 lg:justify-start">
-        <Logo size={26} />
-        <span className="hidden text-sm font-medium tracking-tight text-foreground lg:inline">{APP_NAME}</span>
-      </Link>
+      <div className="mb-8 flex items-center justify-center gap-1 lg:justify-between">
+        <Link href="/" className="focus-ring flex items-center gap-2 rounded-xl px-2 py-1">
+          <Logo size={26} />
+          <span
+            className="text-gold-gradient hidden text-sm font-semibold uppercase lg:inline"
+            style={{ letterSpacing: "0.18em" }}
+          >
+            {APP_NAME}
+          </span>
+        </Link>
+        <AnimatedThemeToggler theme={theme} onThemeChange={setTheme} className="hidden lg:flex" />
+      </div>
 
       <nav className="flex flex-1 flex-col gap-1">
         {NAV_ITEMS.map((item) => (
