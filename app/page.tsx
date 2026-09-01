@@ -104,15 +104,23 @@ export default function Home() {
         />
 
         <div className="relative mx-auto max-w-6xl">
-          {/* Brand kicker — the lockup artwork, which carries the wordmark
-              itself, so no text sits beside it. */}
+          {/* Brand kicker — the isolated mark with the wordmark beside it. */}
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, ease: "easeOut" }}
             className="mb-6 flex items-center gap-3 sm:gap-4"
           >
-            <Logo size={56} className="shrink-0 sm:h-16" />
+            <Logo size={52} className="shrink-0" />
+            <KineticText
+              as="span"
+              dir="ltr"
+              text="LIFE PLUS"
+              animateOnLoad
+              delay={0.15}
+              letterClassName="text-gold-gradient"
+              className="text-xl font-bold uppercase leading-none tracking-[0.34em] sm:text-2xl"
+            />
           </motion.div>
 
           {/* The greeting is the header text now that the wordmark lives in
@@ -136,7 +144,8 @@ export default function Home() {
               animateOnLoad
               wordSafe
               delay={0.32}
-              className="text-gold-gradient font-bold"
+              letterClassName="text-gold-gradient"
+              className="font-bold"
             />
           </h1>
 

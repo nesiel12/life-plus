@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
+import { KineticText } from "@/components/magicui/kinetic-text";
 
 function GoogleIcon() {
   return (
@@ -36,9 +37,17 @@ export default function LoginPage() {
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="glass-card flex w-full max-w-sm flex-col items-center gap-7 p-9"
       >
-        {/* The lockup artwork carries the wordmark, so no text beside it. */}
         <div className="flex flex-col items-center gap-3">
-          <Logo size={72} />
+          <Logo size={64} />
+          <KineticText
+            as="span"
+            dir="ltr"
+            text="LIFE PLUS"
+            animateOnLoad
+            delay={0.2}
+            letterClassName="text-gold-gradient"
+            className="justify-center text-xl font-bold uppercase tracking-[0.24em]"
+          />
           <span aria-hidden className="block h-px w-14 bg-[var(--gold-line)]" />
         </div>
 

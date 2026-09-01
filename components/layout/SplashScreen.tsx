@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
+import { KineticText } from "@/components/magicui/kinetic-text";
 import { APP_NAME } from "@/lib/constants";
 
 const SESSION_KEY = "lifeplus.splash.seen";
@@ -84,18 +85,27 @@ export function SplashScreen() {
               reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 120, damping: 16, mass: 0.9 }
             }
           >
-            <Logo size={240} className="max-h-[34vh]" />
+            <Logo size={200} className="max-h-[30vh]" />
           </motion.div>
 
-          {/* No wordmark here — the lockup artwork carries it. Just a rule
-              drawing itself under the mark as the hold plays out. */}
-          <motion.span
-            aria-hidden
-            className="block h-px bg-[var(--gold-line)]"
-            initial={reduceMotion ? { width: 180 } : { width: 0 }}
-            animate={{ width: 180 }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.5, ease: "easeOut" }}
-          />
+          <div className="flex flex-col items-center gap-4">
+            <KineticText
+              as="span"
+              dir="ltr"
+              text="LIFE PLUS"
+              animateOnLoad={!reduceMotion}
+              delay={0.35}
+              letterClassName="text-gold-gradient"
+              className="justify-center text-4xl font-bold uppercase tracking-[0.24em] sm:text-6xl lg:text-7xl"
+            />
+            <motion.span
+              aria-hidden
+              className="block h-px bg-[var(--gold-line)]"
+              initial={reduceMotion ? { width: 180 } : { width: 0 }}
+              animate={{ width: 180 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.7, ease: "easeOut" }}
+            />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

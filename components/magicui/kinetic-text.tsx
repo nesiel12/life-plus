@@ -27,6 +27,12 @@ type KineticTextProps = React.HTMLAttributes<HTMLElement> & {
   animateOnLoad?: boolean
   /** Seconds before the first letter lands. */
   delay?: number
+  /** Classes applied to each letter span. A `background-clip: text` gradient
+   *  MUST live here rather than on the container when `animateOnLoad` is set:
+   *  framer-motion's per-letter transform/opacity promotes each letter to its
+   *  own layer, and an ancestor's clipped background then paints nothing —
+   *  the glyphs render with no fill and the word looks blank. */
+  letterClassName?: string
   /** Keep words intact when the line wraps. The container is a wrapping flex
    *  row, so a bare per-letter split lets a long heading break in the middle
    *  of a word — fine for a short lockup, wrong for a sentence. Grouping by
@@ -63,6 +69,7 @@ export function KineticText({
   animateOnLoad = false,
   delay = 0,
   wordSafe = false,
+  letterClassName,
   ...rest
 }: KineticTextProps) {
   const reduce = useReducedMotion()
@@ -77,11 +84,16 @@ export function KineticText({
   const renderLetter = (letter: string, key: string) => {
     const content = letter === " " ? "\u00A0" : letter
     return animate ? (
-      <motion.span key={key} aria-hidden="true" variants={LETTER_VARIANTS} className={LETTER_CLASS}>
+      <motion.span
+        key={key}
+        aria-hidden="true"
+        variants={LETTER_VARIANTS}
+        className={cn(LETTER_CLASS, letterClassName)}
+      >
         {content}
       </motion.span>
     ) : (
-      <span key={key} aria-hidden="true" className={LETTER_CLASS}>
+      <span key={key} aria-hidden="true" className={cn(LETTER_CLASS, letterClassName)}>
         {content}
       </span>
     )

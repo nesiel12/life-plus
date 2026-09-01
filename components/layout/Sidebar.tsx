@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
+import { KineticText } from "@/components/magicui/kinetic-text";
 import { AnimatedThemeToggler } from "@/components/magicui/animated-theme-toggler";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { APP_NAME } from "@/lib/constants";
@@ -100,9 +101,17 @@ export function Sidebar() {
           className="focus-ring flex flex-col items-center gap-2.5 rounded-xl px-2 py-1"
           aria-label={APP_NAME}
         >
-          {/* The lockup artwork already contains the wordmark, so there's no
-              text beside it — the mark alone is the home link. */}
-          <Logo size={56} className="max-w-full" />
+          <Logo size={52} className="max-w-full" />
+          {/* Hidden on the collapsed rail, where there's no room for it. */}
+          <KineticText
+            as="span"
+            dir="ltr"
+            text="LIFE PLUS"
+            animateOnLoad
+            delay={0.2}
+            letterClassName="text-gold-gradient"
+            className="hidden justify-center text-sm font-bold uppercase tracking-[0.3em] lg:flex"
+          />
         </Link>
       </div>
 
