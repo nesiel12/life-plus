@@ -1,0 +1,32 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Life Plus">
+  <title>Life Plus</title>
+  <!--
+    Stylized interpretation of the LIFE PLUS woven-ribbon brain: four
+    interlaced loops in the brand colours (blue / green / magenta / gold).
+    Placeholder for the final supplied artwork — swap this file in place and
+    nothing else needs to change (Logo.tsx points at /life-plus-mark.svg).
+  -->
+  <defs>
+    <linearGradient id="lp-blue" x1="18" y1="30" x2="104" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2E8BD6"/><stop offset="1" stop-color="#1763A8"/>
+    </linearGradient>
+    <linearGradient id="lp-green" x1="24" y1="24" x2="110" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#43B14B"/><stop offset="1" stop-color="#2C8A3B"/>
+    </linearGradient>
+    <linearGradient id="lp-magenta" x1="20" y1="40" x2="108" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D81E86"/><stop offset="1" stop-color="#B01568"/>
+    </linearGradient>
+    <linearGradient id="lp-gold" x1="30" y1="64" x2="112" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9C063"/><stop offset="1" stop-color="#B98F3F"/>
+    </linearGradient>
+  </defs>
+
+  <g fill="none" stroke-linecap="round">
+    <ellipse cx="60" cy="56" rx="40" ry="20" transform="rotate(-32 60 56)" stroke="url(#lp-green)" stroke-width="9"/>
+    <ellipse cx="66" cy="58" rx="40" ry="19" transform="rotate(28 66 58)" stroke="url(#lp-blue)" stroke-width="9"/>
+    <ellipse cx="64" cy="64" rx="34" ry="16" transform="rotate(-14 64 64)" stroke="url(#lp-magenta)" stroke-width="8.5"/>
+    <path d="M40 92 C 44 74, 70 70, 92 78 C 108 84, 110 60, 96 50" transform="rotate(6 66 70)" stroke="url(#lp-gold)" stroke-width="8.5"/>
+    <!-- stem -->
+    <path d="M58 84 C 56 98, 62 106, 70 110" stroke="url(#lp-gold)" stroke-width="8"/>
+  </g>
+</svg>

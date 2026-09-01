@@ -97,6 +97,7 @@ export function SplashScreen() {
             >
               <KineticText
                 as="span"
+                dir="ltr"
                 text="LIFE PLUS"
                 className="text-gold-gradient justify-center text-2xl font-semibold tracking-[0.24em] uppercase"
               />
