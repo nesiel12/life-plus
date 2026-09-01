@@ -44,7 +44,7 @@ export function TransactionRow({ transaction, delay, onDelete }: TransactionRowP
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p className="truncate text-sm font-medium text-foreground">{transaction.title}</p>
-          <span className="shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] text-muted">{transaction.category}</span>
+          <span className="shrink-0 rounded-full bg-fill-subtle px-1.5 py-0.5 text-[10px] text-muted">{transaction.category}</span>
         </div>
         {transaction.note && <p className="truncate text-xs text-muted">{transaction.note}</p>}
       </div>

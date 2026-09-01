@@ -53,7 +53,7 @@ export default function LearningSpacePage() {
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
             placeholder="נושא, למשל: תכנות ב-Python, ניתוח עלילה"
             aria-label="שם נושא הלימוד"
-            className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+            className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
           />
           <input
             value={newCategory}
@@ -61,7 +61,7 @@ export default function LearningSpacePage() {
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
             placeholder="קטגוריה (לא חובה)"
             aria-label="קטגוריית נושא הלימוד"
-            className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-48"
+            className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-48"
           />
           <button
             onClick={handleAdd}

@@ -80,7 +80,7 @@ export function NewMealModal({ open, onClose, onCreate }: NewMealModalProps) {
           onClick={resetAndClose}
           disabled={creating}
           aria-label="סגור"
-          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground disabled:opacity-40"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-fill-subtle hover:text-foreground disabled:opacity-40"
         >
           <X size={16} />
         </button>
@@ -98,7 +98,7 @@ export function NewMealModal({ open, onClose, onCreate }: NewMealModalProps) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="למשל: חזה עוף עם אורז וירקות"
               autoFocus
-              className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
           </div>
 
@@ -111,7 +111,7 @@ export function NewMealModal({ open, onClose, onCreate }: NewMealModalProps) {
                 id="new-meal-type"
                 value={type}
                 onChange={(e) => setType(e.target.value as MealType)}
-                className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+                className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground"
               >
                 {MEAL_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -129,7 +129,7 @@ export function NewMealModal({ open, onClose, onCreate }: NewMealModalProps) {
                 type="datetime-local"
                 value={eatenAt}
                 onChange={(e) => setEatenAt(e.target.value)}
-                className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground"
+                className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground"
               />
             </div>
           </div>

@@ -72,7 +72,7 @@ export function EditRabbiModal({ rabbi, onClose, onSave, onDelete }: EditRabbiMo
         <button
           onClick={onClose}
           aria-label="סגור"
-          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-fill-subtle hover:text-foreground"
         >
           <X size={16} />
         </button>
@@ -84,14 +84,14 @@ export function EditRabbiModal({ rabbi, onClose, onSave, onDelete }: EditRabbiMo
           onChange={(e) => updateDraft({ name: e.target.value })}
           placeholder="שם הרב"
           aria-label="שם הרב"
-          className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <input
           value={draft.title}
           onChange={(e) => updateDraft({ title: e.target.value })}
           placeholder="תפקיד / קהילה, למשל: ראש ישיבה"
           aria-label="תפקיד או קהילה"
-          className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <textarea
           value={draft.notes}
@@ -99,7 +99,7 @@ export function EditRabbiModal({ rabbi, onClose, onSave, onDelete }: EditRabbiMo
           placeholder="הערות"
           aria-label="הערות על הרב"
           rows={3}
-          className="focus-ring resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
       </div>
 

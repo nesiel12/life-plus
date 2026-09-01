@@ -82,7 +82,7 @@ export function NewWorkoutModal({ open, onClose, onCreate }: NewWorkoutModalProp
           onClick={resetAndClose}
           disabled={creating}
           aria-label="סגור"
-          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground disabled:opacity-40"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-fill-subtle hover:text-foreground disabled:opacity-40"
         >
           <X size={16} />
         </button>
@@ -100,7 +100,7 @@ export function NewWorkoutModal({ open, onClose, onCreate }: NewWorkoutModalProp
               onChange={(e) => setTitle(e.target.value)}
               placeholder="למשל: אימון כוח — פלג גוף עליון"
               autoFocus
-              className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
           </div>
 
@@ -114,7 +114,7 @@ export function NewWorkoutModal({ open, onClose, onCreate }: NewWorkoutModalProp
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground"
+                className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -126,7 +126,7 @@ export function NewWorkoutModal({ open, onClose, onCreate }: NewWorkoutModalProp
                 type="datetime-local"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground"
+                className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground"
               />
             </div>
           </div>
@@ -141,7 +141,7 @@ export function NewWorkoutModal({ open, onClose, onCreate }: NewWorkoutModalProp
               onChange={(e) => setRoutineDetails(e.target.value)}
               placeholder="למשל: 4 סטים של סקוואט, 3 סטים של לחיצת חזה…"
               rows={3}
-              className="focus-ring resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
           </div>
 

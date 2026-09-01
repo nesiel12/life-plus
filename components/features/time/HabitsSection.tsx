@@ -133,7 +133,7 @@ export function HabitsSection({ selectedDate }: HabitsSectionProps) {
               onKeyDown={(e) => e.key === "Enter" && handleAdd()}
               placeholder="שם ההרגל, למשל: מדיטציה"
               aria-label="שם ההרגל החדש"
-              className="focus-ring min-w-0 flex-1 rounded-lg bg-white/5 px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring min-w-0 flex-1 rounded-lg bg-fill-subtle px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted"
             />
             <button
               onClick={handleAdd}

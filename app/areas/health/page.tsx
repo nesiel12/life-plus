@@ -133,7 +133,7 @@ export default function HealthSpacePage() {
                       <span className="rounded-full bg-accent-fitness/15 px-2 py-0.5 text-[10px] text-accent-fitness">
                         {MEAL_TYPE_LABEL[meal.type]}
                       </span>
-                      <span className="ltr rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-muted">
+                      <span className="ltr rounded-full bg-fill-subtle px-2 py-0.5 text-[10px] text-muted">
                         {formatTime(meal.eatenAt)}
                       </span>
                     </div>

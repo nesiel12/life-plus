@@ -24,7 +24,7 @@ export function LearningInsightsHero({ insights, onAcceptNextReview, onDismissNe
       <GlassCard delay={0}>
         <div className="flex flex-col gap-2.5" aria-hidden>
           {[70, 50].map((width, i) => (
-            <div key={i} className="h-4 animate-pulse rounded-full bg-white/5" style={{ width: `${width}%` }} />
+            <div key={i} className="h-4 animate-pulse rounded-full bg-fill-subtle" style={{ width: `${width}%` }} />
           ))}
         </div>
       </GlassCard>
@@ -59,7 +59,7 @@ export function LearningInsightsHero({ insights, onAcceptNextReview, onDismissNe
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="rounded-xl bg-white/5 p-3"
+          className="rounded-xl bg-fill-subtle p-3"
         >
           <p className="mb-1 flex items-center gap-1 text-xs text-muted">
             <Sparkles size={12} aria-hidden />
@@ -80,7 +80,7 @@ export function LearningInsightsHero({ insights, onAcceptNextReview, onDismissNe
             </button>
             <button
               onClick={() => onDismissNextReview(insights.nextReview!.recommendationEventId)}
-              className="focus-ring flex items-center gap-1 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground"
+              className="focus-ring flex items-center gap-1 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground"
             >
               <X size={12} aria-hidden />
               לא עכשיו

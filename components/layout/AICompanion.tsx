@@ -245,7 +245,7 @@ export function AICompanion() {
             {mode === "chat" && chatHistory.length > 0 && (
               <button
                 onClick={() => setClearConfirmOpen(true)}
-                className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-white/5 hover:text-accent-family"
+                className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-fill-subtle hover:text-accent-family"
                 aria-label="נקה היסטוריית שיחה"
               >
                 <Eraser size={16} />
@@ -253,7 +253,7 @@ export function AICompanion() {
             )}
             <button
               onClick={() => setOpen(false)}
-              className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+              className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
               aria-label="סגור"
             >
               <X size={18} />
@@ -270,7 +270,7 @@ export function AICompanion() {
             onClick={() => setMode("chat")}
             className={cn(
               "focus-ring rounded-lg px-2.5 py-1 text-xs transition-colors",
-              mode === "chat" ? "bg-white/5 text-foreground" : "text-muted hover:text-foreground"
+              mode === "chat" ? "bg-fill-subtle text-foreground" : "text-muted hover:text-foreground"
             )}
           >
             שיחה
@@ -279,7 +279,7 @@ export function AICompanion() {
             onClick={() => setMode("command")}
             className={cn(
               "focus-ring rounded-lg px-2.5 py-1 text-xs transition-colors",
-              mode === "command" ? "bg-white/5 text-foreground" : "text-muted hover:text-foreground"
+              mode === "command" ? "bg-fill-subtle text-foreground" : "text-muted hover:text-foreground"
             )}
           >
             פקודה
@@ -340,7 +340,7 @@ export function AICompanion() {
                         <button
                           key={signal.id}
                           onClick={() => setInput(`ספר לי עוד על: ${signal.summary}`)}
-                          className="focus-ring rounded-full border border-glass-border px-2.5 py-1 text-xs text-muted transition-colors hover:border-transparent hover:bg-white/5 hover:text-foreground"
+                          className="focus-ring rounded-full border border-glass-border px-2.5 py-1 text-xs text-muted transition-colors hover:border-transparent hover:bg-fill-subtle hover:text-foreground"
                         >
                           {snippet}
                         </button>
@@ -374,7 +374,7 @@ export function AICompanion() {
                   <div
                     className={cn(
                       "max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed",
-                      isUser ? "mr-auto bg-accent-knowledge/15 text-foreground" : "ml-auto bg-white/5 text-foreground",
+                      isUser ? "mr-auto bg-accent-knowledge/15 text-foreground" : "ml-auto bg-fill-subtle text-foreground",
                       isPinned && "ring-1 ring-accent-faith/50"
                     )}
                   >
@@ -461,7 +461,7 @@ export function AICompanion() {
                         מבוסס על
                       </button>
                       {expandedReasoning.has(m.id) && (
-                        <ul className="mt-1 flex flex-col gap-0.5 rounded-lg bg-white/5 p-2 text-xs text-foreground/70">
+                        <ul className="mt-1 flex flex-col gap-0.5 rounded-lg bg-fill-subtle p-2 text-xs text-foreground/70">
                           {basedOnByMessageId[m.id].map((line, i) => (
                             <li key={i}>{line}</li>
                           ))}
@@ -479,7 +479,7 @@ export function AICompanion() {
           )}
 
           {streamingReply !== null && (
-            <div className="ml-auto max-w-[85%] rounded-xl bg-white/5 px-3 py-2 text-sm leading-relaxed text-foreground">
+            <div className="ml-auto max-w-[85%] rounded-xl bg-fill-subtle px-3 py-2 text-sm leading-relaxed text-foreground">
               {streamingReply || "Life Plus חושב…"}
             </div>
           )}
@@ -492,7 +492,7 @@ export function AICompanion() {
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="שתף מחשבה…"
             aria-label="הודעה ל-Life Plus"
-            className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+            className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
           />
           <button
             onClick={() => handleSend()}

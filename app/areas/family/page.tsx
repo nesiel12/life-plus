@@ -126,7 +126,7 @@ export default function FamilyCarePage() {
           onKeyDown={(e) => e.key === "Enter" && handleAddPerson()}
           placeholder="שם, למשל: אמא"
           aria-label="שם איש הקשר החדש"
-          className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <input
           value={newRelation}
@@ -134,7 +134,7 @@ export default function FamilyCarePage() {
           onKeyDown={(e) => e.key === "Enter" && handleAddPerson()}
           placeholder="קרבה, למשל: אמא"
           aria-label="הקרבה של איש הקשר החדש"
-          className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-40"
+          className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-40"
         />
         <button
           onClick={handleAddPerson}

@@ -195,7 +195,7 @@ export function DeepOnboardingChat({ onUnavailable }: { onUnavailable: () => voi
             disabled={sending}
             placeholder="הקלד תשובה..."
             aria-label="תשובה ל-Life Plus"
-            className="focus-ring w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted disabled:opacity-60"
+            className="focus-ring w-full rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted disabled:opacity-60"
           />
           <div className="flex items-center justify-end gap-2">
             <motion.button
@@ -203,7 +203,7 @@ export function DeepOnboardingChat({ onUnavailable }: { onUnavailable: () => voi
               whileTap={{ scale: 0.97 }}
               onClick={handleSkip}
               disabled={sending}
-              className="focus-ring flex items-center gap-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-muted transition-colors hover:bg-white/10 hover:text-foreground disabled:opacity-40"
+              className="focus-ring flex items-center gap-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-muted transition-colors hover:bg-fill hover:text-foreground disabled:opacity-40"
             >
               <SkipForward size={14} />
               דלג

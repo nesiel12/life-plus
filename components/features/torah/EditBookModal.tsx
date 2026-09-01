@@ -79,7 +79,7 @@ export function EditBookModal({ book, onClose, onSave, onDelete }: EditBookModal
         <button
           onClick={onClose}
           aria-label="סגור"
-          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-fill-subtle hover:text-foreground"
         >
           <X size={16} />
         </button>
@@ -91,21 +91,21 @@ export function EditBookModal({ book, onClose, onSave, onDelete }: EditBookModal
           onChange={(e) => updateDraft({ title: e.target.value })}
           placeholder="שם הספר"
           aria-label="שם הספר"
-          className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <input
           value={draft.author}
           onChange={(e) => updateDraft({ author: e.target.value })}
           placeholder="מחבר"
           aria-label="מחבר הספר"
-          className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <input
           value={draft.category}
           onChange={(e) => updateDraft({ category: e.target.value })}
           placeholder="קטגוריה, למשל: הלכה"
           aria-label="קטגוריית הספר"
-          className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <textarea
           value={draft.notes}
@@ -113,7 +113,7 @@ export function EditBookModal({ book, onClose, onSave, onDelete }: EditBookModal
           placeholder="הערות"
           aria-label="הערות על הספר"
           rows={3}
-          className="focus-ring resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
       </div>
 

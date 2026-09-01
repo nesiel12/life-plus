@@ -59,7 +59,7 @@ export function NewTaskModal({ open, onClose, onCreate }: NewTaskModalProps) {
           onClick={resetAndClose}
           disabled={creating}
           aria-label="סגור"
-          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground disabled:opacity-40"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-fill-subtle hover:text-foreground disabled:opacity-40"
         >
           <X size={16} />
         </button>
@@ -79,7 +79,7 @@ export function NewTaskModal({ open, onClose, onCreate }: NewTaskModalProps) {
               onChange={(e) => setTitle(e.target.value)}
               placeholder="למשל: לסיים את הדוח הרבעוני"
               autoFocus
-              className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
           </div>
 
@@ -93,7 +93,7 @@ export function NewTaskModal({ open, onClose, onCreate }: NewTaskModalProps) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="פרטים נוספים…"
               rows={4}
-              className="focus-ring resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
           </div>
 
@@ -106,7 +106,7 @@ export function NewTaskModal({ open, onClose, onCreate }: NewTaskModalProps) {
               type="datetime-local"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground"
+              className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground"
             />
           </div>
 

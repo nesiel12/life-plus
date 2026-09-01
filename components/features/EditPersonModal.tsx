@@ -131,7 +131,7 @@ export function EditPersonModal({ person, onClose }: { person: Person | null; on
         <button
           onClick={onClose}
           aria-label="סגור"
-          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-fill-subtle hover:text-foreground"
         >
           <X size={16} />
         </button>
@@ -139,7 +139,7 @@ export function EditPersonModal({ person, onClose }: { person: Person | null; on
 
       <div className="flex items-center gap-3">
         <PersonAvatar person={{ ...person, avatarUrl: draft.avatarUrl }} size={56} />
-        <label className="focus-ring flex cursor-pointer items-center gap-1 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-muted transition-colors hover:bg-white/10 hover:text-foreground">
+        <label className="focus-ring flex cursor-pointer items-center gap-1 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-muted transition-colors hover:bg-fill hover:text-foreground">
           <Upload size={12} aria-hidden />
           החלף תמונה
           <input
@@ -157,35 +157,35 @@ export function EditPersonModal({ person, onClose }: { person: Person | null; on
           onChange={(e) => updateDraft({ name: e.target.value })}
           placeholder="שם"
           aria-label="שם"
-          className="focus-ring col-span-2 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring col-span-2 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <input
           value={draft.relation}
           onChange={(e) => updateDraft({ relation: e.target.value })}
           placeholder="קרבה"
           aria-label="קרבה"
-          className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <input
           value={draft.phone}
           onChange={(e) => updateDraft({ phone: e.target.value })}
           placeholder="טלפון"
           aria-label="מספר טלפון"
-          className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-end text-sm text-foreground placeholder:text-muted"
+          className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-end text-sm text-foreground placeholder:text-muted"
         />
         <input
           value={draft.birthday}
           onChange={(e) => updateDraft({ birthday: e.target.value })}
           placeholder="יום הולדת (MM-DD)"
           aria-label="יום הולדת"
-          className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-end text-sm text-foreground placeholder:text-muted"
+          className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-end text-sm text-foreground placeholder:text-muted"
         />
         <input
           value={draft.anniversary}
           onChange={(e) => updateDraft({ anniversary: e.target.value })}
           placeholder="יום נישואין (MM-DD)"
           aria-label="יום נישואין"
-          className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-end text-sm text-foreground placeholder:text-muted"
+          className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-end text-sm text-foreground placeholder:text-muted"
         />
         <textarea
           value={draft.note}
@@ -193,7 +193,7 @@ export function EditPersonModal({ person, onClose }: { person: Person | null; on
           placeholder="הערה"
           aria-label="הערה"
           rows={2}
-          className="focus-ring col-span-2 resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring col-span-2 resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
       </div>
 

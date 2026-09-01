@@ -82,7 +82,7 @@ export function GoalJourneyCard({
         </div>
         <button
           onClick={onRemove}
-          className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
           aria-label="מחק יעד"
         >
           <Trash2 size={14} />
@@ -101,10 +101,10 @@ export function GoalJourneyCard({
           )}
         </div>
       ) : (
-        <div className="mb-2 h-3.5 w-40 animate-pulse rounded-full bg-white/5" aria-hidden />
+        <div className="mb-2 h-3.5 w-40 animate-pulse rounded-full bg-fill-subtle" aria-hidden />
       )}
 
-      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-fill-subtle">
         <div
           className="h-full rounded-full transition-[width]"
           style={{ width: `${progress}%`, backgroundColor: `var(${meta.colorVar})` }}
@@ -112,7 +112,7 @@ export function GoalJourneyCard({
       </div>
 
       {!insight && (
-        <div className="mb-3 h-20 w-full animate-pulse rounded-xl bg-white/5" aria-hidden />
+        <div className="mb-3 h-20 w-full animate-pulse rounded-xl bg-fill-subtle" aria-hidden />
       )}
 
       {insight?.nextAction && (
@@ -120,7 +120,7 @@ export function GoalJourneyCard({
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="mb-3 rounded-xl bg-white/5 p-3"
+          className="mb-3 rounded-xl bg-fill-subtle p-3"
         >
           <p className="mb-1 flex items-center gap-1 text-xs text-muted">
             <Sparkles size={12} aria-hidden />
@@ -141,7 +141,7 @@ export function GoalJourneyCard({
             </button>
             <button
               onClick={() => onDismissNextAction(insight.nextAction!.recommendationEventId)}
-              className="focus-ring flex items-center gap-1 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground"
+              className="focus-ring flex items-center gap-1 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground"
             >
               <X size={12} aria-hidden />
               לא עכשיו
@@ -151,7 +151,7 @@ export function GoalJourneyCard({
       )}
 
       {insight && insight.relatedMemory.length > 0 && (
-        <div className="mb-3 rounded-lg bg-white/5 p-3">
+        <div className="mb-3 rounded-lg bg-fill-subtle p-3">
           <p className="mb-1 flex items-center gap-1 text-xs text-muted">
             <Link2 size={12} aria-hidden />
             קשור להיסטוריה שלך

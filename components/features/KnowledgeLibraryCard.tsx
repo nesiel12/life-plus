@@ -95,7 +95,7 @@ export function KnowledgeLibraryCard({ entry, insight, delay, onMarkReviewed }: 
       )}
 
       {insight && (insight.relatedKnowledge.length > 0 || insight.relatedMemory.length > 0) && (
-        <div className="mb-3 flex flex-col gap-2 rounded-lg bg-white/5 p-3 text-xs">
+        <div className="mb-3 flex flex-col gap-2 rounded-lg bg-fill-subtle p-3 text-xs">
           {insight.relatedKnowledge.length > 0 && (
             <div>
               <p className="mb-1 flex items-center gap-1 text-muted">
@@ -135,7 +135,7 @@ export function KnowledgeLibraryCard({ entry, insight, delay, onMarkReviewed }: 
         </button>
         <button
           onClick={onMarkReviewed}
-          className="focus-ring flex items-center gap-1 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground"
+          className="focus-ring flex items-center gap-1 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground"
         >
           <Check size={12} aria-hidden />
           סימון כנלמד
@@ -147,12 +147,12 @@ export function KnowledgeLibraryCard({ entry, insight, delay, onMarkReviewed }: 
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="mt-3 rounded-lg bg-white/5 p-3"
+          className="mt-3 rounded-lg bg-fill-subtle p-3"
         >
           {loading && (
             <div className="flex flex-col gap-2" aria-hidden>
-              <div className="h-10 w-full animate-pulse rounded-lg bg-white/5" />
-              <div className="h-10 w-full animate-pulse rounded-lg bg-white/5" />
+              <div className="h-10 w-full animate-pulse rounded-lg bg-fill-subtle" />
+              <div className="h-10 w-full animate-pulse rounded-lg bg-fill-subtle" />
             </div>
           )}
 
@@ -172,7 +172,7 @@ export function KnowledgeLibraryCard({ entry, insight, delay, onMarkReviewed }: 
                           <button
                             key={i}
                             onClick={() => toggleReveal(i)}
-                            className="focus-ring rounded-lg bg-white/5 p-3 text-start text-xs transition-colors hover:bg-white/10"
+                            className="focus-ring rounded-lg bg-fill-subtle p-3 text-start text-xs transition-colors hover:bg-fill"
                           >
                             <p className="text-foreground">{card.front}</p>
                             {revealed.has(i) && <p className="mt-1 text-foreground/70">{card.back}</p>}

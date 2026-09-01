@@ -116,7 +116,7 @@ export function NutritionCoach({ workouts, meals, recommendation, onRecommendati
           </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {recommendation.suggested_menu.map((item, i) => (
-              <div key={i} className="rounded-lg bg-white/5 p-3">
+              <div key={i} className="rounded-lg bg-fill-subtle p-3">
                 <p className="text-sm font-medium text-foreground">{item.item}</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-muted">{item.benefit}</p>
               </div>

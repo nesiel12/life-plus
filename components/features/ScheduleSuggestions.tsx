@@ -89,7 +89,7 @@ export function ScheduleSuggestions() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: i * 0.06, ease: "easeOut" }}
-            className="rounded-xl bg-white/5 p-4 text-sm"
+            className="rounded-xl bg-fill-subtle p-4 text-sm"
           >
             <div className="mb-1 flex items-center justify-between">
               <span className="font-medium text-foreground">{s.title}</span>
@@ -126,7 +126,7 @@ export function ScheduleSuggestions() {
               <button
                 onClick={() => dismissSuggestion(s.id)}
                 disabled={accepting}
-                className="flex items-center gap-1 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground disabled:opacity-40"
+                className="flex items-center gap-1 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground disabled:opacity-40"
               >
                 <X size={12} />
                 התעלם

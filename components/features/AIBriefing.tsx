@@ -48,7 +48,7 @@ export function AIBriefing() {
         </p>
         <div className="flex flex-col gap-2.5" aria-hidden>
           {[85, 70, 55].map((width, i) => (
-            <div key={i} className="h-4 animate-pulse rounded-full bg-white/5" style={{ width: `${width}%` }} />
+            <div key={i} className="h-4 animate-pulse rounded-full bg-fill-subtle" style={{ width: `${width}%` }} />
           ))}
         </div>
       </GlassCard>
@@ -70,7 +70,7 @@ export function AIBriefing() {
       <BriefingSignalList signals={briefing.signals} baseDelay={0.1} />
 
       {briefing.conflicts.length > 0 && (
-        <div className="mt-4 flex items-start gap-2 rounded-lg bg-white/5 p-3 text-xs text-muted">
+        <div className="mt-4 flex items-start gap-2 rounded-lg bg-fill-subtle p-3 text-xs text-muted">
           <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden />
           <div className="flex flex-col gap-1">
             {briefing.conflicts.map((note) => (

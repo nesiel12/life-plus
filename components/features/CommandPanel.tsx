@@ -160,7 +160,7 @@ export function CommandPanel() {
             <p className="mr-auto max-w-[85%] rounded-xl bg-accent-knowledge/15 px-3 py-2 text-sm text-foreground">
               {turn.commandText}
             </p>
-            <div className="ml-auto max-w-[90%] rounded-xl bg-white/5 px-3 py-2 text-sm leading-relaxed text-foreground">
+            <div className="ml-auto max-w-[90%] rounded-xl bg-fill-subtle px-3 py-2 text-sm leading-relaxed text-foreground">
               {turn.reply}
 
               {turn.proposal?.type === "clear_calendar_range" && turn.proposal.clearCalendarRange && (
@@ -193,7 +193,7 @@ export function CommandPanel() {
                   <button
                     onClick={() => handleDismiss(turn)}
                     disabled={turn.executing}
-                    className="focus-ring flex items-center gap-1 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground disabled:opacity-50"
+                    className="focus-ring flex items-center gap-1 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground disabled:opacity-50"
                   >
                     <X size={12} aria-hidden />
                     בטל
@@ -216,7 +216,7 @@ export function CommandPanel() {
             onClick={voice.listening ? voice.stop : voice.start}
             aria-label={voice.listening ? "עצור הקלטה קולית" : "התחל הקלטה קולית"}
             className={`focus-ring flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-              voice.listening ? "bg-accent-family/20 text-accent-family" : "bg-white/5 text-muted hover:text-foreground"
+              voice.listening ? "bg-accent-family/20 text-accent-family" : "bg-fill-subtle text-muted hover:text-foreground"
             }`}
           >
             <Mic size={16} />
@@ -228,7 +228,7 @@ export function CommandPanel() {
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="פקודה חופשית…"
           aria-label="פקודה ל-Life Plus"
-          className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <button
           onClick={handleSend}

@@ -116,7 +116,7 @@ export function TopicCard({ topic, resources, expanded, onToggleExpanded, delay 
           <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-sm font-medium text-foreground">{topic.title}</span>
             {topic.category && (
-              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-muted">{topic.category}</span>
+              <span className="rounded-full bg-fill-subtle px-2 py-0.5 text-[10px] text-muted">{topic.category}</span>
             )}
           </div>
           <p className="mt-1 text-xs text-muted">{resources.length} משאבים</p>
@@ -161,7 +161,7 @@ export function TopicCard({ topic, resources, expanded, onToggleExpanded, delay 
             {resources.map((resource) => {
               const Icon = RESOURCE_ICON[resource.type];
               return (
-                <div key={resource.id} className="flex items-start gap-2 rounded-lg bg-white/5 px-3 py-2">
+                <div key={resource.id} className="flex items-start gap-2 rounded-lg bg-fill-subtle px-3 py-2">
                   <button
                     onClick={() => toggleResource(resource.id, { isCompleted: !resource.isCompleted }).catch(() => {})}
                     aria-label={

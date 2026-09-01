@@ -279,7 +279,7 @@ export function Timeline({
                           </span>
                         )}
                         {event.reminderMinutes && (
-                          <span className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-muted">
+                          <span className="flex items-center gap-1 rounded-full bg-fill-subtle px-2 py-0.5 text-[10px] text-muted">
                             <Bell size={10} aria-hidden />
                             {formatReminderLabel(event.reminderMinutes)}
                           </span>
@@ -287,7 +287,7 @@ export function Timeline({
                         {linkedPeople.map((person) => (
                           <span
                             key={person.id}
-                            className="flex items-center gap-1 rounded-full bg-white/5 py-0.5 ps-0.5 pe-2 text-[10px] text-foreground/80"
+                            className="flex items-center gap-1 rounded-full bg-fill-subtle py-0.5 ps-0.5 pe-2 text-[10px] text-foreground/80"
                           >
                             <PersonAvatar person={person} size={14} />
                             {person.hebrewName ?? person.name}
@@ -325,7 +325,7 @@ export function Timeline({
                         {formatAmount(transaction.amount)} ₪
                       </span>
                       {transaction.hourlyRate && (
-                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-muted">
+                        <span className="rounded-full bg-fill-subtle px-2 py-0.5 text-[10px] text-muted">
                           {transaction.hourlyRate} ₪/שעה
                         </span>
                       )}

@@ -74,7 +74,7 @@ export function QuickCapture() {
         onChange={(e) => setTitle(e.target.value)}
         placeholder="כותרת (אופציונלי)"
         aria-label="כותרת הרגע"
-        className="focus-ring mb-2 w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+        className="focus-ring mb-2 w-full rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
       />
       <textarea
         value={content}
@@ -83,7 +83,7 @@ export function QuickCapture() {
         aria-label="תוכן הרגע"
         rows={4}
         autoFocus
-        className="focus-ring mb-4 w-full resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+        className="focus-ring mb-4 w-full resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
       />
 
       {saveError && <p className="mb-2 text-xs text-accent-family">{saveError}</p>}

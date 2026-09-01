@@ -51,7 +51,7 @@ export function RabbiProfileModal({ rabbi, onClose }: RabbiProfileModalProps) {
             <button
               onClick={onClose}
               aria-label="סגור"
-              className="focus-ring shrink-0 rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground"
+              className="focus-ring shrink-0 rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-fill-subtle hover:text-foreground"
             >
               <X size={16} />
             </button>
@@ -68,7 +68,7 @@ export function RabbiProfileModal({ rabbi, onClose }: RabbiProfileModalProps) {
             </p>
 
             {linkedSummaries.length === 0 ? (
-              <p className="rounded-xl bg-white/5 p-4 text-sm text-muted">אין עדיין סיכומים לרב זה.</p>
+              <p className="rounded-xl bg-fill-subtle p-4 text-sm text-muted">אין עדיין סיכומים לרב זה.</p>
             ) : (
               <div className="flex flex-col gap-3">
                 {linkedSummaries.map((summary, i) => (
@@ -77,7 +77,7 @@ export function RabbiProfileModal({ rabbi, onClose }: RabbiProfileModalProps) {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.3), ease: "easeOut" }}
-                    className="rounded-xl bg-white/5 p-4"
+                    className="rounded-xl bg-fill-subtle p-4"
                   >
                     <div className="mb-1 flex items-center justify-between gap-2">
                       <span className="font-medium text-foreground">{summary.title}</span>

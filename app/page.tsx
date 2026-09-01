@@ -84,7 +84,7 @@ export default function Home() {
                 placeholder="על מה תרצה להתמקד היום?"
                 aria-label="הכוונה של היום"
                 rows={3}
-                className="focus-ring w-full resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+                className="focus-ring w-full resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
               />
             </GlassCard>
 

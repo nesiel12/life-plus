@@ -6,16 +6,15 @@ import { Logo } from "@/components/ui/Logo";
 import { APP_NAME } from "@/lib/constants";
 
 const SESSION_KEY = "lifeplus.splash.seen";
-const HOLD_MS = 1900;
+const HOLD_MS = 2100;
 
-// The opening view: the LIFE PLUS mark, large and centered, with a calm
-// entrance, shown once per browser session (sessionStorage) before the app
-// underneath is revealed. Tapping or pressing a key skips it. Honors
-// prefers-reduced-motion — no scale/blur/stagger, just a brief static hold
-// and a plain fade.
+// The opening view: the LIFE PLUS mark + wordmark, large and centered on a
+// clean field, with a calm gold entrance. Shown once per browser session
+// (sessionStorage); tap or any key skips it. Honors prefers-reduced-motion —
+// a brief static hold and a plain fade, nothing else.
 //
-// The <Logo> here is the current placeholder mark; swap it for the final
-// LIFE PLUS logo (an <img>/<svg>) without touching the animation shell.
+// The <Logo> is the interim mark. Swap in the final logo asset (an <img> of
+// public/…) without touching this animation shell.
 export function SplashScreen() {
   const reduceMotion = useReducedMotion();
   const [visible, setVisible] = useState(false);
@@ -25,7 +24,7 @@ export function SplashScreen() {
     try {
       seen = sessionStorage.getItem(SESSION_KEY) === "1";
     } catch {
-      // private mode / storage blocked — treat as not seen, show once
+      // storage blocked (private mode) — show once, don't persist
     }
     if (seen) return;
 
@@ -56,48 +55,60 @@ export function SplashScreen() {
           role="status"
           aria-label={`${APP_NAME} נטען`}
           onClick={() => setVisible(false)}
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-background"
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-7 bg-background"
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.5, ease: "easeInOut" } }}
+          exit={{ opacity: 0, transition: { duration: 0.55, ease: "easeInOut" } }}
         >
-          {/* soft radial halo behind the mark */}
+          {/* soft gold bloom behind the mark */}
           <motion.div
             aria-hidden
-            className="pointer-events-none absolute h-[42vmin] w-[42vmin] rounded-full"
+            className="pointer-events-none absolute h-[46vmin] w-[46vmin] rounded-full"
             style={{
               background:
-                "radial-gradient(circle, color-mix(in srgb, var(--accent-faith) 22%, transparent), transparent 70%)",
+                "radial-gradient(circle, color-mix(in srgb, var(--gold) 24%, transparent), transparent 70%)",
             }}
-            initial={reduceMotion ? { opacity: 0.6 } : { opacity: 0, scale: 0.6 }}
+            initial={reduceMotion ? { opacity: 0.5 } : { opacity: 0, scale: 0.6 }}
             animate={
-              reduceMotion
-                ? { opacity: 0.6 }
-                : { opacity: [0, 0.9, 0.55], scale: [0.6, 1.15, 1] }
+              reduceMotion ? { opacity: 0.5 } : { opacity: [0, 0.85, 0.5], scale: [0.6, 1.15, 1] }
             }
-            transition={{ duration: 1.6, ease: "easeOut" }}
+            transition={{ duration: 1.7, ease: "easeOut" }}
           />
 
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.82, filter: "blur(6px)" }}
+            initial={
+              reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.82, filter: "blur(6px)" }
+            }
             animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
             transition={
-              reduceMotion
-                ? { duration: 0 }
-                : { type: "spring", stiffness: 120, damping: 16, mass: 0.9 }
+              reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 120, damping: 16, mass: 0.9 }
             }
           >
-            <Logo size={112} />
+            <Logo size={116} />
           </motion.div>
 
-          <motion.p
-            className="text-sm font-medium uppercase text-foreground/90"
-            style={{ letterSpacing: reduceMotion ? "0.32em" : undefined }}
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, letterSpacing: "0.6em", y: 8 }}
-            animate={{ opacity: 1, letterSpacing: "0.32em", y: 0 }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.7, delay: 0.35, ease: "easeOut" }}
-          >
-            {APP_NAME}
-          </motion.p>
+          <div className="flex flex-col items-center gap-3">
+            <motion.span
+              className="text-gold-gradient text-2xl font-semibold uppercase leading-none"
+              style={{ letterSpacing: reduceMotion ? "0.24em" : undefined }}
+              initial={
+                reduceMotion ? { opacity: 1 } : { opacity: 0, letterSpacing: "0.55em", y: 8 }
+              }
+              animate={{ opacity: 1, letterSpacing: "0.24em", y: 0 }}
+              transition={
+                reduceMotion ? { duration: 0 } : { duration: 0.7, delay: 0.3, ease: "easeOut" }
+              }
+            >
+              LIFE&nbsp;PLUS
+            </motion.span>
+
+            <motion.span
+              aria-hidden
+              className="block h-px bg-[var(--gold-line)]"
+              initial={reduceMotion ? { width: 96 } : { width: 0 }}
+              animate={{ width: 96 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.6, delay: 0.5, ease: "easeOut" }}
+            />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

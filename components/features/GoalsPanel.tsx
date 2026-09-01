@@ -119,13 +119,13 @@ export function GoalsPanel() {
           onKeyDown={(e) => e.key === "Enter" && handleCreateGoal()}
           placeholder="יעד חדש, למשל: ללמוד מסכת חדשה"
           aria-label="כותרת היעד החדש"
-          className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value as LifeAreaKey)}
           aria-label="תחום החיים של היעד"
-          className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+          className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground"
         >
           {LIFE_AREA_LIST.map((area) => (
             <option key={area.key} value={area.key} className="bg-background">
@@ -149,13 +149,13 @@ export function GoalsPanel() {
           value={targetDate}
           onChange={(e) => setTargetDate(e.target.value)}
           aria-label="תאריך יעד (אופציונלי) — ייצור ציר זמן לאבני הדרך"
-          className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+          className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground"
         />
         <select
           value={personId}
           onChange={(e) => setPersonId(e.target.value)}
           aria-label="קשר את היעד לאדם (אופציונלי)"
-          className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+          className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground"
         >
           <option value="" className="bg-background">
             לא קשור לאדם ספציפי

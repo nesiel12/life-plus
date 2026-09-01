@@ -3,6 +3,10 @@ interface LogoProps {
   className?: string;
 }
 
+// Interim LIFE PLUS mark — an interwoven double-loop knot in the logo's gold,
+// echoing the woven-ribbon brain without reproducing the full illustration.
+// Replace with the real logo asset (drop a file in public/ and swap this for
+// an <img>/inline <svg>) — nothing else references the mark's internals.
 export function Logo({ size = 32, className }: LogoProps) {
   return (
     <svg
@@ -14,33 +18,39 @@ export function Logo({ size = 32, className }: LogoProps) {
       aria-hidden
     >
       <defs>
-        <linearGradient id="atlas-ring" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#d4af7a" />
-          <stop offset="1" stopColor="#7ba7d4" />
+        <linearGradient id="lp-gold" x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#8a6a2f" />
+          <stop offset="0.45" stopColor="#c6a15b" />
+          <stop offset="0.65" stopColor="#e7d3a4" />
+          <stop offset="1" stopColor="#a9843f" />
         </linearGradient>
-        <radialGradient id="atlas-sphere" cx="0.35" cy="0.3" r="0.8">
-          <stop offset="0" stopColor="#f2f2f0" stopOpacity="0.9" />
-          <stop offset="1" stopColor="#3a3a3d" stopOpacity="0.6" />
-        </radialGradient>
       </defs>
 
-      {/* Incomplete ring — the invisible force holding the sphere */}
-      <circle
-        cx="24"
-        cy="24"
-        r="19"
-        stroke="url(#atlas-ring)"
-        strokeWidth="1.5"
+      {/* two interlaced ellipses — a woven knot */}
+      <g
+        stroke="url(#lp-gold)"
+        strokeWidth="2.4"
         strokeLinecap="round"
-        strokeDasharray="82 36"
-        transform="rotate(-45 24 24)"
-      />
+        fill="none"
+      >
+        <ellipse cx="24" cy="24" rx="16" ry="8.5" transform="rotate(38 24 24)" />
+        <ellipse cx="24" cy="24" rx="16" ry="8.5" transform="rotate(-38 24 24)" />
+      </g>
 
-      {/* The sphere */}
-      <circle cx="24" cy="24" r="10" fill="url(#atlas-sphere)" />
-
-      {/* Compass point */}
-      <circle cx="24" cy="6" r="1.4" fill="#d4af7a" />
+      {/* centre node */}
+      <circle cx="24" cy="24" r="3.1" fill="url(#lp-gold)" />
     </svg>
+  );
+}
+
+// The wordmark, set the way the logo has it: wide-tracked, uppercase, gold.
+export function Wordmark({ className }: { className?: string }) {
+  return (
+    <span
+      className={`text-gold-gradient font-semibold uppercase leading-none ${className ?? ""}`}
+      style={{ letterSpacing: "0.22em" }}
+    >
+      LIFE&nbsp;PLUS
+    </span>
   );
 }

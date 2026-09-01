@@ -73,7 +73,7 @@ export function AreaHealthCard({ meta, insight, delay }: AreaHealthCardProps) {
           {attention ? (
             <span className={`text-xs font-medium ${attention.colorClass}`}>{attention.label}</span>
           ) : (
-            <span className="h-3 w-14 animate-pulse rounded-full bg-white/5" aria-hidden />
+            <span className="h-3 w-14 animate-pulse rounded-full bg-fill-subtle" aria-hidden />
           )}
         </div>
 
@@ -81,7 +81,7 @@ export function AreaHealthCard({ meta, insight, delay }: AreaHealthCardProps) {
           <span className="text-muted">מדד התחום</span>
           <span className="text-foreground">{score}%</span>
         </div>
-        <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+        <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-fill-subtle">
           <div className="h-full rounded-full" style={{ width: `${score}%`, backgroundColor: `var(${meta.colorVar})` }} />
         </div>
 
@@ -98,7 +98,7 @@ export function AreaHealthCard({ meta, insight, delay }: AreaHealthCardProps) {
                 : `לפני ${insight.lastActivityDaysAgo} ימים`}
           </p>
         ) : (
-          <div className="mb-2 h-3 w-32 animate-pulse rounded-full bg-white/5" aria-hidden />
+          <div className="mb-2 h-3 w-32 animate-pulse rounded-full bg-fill-subtle" aria-hidden />
         )}
 
         {highlight && HighlightIcon && (

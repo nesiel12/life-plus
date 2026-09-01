@@ -84,7 +84,7 @@ function InlineDateField({
         onKeyDown={(e) => e.key === "Enter" && save()}
         placeholder="MM-DD"
         aria-label={ariaLabel}
-        className="focus-ring ltr w-20 rounded-lg bg-white/5 px-2 py-1.5 text-xs text-foreground placeholder:text-muted"
+        className="focus-ring ltr w-20 rounded-lg bg-fill-subtle px-2 py-1.5 text-xs text-foreground placeholder:text-muted"
         autoFocus
       />
       <button onClick={save} className="focus-ring text-xs text-accent-family">
@@ -193,12 +193,12 @@ export function PersonRelationshipCard({
               {health.label}
             </span>
           ) : (
-            <span className="h-3 w-14 animate-pulse rounded-full bg-white/5" aria-hidden />
+            <span className="h-3 w-14 animate-pulse rounded-full bg-fill-subtle" aria-hidden />
           )}
           <button
             onClick={() => onEdit(person)}
             aria-label={`ערוך את ${displayName}`}
-            className="focus-ring rounded-lg p-1 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+            className="focus-ring rounded-lg p-1 text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
           >
             <MoreVertical size={16} />
           </button>
@@ -217,7 +217,7 @@ export function PersonRelationshipCard({
           {insight.interactionCount > 0 && ` · ${insight.interactionCount} רגעים מתועדים`}
         </p>
       ) : (
-        <div className="mb-2 h-3 w-32 animate-pulse rounded-full bg-white/5" aria-hidden />
+        <div className="mb-2 h-3 w-32 animate-pulse rounded-full bg-fill-subtle" aria-hidden />
       )}
 
       {untilBirthday !== null && (
@@ -239,7 +239,7 @@ export function PersonRelationshipCard({
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="mb-3 rounded-xl bg-white/5 p-3"
+          className="mb-3 rounded-xl bg-fill-subtle p-3"
         >
           <p className="mb-1 flex items-center gap-1 text-xs text-muted">
             <ActionIcon size={12} aria-hidden />
@@ -259,7 +259,7 @@ export function PersonRelationshipCard({
             </button>
             <button
               onClick={() => onDismissAction(insight.suggestedAction!.recommendationEventId)}
-              className="focus-ring flex items-center gap-1 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground"
+              className="focus-ring flex items-center gap-1 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-muted transition-opacity hover:text-foreground"
             >
               <X size={12} aria-hidden />
               לא עכשיו
@@ -278,7 +278,7 @@ export function PersonRelationshipCard({
             {showTimeline ? "הסתר היסטוריית קשר" : "הצג היסטוריית קשר"}
           </button>
           {showTimeline && (
-            <div className="mt-2 flex flex-col gap-2 rounded-lg bg-white/5 p-3 text-xs">
+            <div className="mt-2 flex flex-col gap-2 rounded-lg bg-fill-subtle p-3 text-xs">
               {insight.relatedMemory.map((line, i) => (
                 <p key={`mem-${i}`} className="text-foreground/70">
                   {line}
@@ -327,7 +327,7 @@ export function PersonRelationshipCard({
         <button
           onClick={handleSuggestMeetup}
           disabled={loadingMeetup}
-          className="focus-ring flex items-center gap-1 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground disabled:opacity-50"
+          className="focus-ring flex items-center gap-1 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground disabled:opacity-50"
         >
           <CalendarClock size={12} aria-hidden />
           {loadingMeetup ? "בודק זמנים…" : "הצע להיפגש"}
@@ -355,7 +355,7 @@ export function PersonRelationshipCard({
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="mt-3 rounded-xl bg-white/5 p-3 text-xs"
+          className="mt-3 rounded-xl bg-fill-subtle p-3 text-xs"
         >
           <p className="mb-2 text-foreground/70">{meetup.note}</p>
           {meetup.slots.length > 0 && (

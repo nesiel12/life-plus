@@ -30,22 +30,28 @@ function GoogleIcon() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-background to-foreground/5 px-6 text-center">
+    <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="glass-card flex w-full max-w-sm flex-col items-center gap-6 rounded-2xl p-8"
+        className="glass-card flex w-full max-w-sm flex-col items-center gap-7 p-9"
       >
-        <Logo size={40} />
+        <Logo size={44} />
 
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-medium tracking-tight">{APP_NAME}</h1>
+        <div className="flex flex-col items-center gap-2.5">
+          <span
+            className="text-gold-gradient text-xl font-semibold uppercase leading-none"
+            style={{ letterSpacing: "0.24em" }}
+          >
+            {APP_NAME}
+          </span>
+          <span aria-hidden className="block h-px w-14 bg-[var(--gold-line)]" />
         </div>
 
         <button
           onClick={() => signIn("google", { callbackUrl: "/" })}
-          className="flex w-full items-center justify-center gap-3 rounded-xl bg-white/95 px-4 py-2.5 text-sm font-medium text-black transition-opacity hover:opacity-90"
+          className="focus-ring flex w-full items-center justify-center gap-3 rounded-xl bg-ink px-4 py-3 text-sm font-medium text-[var(--background)] transition-transform hover:-translate-y-0.5"
         >
           <GoogleIcon />
           המשך עם Google

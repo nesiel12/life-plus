@@ -20,7 +20,7 @@ export function ConfidenceBar({ value, ariaLabel, barColorClass = "bg-accent-fai
     <div className={cn("flex items-center gap-2", className)}>
       <span className="shrink-0 text-xs text-muted">רמת התאמה</span>
       <div
-        className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/5"
+        className="h-1.5 flex-1 overflow-hidden rounded-full bg-fill-subtle"
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}

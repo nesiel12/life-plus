@@ -113,7 +113,7 @@ export function Sidebar() {
           </div>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="focus-ring rounded-lg p-2 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+            className="focus-ring rounded-lg p-2 text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
             aria-label="התנתק"
           >
             <LogOut size={16} />

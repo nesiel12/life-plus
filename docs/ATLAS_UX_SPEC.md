@@ -1,8 +1,9 @@
 # Atlas UX Spec
 
-> **⚠️ SUPERSEDED (2026-08-31).** Early, narrower "reflection-partner" framing. Product scope is now the
-> full LifeOS — see `docs/ATLAS_BIBLE.md` §1–§3. The design philosophy here (calm, restrained,
-> synthesis-first) still holds; the screen inventory does not. Kept for historical context.
+> **§1–§3 SUPERSEDED (2026-08-31)** — early "reflection-partner" framing and screen inventory; product
+> scope is now the full LifeOS (`docs/ATLAS_BIBLE.md` §1–§3).
+> **§4 Visual Direction is CURRENT (2026-09-01)** — the LIFE PLUS Luxe design system (white / gold /
+> black + MagicUI). That section, plus `ATLAS_BIBLE.md` §2.1, is the live design spec.
 
 Builds on ATLAS_PRODUCT_STRATEGY.md and ATLAS_MVP_PRODUCT_SPEC.md. Covers experience and interface only — no implementation detail.
 
@@ -68,14 +69,65 @@ Guiding design principle: **restraint over richness.** Every screen should defau
 **Empty state:** N/A.
 **UX principles:** Data control should be immediate and unambiguous — this is sensitive personal content, and trust is built partly through how easy it is to leave or export, not just how easy it is to stay.
 
-## 4. Visual Direction
+## 4. Visual Direction — LIFE PLUS Luxe (current, 2026‑09‑01)
 
-**Colors:** A restrained, warm-neutral palette — off-whites and warm greys as the dominant surface, one deep, calm accent color (a muted ink blue or deep forest, not a bright SaaS-blue or gradient) used sparingly for the reflection moment specifically, so color itself signals "this is different from your raw notes." Avoid the bright, high-saturation palettes common in productivity apps — they read as energetic, not reflective. Dark mode should feel like dim lamplight, not a coding IDE.
+> This section replaces the earlier "warm‑neutral reflective" direction. The product is now a
+> **premium** experience: clean white, metallic gold, deep black — drawn from the LIFE PLUS logo
+> (brushed‑silver ground, gold wordmark, a brain woven from blue/green/magenta/gold ribbons).
 
-**Typography:** A humanist serif or high-quality serif-adjacent typeface for reflections and long-form reading (signals thoughtfulness, slows reading pace), paired with a clean, neutral sans-serif for UI chrome, timestamps, and navigation. This pairing does real work: it visually distinguishes "what Atlas wrote about you" from "what you wrote yourself" without needing extra labels.
+**Palette — white‑first.**
 
-**Layout style:** Generous whitespace, single-column reading-first layouts (no dashboard grids or multi-panel density), soft rounded corners, minimal borders — let spacing, not lines, create structure. Nothing should look like an admin panel or analytics tool.
+| Token | Light (default) | Dark (opt‑in via toggle) | Use |
+|---|---|---|---|
+| `--background` | `#f8f7f4` | `#0b0b0d` | page |
+| `--surface` | `#ffffff` | `#161619` | cards, inputs, panels |
+| `--surface-sunken` | `#f2f1ec` | `#0f0f11` | wells, tracks |
+| `--foreground` | `#16151a` | `#f4f3f0` | primary text (~16:1) |
+| `--muted` | `#6b6a71` | `#a1a0a8` | secondary text (~5:1) |
+| `--hairline` | `#e8e6df` | `#262629` | borders, dividers |
+| `--gold` | `#b89355` | `#d0aa66` | decorative / large text / UI gold |
+| `--gold-ink` | `#876628` | `#e0c48c` | **gold text on background** (AA ~5:1) |
+| `--gold-soft` | `#f5eedd` | `rgba(208,170,102,.12)` | gold tint fills, chips, hover |
+| `--gold-line` | `#e6d5ad` | `rgba(208,170,102,.28)` | gold hairline |
+| `--ink` | `#101014` | `#f4f3f0` | occasional deep‑black element (e.g. primary CTA) |
+| `--fill-subtle` / `--fill` / `--fill-strong` | `rgba(22,21,26,.04 / .07 / .11)` | `rgba(255,255,255,.045 / .08 / .13)` | neutral fills (replaced `bg-white/N`) |
 
-**Mobile-first approach:** Capture must be effortless one-handed, thumb-reachable, and fast to open — the entire capture flow should be reachable in two taps from any screen. Reflections should be optimized for single-column vertical reading on a phone first, with desktop treated as a wider, more spacious version of the same reading experience rather than a denser one. Voice capture should be a first-class citizen on mobile, not an afterthought, since it's the lowest-friction way to capture a fleeting thought.
+Life‑area accents (the woven‑ribbon brain): **faith** gold `#c08a1e`, **family** magenta `#cc1f78`,
+**knowledge** blue `#1a72bb`, **health** green `#2f9e44`, career violet `#6f45b8`, time teal, finance
+deep‑green, learning indigo, fitness orange. All defined light + dark in `app/globals.css`.
 
-Overall design mandate: every visual decision should ask "does this make the user feel like Atlas is paying quiet, careful attention to them" — if a pattern (streaks, badges, bright colors, dense dashboards) borrows from productivity-app conventions instead, cut it, even if it's common elsewhere.
+**Gold usage rule:** gold as a *surface/large‑display* colour freely (`--gold`); gold as **text**
+only via `--gold-ink` (or `--gold` on dark), and never for long body copy — headings, labels, the
+wordmark, numbers.
+
+**Typography.** `Heebo` (already loaded, Hebrew + Latin) for everything. Primary headings get a
+**kinetic / typing** treatment (MagicUI) and may use the gold gradient (`.text-gold-gradient`).
+Wide tracking on the uppercase wordmark (`0.22–0.24em`). Body stays calm and highly readable.
+
+**Surfaces & depth.** `.glass-card` = a crisp **white** card: `1px` hairline border + a soft, diffuse
+shadow (`0 12px 32px -16px rgba(16,16,20,.12)`), `1rem` radius. No translucency in light mode. Chrome
+(`.glass-panel`) is fractionally sunken with a slightly crisper edge. Modals (`.glass-glow`) get an
+ambient lift + a hairline gold ring.
+
+**Background.** A still, soft gold bloom top‑centre + the faintest neutral vignette (`body::before`) —
+echoes the logo's brushed‑metal ground. On hero areas, `.hero-gradient` adds a whisper more gold.
+Optionally a **Light Rays** or **Warp Background** MagicUI layer behind the Today hero — subtle,
+low‑opacity, `prefers-reduced-motion` disables it.
+
+**Layout.** Generous whitespace and clear hierarchy remain. The Today dashboard and area landing
+pages use a **Bento Grid** (varied cell sizes, one clear focal cell) rather than a uniform stack.
+Reading‑heavy surfaces (a reflection, a shiur summary) stay single‑column.
+
+**Motion.** Framer Motion, 150–350ms, spring for surfaces, ease‑out for text. Entrance stagger on
+first paint. Celebratory micro‑interactions — **Confetti** on a completed goal / finished course,
+**Cool Mode** on a deliberate "done" tap — used sparingly, only on real accomplishments, never on
+routine actions. Everything collapses to instant under `prefers-reduced-motion`.
+
+**Accessibility.** AA contrast on every text/background pair (verified: `--muted` and `--gold-ink`
+both clear 4.5:1 on `--surface`). Gold `:focus-visible` ring, `2px`, `2px` offset, visible on both
+themes. Every icon button has an `aria-label`; every animated region is decorative (`aria-hidden`) or
+announced (`role="status"`). Touch targets ≥ 44px. Skip‑to‑content link on every page.
+
+**MagicUI components (Option B — hand‑integrated, no shadcn):** Kinetic Text, Bento Grid, Animated
+List, Theme Toggler, Confetti, Typing Animation, Number Ticker, Light Rays, Cool Mode, Warp
+Background. Each adapted to these tokens, RTL, and Tailwind v4; keyframes live in `globals.css`.

@@ -266,7 +266,7 @@ export default function TorahSpacePage() {
               onKeyDown={(e) => e.key === "Enter" && handleAddBook()}
               placeholder="שם ספר, למשל: משנה ברורה"
               aria-label="שם הספר החדש"
-              className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
             <input
               value={newBookAuthor}
@@ -274,7 +274,7 @@ export default function TorahSpacePage() {
               onKeyDown={(e) => e.key === "Enter" && handleAddBook()}
               placeholder="מחבר (לא חובה)"
               aria-label="מחבר הספר"
-              className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-48"
+              className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-48"
             />
             <button
               onClick={handleAddBook}
@@ -322,7 +322,7 @@ export default function TorahSpacePage() {
               onKeyDown={(e) => e.key === "Enter" && handleAddRabbi()}
               placeholder="שם הרב"
               aria-label="שם הרב החדש"
-              className="focus-ring flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
             <input
               value={newRabbiTitle}
@@ -330,7 +330,7 @@ export default function TorahSpacePage() {
               onKeyDown={(e) => e.key === "Enter" && handleAddRabbi()}
               placeholder="תפקיד / קהילה (לא חובה)"
               aria-label="תפקיד או קהילה של הרב"
-              className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-48"
+              className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-48"
             />
             <button
               onClick={handleAddRabbi}
@@ -419,7 +419,7 @@ export default function TorahSpacePage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ ease: "easeOut" }}
-                className="mt-4 rounded-xl bg-white/5 p-4 text-sm"
+                className="mt-4 rounded-xl bg-fill-subtle p-4 text-sm"
               >
                 <div className="mb-2 flex items-center gap-2 text-foreground/90">
                   <FileAudio size={16} className="text-accent-knowledge" aria-hidden />
@@ -439,7 +439,7 @@ export default function TorahSpacePage() {
                 </p>
 
                 {relatedSessions.length > 0 && (
-                  <div className="mb-3 rounded-lg bg-white/5 p-3">
+                  <div className="mb-3 rounded-lg bg-fill-subtle p-3">
                     <p className="mb-1 flex items-center gap-1 text-xs text-muted">
                       <Link2 size={12} aria-hidden />
                       קשור לשיעורים קודמים
@@ -472,7 +472,7 @@ export default function TorahSpacePage() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="חיפוש בספריית הידע…"
               aria-label="חיפוש בספריית הידע"
-              className="focus-ring w-full rounded-lg bg-white/5 py-2 pe-9 ps-3 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring w-full rounded-lg bg-fill-subtle py-2 pe-9 ps-3 text-sm text-foreground placeholder:text-muted"
             />
           </div>
 
@@ -525,7 +525,7 @@ export default function TorahSpacePage() {
                 onChange={(e) => setNewSummaryTitle(e.target.value)}
                 placeholder="כותרת הסיכום"
                 aria-label="כותרת הסיכום"
-                className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+                className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
               />
               <textarea
                 value={newSummaryContent}
@@ -533,7 +533,7 @@ export default function TorahSpacePage() {
                 placeholder="תוכן הסיכום…"
                 aria-label="תוכן הסיכום"
                 rows={4}
-                className="focus-ring resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+                className="focus-ring resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
               />
               <button
                 onClick={handleAddSummary}

@@ -48,9 +48,33 @@ narrower "reflection‑partner" framing. Every product decision is checked again
 5. **Honest AI.** When a provider is unavailable, degrade honestly — never fabricate a response.
 6. **Hebrew‑first, RTL‑perfect.** The entire UI, every piece of UX copy, every empty/error/loading
    state, and the AI's conversational voice are in fluent, natural, modern Israeli Hebrew.
-7. **Calm, restrained interface.** Never a dashboard, spreadsheet, or admin panel. Every screen leads
-   with synthesis ("what matters now"), then shows records. Empty states are quiet and honest, never
-   gamified.
+7. **Luxe, not loud.** The interface is *premium* — crisp white, metallic gold, deep black; generous
+   whitespace; clear hierarchy; deliberate motion. Every screen still leads with synthesis ("what
+   matters now") before records, and empty states stay honest — but the register shifted (2026‑09‑01)
+   from "quiet minimalism" to "considered, high‑end, and quietly delightful": tasteful entrance
+   animations, kinetic/typing treatments on primary headings, a bento‑grid dashboard, and celebratory
+   micro‑interactions (confetti / cool‑mode) on genuine wins. Restraint now means *editing* the
+   effects to where they earn their place, not avoiding them. See `docs/ATLAS_UX_SPEC.md` §Visual
+   Direction and §Design System for the palette, tokens, and component rules.
+
+### 2.1 Design system (summary — full spec in `ATLAS_UX_SPEC.md`)
+
+- **Palette:** white‑first. `--background` warm paper `#f8f7f4`, `--surface` white, `--foreground`
+  near‑black `#16151a`, `--muted` `#6b6a71`. Brand accent **gold** — `--gold` `#b89355` (decor/large),
+  `--gold-ink` `#876628` (small text on white, ~5:1). Deep black `--ink` `#101014` for occasional
+  high‑contrast elements. Dark theme is a first‑class opt‑in via the Theme Toggler
+  (`[data-theme="dark"]` on `<html>`), **not** driven by `prefers-color-scheme`.
+- **Life‑area accents** map to the logo's woven‑ribbon brain: faith=gold, family=magenta `#cc1f78`,
+  knowledge=blue `#1a72bb`, health=green `#2f9e44`.
+- **Tokens** live in `app/globals.css` (`@theme inline`). Semantic fills: `--fill-subtle` / `--fill` /
+  `--fill-strong` replace the old `bg-white/N` translucency (codemod done). `.glass-card` is now a
+  clean white card (hairline + soft shadow), not a dark translucent pane.
+- **MagicUI components** are integrated by hand into this token system (no shadcn / no
+  `components.json`) — Kinetic Text, Bento Grid, Animated List, Theme Toggler, Confetti, Typing
+  Animation, Number Ticker, Light Rays, Cool Mode, Warp Background.
+- **Accessibility is non‑negotiable:** AA contrast on all text (gold text uses `--gold-ink`), gold
+  `focus-ring` visible on both themes, ARIA labels on every interactive element, `prefers-reduced-motion`
+  collapses every animation.
 
 ---
 

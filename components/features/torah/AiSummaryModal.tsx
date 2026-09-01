@@ -259,7 +259,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
           onClick={resetAndClose}
           disabled={busy}
           aria-label="סגור"
-          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground disabled:opacity-40"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-fill-subtle hover:text-foreground disabled:opacity-40"
         >
           <X size={16} />
         </button>
@@ -296,7 +296,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
 
         {step === "input" && !summarizing && (
           <div className="flex flex-col gap-2 pb-2">
-            <div className="inline-flex w-fit rounded-lg bg-white/5 p-1" role="tablist" aria-label="סוג קלט">
+            <div className="inline-flex w-fit rounded-lg bg-fill-subtle p-1" role="tablist" aria-label="סוג קלט">
               <button
                 type="button"
                 role="tab"
@@ -349,7 +349,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                   onChange={(e) => setRawText(e.target.value)}
                   placeholder="הדבק כאן את הטקסט המלא של השיעור…"
                   rows={12}
-                  className="focus-ring min-h-64 resize-y rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+                  className="focus-ring min-h-64 resize-y rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
                 />
               </>
             ) : inputMode === "youtube" ? (
@@ -362,7 +362,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                   value={youtubeUrl}
                   onChange={(e) => setYoutubeUrl(e.target.value)}
                   placeholder="https://www.youtube.com/watch?v=…"
-                  className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground placeholder:text-muted"
+                  className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground placeholder:text-muted"
                 />
                 <p className="text-xs text-muted">
                   התמלול/הכתוביות של הסרטון ייטענו אוטומטית ויועברו לסיכום. דורש שלסרטון יש כתוביות זמינות.
@@ -395,7 +395,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                     <span className="text-sm">{audioFile ? "החלף קובץ שמע" : "גרור קובץ שמע לכאן או לחץ לבחירה"}</span>
                   </button>
                   {audioFile && (
-                    <div className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground/90">
+                    <div className="flex items-center gap-2 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground/90">
                       <FileAudio size={16} className="text-accent-knowledge shrink-0" aria-hidden />
                       <span className="truncate">{audioFile.name}</span>
                     </div>
@@ -418,7 +418,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                 id="ai-summary-title"
                 value={draft.title}
                 onChange={(e) => updateDraft({ title: e.target.value })}
-                className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+                className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground"
               />
             </div>
 
@@ -431,7 +431,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                 value={draft.tldr}
                 onChange={(e) => updateDraft({ tldr: e.target.value })}
                 rows={3}
-                className="focus-ring resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+                className="focus-ring resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground"
               />
             </div>
 
@@ -444,7 +444,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                 value={draft.keyPointsText}
                 onChange={(e) => updateDraft({ keyPointsText: e.target.value })}
                 rows={5}
-                className="focus-ring resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+                className="focus-ring resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground"
               />
             </div>
 
@@ -458,14 +458,14 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                   value={draft.suggestedRabbi}
                   onChange={(e) => updateDraft({ suggestedRabbi: e.target.value })}
                   placeholder="לא זוהה"
-                  className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+                  className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
                 />
                 {rabbiName && (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span
                       className={cn(
                         "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs",
-                        matchedRabbi ? "bg-accent-health/15 text-accent-health" : "bg-white/5 text-muted"
+                        matchedRabbi ? "bg-accent-health/15 text-accent-health" : "bg-fill-subtle text-muted"
                       )}
                     >
                       {matchedRabbi ? <Check size={11} aria-hidden /> : <GraduationCap size={11} aria-hidden />}
@@ -493,7 +493,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                   value={draft.suggestedBooksText}
                   onChange={(e) => updateDraft({ suggestedBooksText: e.target.value })}
                   rows={2}
-                  className="focus-ring resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+                  className="focus-ring resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground"
                 />
                 {bookNames.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -504,7 +504,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                           <span
                             className={cn(
                               "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs",
-                              matched ? "bg-accent-health/15 text-accent-health" : "bg-white/5 text-muted"
+                              matched ? "bg-accent-health/15 text-accent-health" : "bg-fill-subtle text-muted"
                             )}
                           >
                             {matched ? <Check size={11} aria-hidden /> : <BookOpen size={11} aria-hidden />}

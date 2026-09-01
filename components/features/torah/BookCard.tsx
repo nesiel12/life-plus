@@ -30,7 +30,7 @@ export function BookCard({ book, delay, onEdit, onOpenProfile }: BookCardProps) 
             onEdit(book);
           }}
           aria-label={`ערוך את ${book.title}`}
-          className="focus-ring shrink-0 rounded-lg p-1 text-muted transition-colors hover:bg-white/5 hover:text-foreground"
+          className="focus-ring shrink-0 rounded-lg p-1 text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
         >
           <MoreVertical size={16} />
         </button>

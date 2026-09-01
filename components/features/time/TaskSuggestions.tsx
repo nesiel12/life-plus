@@ -132,7 +132,7 @@ export function TaskSuggestions({ events, shifts, habits, habitLogs, selectedDat
                     "focus-ring flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-all",
                     added
                       ? "border-accent-time/30 bg-accent-time/10 text-muted"
-                      : "border-glass-border bg-white/5 text-foreground hover:scale-[1.03] hover:border-accent-time/50 hover:bg-accent-time/10"
+                      : "border-glass-border bg-fill-subtle text-foreground hover:scale-[1.03] hover:border-accent-time/50 hover:bg-accent-time/10"
                   )}
                 >
                   {added ? (
@@ -142,7 +142,7 @@ export function TaskSuggestions({ events, shifts, habits, habitLogs, selectedDat
                   )}
                   <span className={cn(added && "line-through")}>{suggestion.title}</span>
                   <span className="ltr text-muted">· {suggestion.estimated_minutes} דק׳</span>
-                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] text-muted">
+                  <span className="rounded-full bg-fill px-1.5 py-0.5 text-[10px] text-muted">
                     {suggestion.category}
                   </span>
                 </motion.button>

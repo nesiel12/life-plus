@@ -81,10 +81,10 @@ function ToggleSwitch({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="focus-ring flex w-full items-center justify-between rounded-lg bg-white/5 px-3 py-2.5 transition-colors hover:bg-white/[0.07]"
+      className="focus-ring flex w-full items-center justify-between rounded-lg bg-fill-subtle px-3 py-2.5 transition-colors hover:bg-fill-subtle"
     >
       <span className="flex items-center gap-1.5 text-sm text-foreground">{children}</span>
-      <span className={cn("relative h-5 w-9 shrink-0 rounded-full transition-colors", checked ? "bg-accent-finance" : "bg-white/15")}>
+      <span className={cn("relative h-5 w-9 shrink-0 rounded-full transition-colors", checked ? "bg-accent-finance" : "bg-fill")}>
         <span
           className={cn(
             "absolute top-0.5 size-4 rounded-full bg-white transition-all",
@@ -196,7 +196,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
           onClick={resetAndClose}
           disabled={creating}
           aria-label="סגור"
-          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground disabled:opacity-40"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-fill-subtle hover:text-foreground disabled:opacity-40"
         >
           <X size={16} />
         </button>
@@ -204,7 +204,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
 
       <div className="flex-1 overflow-y-auto px-6">
         <div className="flex flex-col gap-3 pb-2">
-          <div className="inline-flex w-fit rounded-lg bg-white/5 p-1" role="tablist" aria-label="סוג עסקה">
+          <div className="inline-flex w-fit rounded-lg bg-fill-subtle p-1" role="tablist" aria-label="סוג עסקה">
             <button
               type="button"
               role="tab"
@@ -242,7 +242,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={isShift ? "למשל: משמרת ערב" : "למשל: קניות בסופר, משכורת חודשית"}
-              className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
           </div>
 
@@ -264,7 +264,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
                   value={employer}
                   onChange={(e) => setEmployer(e.target.value)}
                   placeholder="למשל: קפה השכונה"
-                  className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+                  className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
                 />
               </div>
 
@@ -282,7 +282,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
                     value={hourlyRate}
                     onChange={(e) => setHourlyRate(e.target.value)}
                     placeholder="0.00"
-                    className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground placeholder:text-muted"
+                    className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground placeholder:text-muted"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -295,7 +295,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
                     value={amount}
                     placeholder="0.00"
                     aria-label="סכום מחושב אוטומטית משעות העבודה והתעריף"
-                    className="ltr rounded-lg bg-white/[0.03] px-3 py-2 text-start text-sm text-muted"
+                    className="ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-muted"
                   />
                 </div>
               </div>
@@ -310,7 +310,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
                     type="datetime-local"
                     value={shiftStart}
                     onChange={(e) => setShiftStart(e.target.value)}
-                    className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground"
+                    className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -322,7 +322,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
                     type="datetime-local"
                     value={shiftEnd}
                     onChange={(e) => setShiftEnd(e.target.value)}
-                    className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground"
+                    className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground"
                   />
                 </div>
               </div>
@@ -341,7 +341,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground placeholder:text-muted"
+                className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground placeholder:text-muted"
               />
             </div>
           )}
@@ -374,7 +374,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="למשל: מכולת, משכורת, תחבורה"
-              className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
           </div>
 
@@ -388,7 +388,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground"
+                className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground"
               />
             </div>
           )}
@@ -403,7 +403,7 @@ export function NewTransactionModal({ open, onClose, onCreate }: NewTransactionM
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               placeholder="פרטים נוספים…"
-              className="focus-ring resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring resize-none rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
           </div>
 

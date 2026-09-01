@@ -1,37 +1,110 @@
 @import "tailwindcss";
 
-:root {
-  --background: #0a0a0f;
-  --foreground: #f5f5f4;
-  --muted: #a8a8b3;
+/* ============================================================================
+   LIFE PLUS — Luxe design system
+   Crisp white · metallic gold · deep black. Light is the primary surface;
+   dark is a first-class alternate via [data-theme="dark"] on <html>.
+   Palette drawn from the LIFE PLUS logo: brushed-silver ground, gold wordmark,
+   and the interwoven brain ribbons (blue / green / magenta / gold) that map
+   onto the life-area accents.
+   ========================================================================== */
 
-  /* "Vibrant within calm" (UI/UX Revamp): richer, more saturated versions
-     of the same five hues, not a new palette — every existing consumer
-     (life-area badges, GlassCard borders, ScheduleSuggestions, etc.) keeps
-     meaning exactly what it always did, it just reads as alive instead of
-     washed out. */
+:root {
+  color-scheme: light;
+
+  /* — Surfaces — */
+  --background: #f8f7f4; /* warm paper */
+  --surface: #ffffff; /* cards, panels, inputs */
+  --surface-sunken: #f2f1ec; /* wells, track backgrounds */
+  --foreground: #16151a; /* near-black ink — ~16:1 on white */
+  --muted: #6b6a71; /* secondary text — ~5.2:1 on white */
+  --hairline: #e8e6df; /* borders, dividers */
+
+  /* — Gold: the brand accent — */
+  --gold: #b89355; /* decorative / large text / UI gold */
+  --gold-ink: #876628; /* gold for small text on white — ~5:1 */
+  --gold-soft: #f5eedd; /* gold tint fill (chips, hover) */
+  --gold-line: #e6d5ad; /* gold hairline */
+
+  /* — Deep black highlight (occasional) — */
+  --ink: #101014;
+
+  /* — Neutral fills (replace the old bg-white/N translucency) — */
+  --fill-subtle: rgba(22, 21, 26, 0.04);
+  --fill: rgba(22, 21, 26, 0.07);
+  --fill-strong: rgba(22, 21, 26, 0.11);
+
+  /* — Glass tokens kept by NAME so 33 GlassCard/glass-panel consumers don't
+       all break at once; on light they mean "clean elevated white card". — */
+  --glass-bg: #ffffff;
+  --glass-bg-strong: #ffffff;
+  --glass-border: var(--hairline);
+
+  /* — Life-area accents — the logo's brain-ribbon language — */
+  --accent-faith: #c08a1e; /* gold ribbon */
+  --accent-family: #cc1f78; /* magenta ribbon */
+  --accent-knowledge: #1a72bb; /* blue ribbon */
+  --accent-health: #2f9e44; /* green ribbon */
+  --accent-career: #6f45b8; /* violet */
+  --accent-time: #0e97a5; /* teal — Time & Tasks */
+  --accent-finance: #278a3d; /* deep green — Finances */
+  --accent-learning: #3a56d4; /* indigo — Learning */
+  --accent-fitness: #e2590c; /* warm orange — Health & Fitness UI */
+
+  --focus-ring: var(--gold);
+}
+
+/* LIFE PLUS is white-first by design — light is the default regardless of OS
+   preference. Dark is a deliberate opt-in through the Theme Toggler, which
+   sets [data-theme="dark"] on <html>. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0b0b0d;
+  --surface: #161619;
+  --surface-sunken: #0f0f11;
+  --foreground: #f4f3f0;
+  --muted: #a1a0a8;
+  --hairline: #262629;
+  --gold: #d0aa66;
+  --gold-ink: #e0c48c;
+  --gold-soft: rgba(208, 170, 102, 0.12);
+  --gold-line: rgba(208, 170, 102, 0.28);
+  --ink: #f4f3f0;
+  --fill-subtle: rgba(255, 255, 255, 0.045);
+  --fill: rgba(255, 255, 255, 0.08);
+  --fill-strong: rgba(255, 255, 255, 0.13);
   --glass-bg: rgba(255, 255, 255, 0.045);
   --glass-bg-strong: rgba(255, 255, 255, 0.07);
-  /* Bumped 0.12 -> 0.16 for the "Liquid Glass" pass: a more visible,
-     fluid-glass edge, still comfortably short of a harsh white outline. */
-  --glass-border: rgba(255, 255, 255, 0.16);
-
-  /* Life-area accents */
-  --accent-faith: #f2b84e; /* warm gold */
-  --accent-family: #fb7aa5; /* vivid rose */
-  --accent-knowledge: #4f9dfb; /* vivid sky blue */
-  --accent-health: #43d19e; /* vivid mint green */
-  --accent-career: #a78bfa; /* vivid violet */
-  --accent-time: #22d3ee; /* vivid cyan — Time & Tasks Space (Phase 5), not one of the original five life areas */
-  --accent-finance: #22c55e; /* money green — Finances Space (Phase 6), distinct from --accent-health's cooler mint */
-  --accent-learning: #6366f1; /* vivid indigo — Learning & Knowledge Space (Phase 7), distinct from --accent-career's softer violet and --accent-knowledge's sky blue */
-  --accent-fitness: #ff6b4a; /* vibrant coral/active-orange — Health & Fitness Space (Phase 8) meals/workouts UI specifically; the pre-existing --accent-health (mint) stays untouched everywhere it's already used (life-area score, Sidebar nav, etc.) */
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --accent-faith: #e8b34e;
+  --accent-family: #fb7aa5;
+  --accent-knowledge: #4f9dfb;
+  --accent-health: #43d19e;
+  --accent-career: #a78bfa;
+  --accent-time: #22d3ee;
+  --accent-finance: #22c55e;
+  --accent-learning: #818cf8;
+  --accent-fitness: #ff6b4a;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-hairline: var(--hairline);
+  --color-gold: var(--gold);
+  --color-gold-ink: var(--gold-ink);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-line: var(--gold-line);
+  --color-ink: var(--ink);
+  --color-fill-subtle: var(--fill-subtle);
+  --color-fill: var(--fill);
+  --color-fill-strong: var(--fill-strong);
   --color-glass-bg: var(--glass-bg);
   --color-glass-bg-strong: var(--glass-bg-strong);
   --color-glass-border: var(--glass-border);
@@ -49,7 +122,6 @@
 
 html {
   direction: rtl;
-  color-scheme: dark;
 }
 
 body {
@@ -59,17 +131,9 @@ body {
   min-height: 100vh;
 }
 
-/* Global Liquid Glass background wash (UI/UX Revamp, full-width pass): a
-   fixed, full-viewport gradient behind every page and every glass
-   surface — not just the per-page Hero band's own (stronger)
-   .hero-gradient. Every .glass-card/.glass-panel element is translucent
-   specifically so this shows through consistently everywhere (Sidebar,
-   AI Companion, page cards), which is the actual point of a "fixed
-   background that fills the screen" — a wash confined to one band at the
-   top of one page wouldn't read as one coherent atmosphere. Toned down
-   from .hero-gradient's own percentages since this is always visible
-   everywhere, not a one-time accent; pointer-events: none + negative
-   z-index so it never interferes with real content or clicks. */
+/* Luxe ambient background — a still, soft light bloom + the faintest gold
+   sheen, echoing the logo's brushed-metal ground. No colored blobs. Fixed,
+   behind everything, non-interactive. */
 body::before {
   content: "";
   position: fixed;
@@ -77,113 +141,88 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(120% 90% at 8% -10%, color-mix(in srgb, var(--accent-family) 16%, transparent), transparent 55%),
-    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--accent-knowledge) 14%, transparent), transparent 55%),
-    radial-gradient(100% 80% at 50% 110%, color-mix(in srgb, var(--accent-faith) 10%, transparent), transparent 55%);
+    radial-gradient(80% 55% at 50% -8%, color-mix(in srgb, var(--gold) 10%, transparent), transparent 60%),
+    radial-gradient(60% 50% at 90% 8%, color-mix(in srgb, var(--foreground) 4%, transparent), transparent 55%);
 }
 
-/* Escape hatch for embedding LTR content (numbers, English, code) inside RTL layout */
+/* Escape hatch for embedding LTR content (numbers, English, code) inside RTL */
 .ltr {
   direction: ltr;
   unicode-bidi: isolate;
 }
 
-/* Every page card (GlassCard.tsx — AIBriefing, GoalsPanel, calendar event
-   cards, area/family cards, everything) goes through this one class, so
-   "apply Liquid Glass across the board" means tuning it once here, not
-   editing every consumer. Blur bumped 20px -> 28px and the shadow now
-   carries a touch of real color (not pure black) for the same soft-glow
-   depth every other glass surface has, at a gentler intensity than
-   .glass-glow since a card is a smaller, more frequent element than a
-   modal or the sidebar.
-   IMPORTANT: only the unprefixed `backdrop-filter` is written here, not a
-   manual `-webkit-backdrop-filter` pair — a real bug was found and fixed
-   here: Tailwind v4's Lightning CSS build step collapses a manually
-   duplicated backdrop-filter/-webkit-backdrop-filter pair down to *only*
-   the vendor-prefixed one, which this Chromium-based browser doesn't
-   apply at all (confirmed via computed style: backdrop-filter measured
-   literally "none" on a live element until this was fixed). Lightning CSS
-   adds whatever prefixes the target browserslist actually needs on its
-   own — writing the prefix by hand is what broke it. */
+/* The one shared card surface (GlassCard.tsx → 33 consumers). Luxe = a crisp
+   white card, a hairline border, and a soft diffuse shadow — not translucency.
+   Tuned once here. */
 .glass-card {
-  background: linear-gradient(155deg, var(--glass-bg-strong), var(--glass-bg));
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(28px);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 1rem;
   box-shadow:
-    0 12px 40px -12px rgba(0, 0, 0, 0.45),
-    0 0 36px -20px color-mix(in srgb, var(--accent-knowledge) 20%, transparent),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+    0 1px 2px rgba(16, 16, 20, 0.04),
+    0 12px 32px -16px rgba(16, 16, 20, 0.12);
 }
 
-/* Sidebar/AI Companion chrome — stronger blur than a content card since it
-   sits over shifting page content rather than the flat background.
-   Bumped again (34px -> 46px) for the "Liquid Glass" full-width/global
-   pass: real "backdrop-blur-2xl+" territory, thick fluid frosted glass.
-   Now carries its own soft glow + inner highlight directly (previously
-   glass-panel had no shadow of its own at all — only Modal's separate
-   .glass-glow class did, which never applied to the Sidebar), so every
-   .glass-panel surface gets real depth without needing a second class. */
+/* Chrome surfaces (Sidebar, AI Companion). Slightly stronger presence than a
+   content card — a faint sunken tint + a crisper edge. */
 .glass-panel {
-  background: linear-gradient(180deg, var(--glass-bg-strong), var(--glass-bg));
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(46px);
-  box-shadow:
-    0 16px 48px -16px rgba(0, 0, 0, 0.5),
-    0 0 48px -24px color-mix(in srgb, var(--accent-knowledge) 22%, transparent),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--surface) 88%, var(--background));
+  border: 1px solid var(--hairline);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 48px -24px rgba(16, 16, 20, 0.16);
 }
 
-/* The Today Hero (UI/UX Revamp) — a soft, multi-hue wash behind the
-   greeting, built from the same life-area accent tokens rather than new
-   brand colors, so "vibrant" still reads as this app's own palette turned
-   up, not a different product bolted on. */
+/* The Today hero band — a whisper of gold, not a rainbow wash. */
 .hero-gradient {
   background:
-    radial-gradient(120% 140% at 15% -10%, color-mix(in srgb, var(--accent-family) 22%, transparent), transparent 60%),
-    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent-knowledge) 20%, transparent), transparent 60%),
-    radial-gradient(100% 120% at 50% 120%, color-mix(in srgb, var(--accent-faith) 14%, transparent), transparent 60%);
+    radial-gradient(120% 140% at 12% -10%, color-mix(in srgb, var(--gold) 16%, transparent), transparent 60%),
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--foreground) 6%, transparent), transparent 60%);
 }
 
-/* A short, reusable gradient text treatment for headings that want extra
-   warmth (Hero greeting) — same two tokens the logo mark already uses. */
-.gradient-text {
-  background: linear-gradient(90deg, var(--accent-faith), var(--accent-family));
+/* Gold gradient text — for primary headings / the wordmark. A metallic sweep
+   from the logo's gold: base → highlight → base. */
+.gradient-text,
+.text-gold-gradient {
+  background: linear-gradient(100deg, var(--gold) 0%, #caa869 44%, #e6d3a4 62%, var(--gold) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-/* "Elegant glowing borders" (UI/UX Revamp, Modal system): a soft, colorful
-   ambient glow instead of a hard drop shadow — used by every Modal panel
-   (components/ui/Modal.tsx) so the whole overlay/dialog system shares one
-   consistent premium chrome. Two accent tones, not one, so it reads as
-   this app's palette rather than a single-brand-color glow.
-   "Liquid Glass" refinement (urgent onboarding-modal fix): the glow is
-   softer and more diffuse now (lower color-mix %, wider spread) rather
-   than a tight bright ring — reads as an ambient highlight, not a neon
-   outline — plus a subtle inner top highlight for the "soft highlight"
-   the liquid-glass look calls for. Foreground/background contrast itself
-   is untouched (still ~7.5:1, see the focus-ring comment below) — none of
-   this affects text legibility, only the panel chrome around it. */
+/* Modal / dialog chrome — a soft ambient lift with a hairline gold ring. */
 .glass-glow {
   box-shadow:
-    0 16px 48px -16px rgba(0, 0, 0, 0.55),
-    0 0 0 1px var(--glass-border),
-    0 0 80px -28px color-mix(in srgb, var(--accent-knowledge) 28%, transparent),
-    0 0 56px -24px color-mix(in srgb, var(--accent-family) 22%, transparent),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+    0 24px 64px -24px rgba(16, 16, 20, 0.28),
+    0 0 0 1px var(--hairline),
+    0 0 0 4px color-mix(in srgb, var(--gold) 10%, transparent);
 }
 
-/* Consistent keyboard-focus indicator (design/motion/a11y audit). Every
-   input/textarea/select in the app removes the browser default outline
-   (they need `focus-ring` instead of Tailwind's `focus:outline-none`, which
-   left focus invisible everywhere — a real WCAG 2.4.7 gap, not a style
-   preference). :focus-visible, not :focus, so it only appears for keyboard
-   navigation and never flashes on a mouse click. */
+/* Keyboard focus — gold, visible on both themes (WCAG 2.4.7). */
 .focus-ring {
   outline: none;
 }
 .focus-ring:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline: 2px solid var(--gold);
   outline-offset: 2px;
+}
+
+/* MagicUI component keyframes (Option B — integrated, no shadcn) */
+@keyframes lp-shimmer {
+  0%,
+  90%,
+  100% {
+    background-position: calc(-100% - var(--shimmer-width)) 0;
+  }
+  30%,
+  60% {
+    background-position: calc(100% + var(--shimmer-width)) 0;
+  }
+}
+@keyframes lp-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+  }
 }

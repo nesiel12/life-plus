@@ -116,7 +116,7 @@ export function NewManualEventModal({ open, onClose, people, onCreate }: NewManu
           onClick={resetAndClose}
           disabled={creating}
           aria-label="סגור"
-          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-white/5 hover:text-foreground disabled:opacity-40"
+          className="focus-ring rounded-lg p-1.5 text-muted transition-all hover:scale-110 hover:bg-fill-subtle hover:text-foreground disabled:opacity-40"
         >
           <X size={16} />
         </button>
@@ -134,7 +134,7 @@ export function NewManualEventModal({ open, onClose, people, onCreate }: NewManu
               onChange={(e) => setTitle(e.target.value)}
               placeholder="למשל: פגישה עם הרופא"
               autoFocus
-              className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
             />
           </div>
 
@@ -148,7 +148,7 @@ export function NewManualEventModal({ open, onClose, people, onCreate }: NewManu
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground"
+                className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -160,7 +160,7 @@ export function NewManualEventModal({ open, onClose, people, onCreate }: NewManu
                 type="datetime-local"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="focus-ring ltr rounded-lg bg-white/5 px-3 py-2 text-start text-sm text-foreground"
+                className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground"
               />
             </div>
           </div>
@@ -174,7 +174,7 @@ export function NewManualEventModal({ open, onClose, people, onCreate }: NewManu
                 id="new-event-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as MomentCategory | "")}
-                className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+                className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground"
               >
                 <option value="">כללי</option>
                 {LIFE_AREA_LIST.map((area) => (
@@ -193,7 +193,7 @@ export function NewManualEventModal({ open, onClose, people, onCreate }: NewManu
                 id="new-event-reminder"
                 value={reminderMinutes}
                 onChange={(e) => setReminderMinutes(e.target.value)}
-                className="focus-ring rounded-lg bg-white/5 px-3 py-2 text-sm text-foreground"
+                className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground"
               >
                 {REMINDER_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -219,7 +219,7 @@ export function NewManualEventModal({ open, onClose, people, onCreate }: NewManu
                       aria-pressed={isSelected}
                       className={cn(
                         "focus-ring flex items-center gap-1.5 rounded-full py-1 ps-1 pe-2.5 text-xs transition-colors",
-                        isSelected ? "bg-accent-finance/20 text-accent-finance" : "bg-white/5 text-muted hover:text-foreground"
+                        isSelected ? "bg-accent-finance/20 text-accent-finance" : "bg-fill-subtle text-muted hover:text-foreground"
                       )}
                     >
                       <PersonAvatar person={person} size={18} />
