@@ -265,25 +265,31 @@ body::before {
 }
 
 /* ── Brand mark blending ───────────────────────────────────────────────────
-   The supplied lockup is a raster with a baked-in silver-gradient background
-   rather than transparency, so it arrives as an opaque rectangle.
+   The supplied lockup is a raster with a baked-in brushed-silver background
+   rather than transparency, so it arrives as an opaque rectangle. That silver
+   is a vignette: bright in the middle, mid-grey toward the corners.
 
-   Light theme: `multiply` composites that silver away almost entirely — white
-   and near-white multiply down to the backdrop while the gold wordmark and the
-   coloured ribbons survive. This one genuinely is seamless.
+   Both themes fade the outer edges to transparent so the plate has no hard
+   boundary. The ellipse is wide enough to clear the wordmark (which spans
+   roughly 26–74% of the width) and only eats the empty margins.
 
-   Dark theme: nothing can make a bright opaque plate vanish into near-black.
-   `multiply` would crush the whole mark away; `screen` would blow the silver
-   out further. So rather than fake it, dark theme *frames* it — rounded
-   corners and a gold hairline turn the rectangle into a deliberate brand tile
-   instead of a stray screenshot, and a slight knock-back keeps it from
-   out-shouting the page. A transparent-background export is the only real fix.
+   Light theme adds `multiply` on top: the bright centre multiplies down into
+   the warm-white page almost completely, and the mask handles the darker
+   corners the blend can't.
 
-   A transparent source (the gold SVG placeholder) is unaffected by either
-   path: multiply over white leaves gold untouched, and the dark-theme frame is
-   invisible without an opaque ground behind it. */
+   Dark theme can't blend — nothing makes a bright opaque plate vanish into
+   near-black, `multiply` would crush the mark away and `screen` would blow the
+   silver out further. So it *frames* instead: rounded corners plus a gold
+   hairline, which reads as a deliberate brand tile rather than a stray
+   screenshot. A transparent-background export is the only real fix there.
+
+   A transparent source (the gold SVG placeholder) is unaffected: multiply over
+   white leaves gold untouched, the mask only trims empty margins, and the
+   dark-theme frame is scoped to raster extensions so it never rings nothing. */
 .logo-mark {
   mix-blend-mode: multiply;
+  -webkit-mask-image: radial-gradient(ellipse 76% 88% at 50% 50%, #000 52%, transparent 96%);
+  mask-image: radial-gradient(ellipse 76% 88% at 50% 50%, #000 52%, transparent 96%);
 }
 :root[data-theme="dark"] .logo-mark {
   mix-blend-mode: normal;

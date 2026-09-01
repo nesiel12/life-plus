@@ -92,8 +92,10 @@ export function AIBriefing({ bare = false }: AIBriefingProps = {}) {
         <div className="mt-4 flex items-start gap-2 rounded-lg bg-fill-subtle p-3 text-xs text-muted">
           <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden />
           <div className="flex flex-col gap-1">
-            {briefing.conflicts.map((note) => (
-              <p key={note}>{note}</p>
+            {/* Conflict notes are free text from the ranking pipeline and can
+                legitimately repeat, so the text alone isn't a unique key. */}
+            {briefing.conflicts.map((note, idx) => (
+              <p key={`${note}-${idx}`}>{note}</p>
             ))}
           </div>
         </div>
