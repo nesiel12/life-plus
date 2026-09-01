@@ -84,64 +84,83 @@ export default function Home() {
       />
 
       {/* ─── Hero ─────────────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden border-b border-hairline px-6 pb-12 pt-16 sm:px-10 sm:pt-24 lg:px-16">
-        <RetroGrid
-          className="opacity-[0.35]"
-          angle={68}
-          cellSize={52}
-          opacity={0.5}
-          lightLineColor="#e0cfa6"
-          darkLineColor="rgba(208,170,102,0.30)"
+      <div className="relative isolate overflow-hidden px-6 pb-14 pt-20 sm:px-10 sm:pt-28 lg:px-16">
+        {/* Full-bleed RetroGrid + rays, faded into the page at every edge so
+            there's no hard cut-off. */}
+        <motion.div
+          aria-hidden
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1.2, ease: "easeOut" }}
+          className="pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,black_55%,transparent)]"
+        >
+          <RetroGrid
+            className="opacity-60"
+            angle={70}
+            cellSize={56}
+            opacity={0.55}
+            lightLineColor="#e0cfa6"
+            darkLineColor="rgba(208,170,102,0.32)"
+          />
+          <LightRays className="opacity-70" count={6} length="60vh" />
+        </motion.div>
+        {/* soft warm wash on top of the grid */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(120%_90%_at_50%_-10%,color-mix(in_srgb,var(--gold)_12%,transparent),transparent_60%)]"
         />
-        <LightRays className="opacity-70" count={6} length="55vh" />
 
-        <div className="relative z-10 mx-auto max-w-5xl">
-          <div className="mb-3 flex items-center gap-2">
-            <Sparkles size={14} className="text-gold-ink" aria-hidden />
-            <KineticText
-              as="span"
-              dir="ltr"
-              text="LIFE PLUS"
-              className="text-gold-gradient text-xs font-semibold tracking-[0.42em] uppercase"
-            />
-          </div>
-
-          <div className="flex items-center gap-4">
+        <div className="relative mx-auto max-w-5xl">
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="mb-5 flex items-center gap-2"
+          >
             {session?.user?.image && (
               <Image
                 src={session.user.image}
                 alt=""
-                width={52}
-                height={52}
+                width={32}
+                height={32}
                 className="rounded-full ring-1 ring-hairline"
                 aria-hidden
               />
             )}
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-[2.6rem] sm:leading-[1.1]">
-              {greeting ? (
-                <TypingAnimation
-                  as="span"
-                  duration={55}
-                  className="text-3xl font-semibold tracking-tight sm:text-[2.6rem]"
-                >
-                  {`${greeting}, ${displayName}`}
-                </TypingAnimation>
-              ) : (
-                <span>שלום, {displayName}</span>
-              )}
-            </h1>
-          </div>
+            <Sparkles size={13} className="text-gold-ink" aria-hidden />
+            <KineticText
+              as="span"
+              dir="ltr"
+              text="LIFE PLUS"
+              className="text-gold-gradient text-[0.7rem] font-semibold tracking-[0.42em] uppercase"
+            />
+          </motion.div>
 
-          {user.lifeStage && <p className="mt-2 text-muted">{user.lifeStage}</p>}
+          <motion.h1
+            initial={{ opacity: 0, scale: 0.965, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="text-4xl font-bold leading-[1.08] tracking-tight text-foreground sm:text-6xl lg:text-7xl"
+          >
+            {greeting ? (
+              <TypingAnimation as="span" duration={48} className="text-4xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
+                {`${greeting}, ${displayName}`}
+              </TypingAnimation>
+            ) : (
+              <span>{`שלום, ${displayName}`}</span>
+            )}
+          </motion.h1>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <div className="flex items-baseline gap-1.5 rounded-full border border-gold-line bg-gold-soft px-3.5 py-1.5">
-              <NumberTicker value={avgScore} className="ltr text-lg font-semibold text-gold-ink" />
-              <span className="text-xs text-gold-ink/80">מדד חיים כולל</span>
-            </div>
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.35, ease: "easeOut" }}
+            className="mt-6 flex flex-wrap items-center gap-3"
+          >
+            {user.lifeStage && <span className="text-sm text-muted">{user.lifeStage}</span>}
             <EnergyLevelBadge />
             <ScreenTimeWidget />
-          </div>
+          </motion.div>
         </div>
       </div>
 

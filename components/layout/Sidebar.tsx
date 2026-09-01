@@ -89,17 +89,25 @@ export function Sidebar() {
 
   return (
     <aside className="glass-panel sticky top-0 hidden h-screen w-20 shrink-0 flex-col items-center border-s px-2 py-6 sm:flex lg:w-64 lg:items-stretch lg:px-4">
-      <div className="mb-8 flex items-center justify-center gap-1 lg:justify-between">
-        <Link href="/" className="focus-ring flex items-center gap-2 rounded-xl px-2 py-1">
-          <Logo size={26} />
+      <div className="relative mb-8 flex w-full flex-col items-center">
+        <AnimatedThemeToggler
+          theme={theme}
+          onThemeChange={setTheme}
+          className="absolute -top-1 start-0 hidden lg:flex"
+        />
+        <Link
+          href="/"
+          className="focus-ring flex flex-col items-center gap-2.5 rounded-xl px-2 py-1"
+          aria-label={APP_NAME}
+        >
+          <Logo size={60} />
           <span
-            className="text-gold-gradient hidden text-sm font-semibold uppercase lg:inline"
-            style={{ letterSpacing: "0.18em" }}
+            className="text-gold-gradient hidden text-sm font-semibold uppercase leading-none lg:inline"
+            style={{ letterSpacing: "0.3em" }}
           >
             {APP_NAME}
           </span>
         </Link>
-        <AnimatedThemeToggler theme={theme} onThemeChange={setTheme} className="hidden lg:flex" />
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
