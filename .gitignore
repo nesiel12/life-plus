@@ -45,3 +45,8 @@ next-env.d.ts
 
 # Claude Code local settings (machine-specific)
 .claude/settings.local.json
+
+# vim swap files
+*.swp
+*.swo
+*~
