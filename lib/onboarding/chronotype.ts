@@ -11,17 +11,43 @@ import type { ChronotypeSettings, DayPart } from "@/types";
 export interface DayPartMeta {
   key: DayPart;
   label: string;
-  /** Representative clock window, shown under the label. */
+  /** Inclusive start hour, 0-23. */
+  startHour: number;
+  /** Exclusive end hour, 1-24. */
+  endHour: number;
+  /** Representative clock window, shown under the label. Derived from the
+   *  hour bounds so the label and the scheduling maths can never drift. */
   range: string;
 }
 
+const hh = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
+
+function dayPart(key: DayPart, label: string, startHour: number, endHour: number): DayPartMeta {
+  return { key, label, startHour, endHour, range: `${hh(startHour)}–${hh(endHour)}` };
+}
+
+// The hour bounds are the single source of truth for both the wizard's chips
+// and the calendar's energy banding (lib/calendar/energy.ts). They tile 05:00
+// through 24:00 with no gaps or overlaps; 00:00-05:00 is deliberately
+// uncovered — it belongs to sleep, not to a focus window.
 export const DAY_PARTS: DayPartMeta[] = [
-  { key: "earlyMorning", label: "בוקר מוקדם", range: "05:00–08:00" },
-  { key: "morning", label: "בוקר", range: "08:00–12:00" },
-  { key: "afternoon", label: "צהריים", range: "12:00–16:00" },
-  { key: "evening", label: "ערב", range: "16:00–20:00" },
-  { key: "night", label: "לילה", range: "20:00–24:00" },
+  dayPart("earlyMorning", "בוקר מוקדם", 5, 8),
+  dayPart("morning", "בוקר", 8, 12),
+  dayPart("afternoon", "צהריים", 12, 16),
+  dayPart("evening", "ערב", 16, 20),
+  dayPart("night", "לילה", 20, 24),
 ];
+
+const META_BY_KEY = new Map(DAY_PARTS.map((part) => [part.key, part]));
+
+/** The day part an hour-of-day falls in, or null for the small hours. */
+export function dayPartForHour(hour: number): DayPart | null {
+  return DAY_PARTS.find((p) => hour >= p.startHour && hour < p.endHour)?.key ?? null;
+}
+
+export function dayPartMeta(key: DayPart): DayPartMeta | undefined {
+  return META_BY_KEY.get(key);
+}
 
 const LABEL_BY_KEY = new Map(DAY_PARTS.map((part) => [part.key, part.label]));
 

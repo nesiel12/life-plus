@@ -6,6 +6,8 @@ import { CalendarClock, CalendarHeart, Clock } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ScheduleSuggestions } from "@/components/features/ScheduleSuggestions";
+import { VerticalTimeline } from "@/components/features/calendar/VerticalTimeline";
+import { CalendarAgentPanel } from "@/components/features/calendar/CalendarAgentPanel";
 import { useInsights } from "@/hooks/useInsights";
 import { groupUpcomingEvents } from "@/lib/calendar/groupUpcomingEvents";
 import { daysUntil } from "@/lib/utils";
@@ -33,8 +35,21 @@ function formatEventTime(iso: string): string {
 // (ScheduleSuggestions) is unchanged.
 export default function CalendarPage() {
   const upcomingEvents = useAtlasStore((s) => s.upcomingEvents);
-  const { data } = useInsights<UpcomingResponse>("/api/calendar/upcoming", FALLBACK);
+  const chronotype = useAtlasStore((s) => s.personalDNA.chronotype);
+  const { data, refresh } = useInsights<UpcomingResponse>("/api/calendar/upcoming", FALLBACK);
   const groups = data ? groupUpcomingEvents(data.events, new Date()) : [];
+
+  // The vertical timeline shows today only; groupUpcomingEvents already
+  // separates Today from later days, so reuse its notion of "today" rather
+  // than re-deriving a second, possibly-disagreeing one.
+  const now = new Date();
+  const startOfTomorrow = new Date(now);
+  startOfTomorrow.setHours(24, 0, 0, 0);
+  const todayEvents = (data?.events ?? []).filter((e) => {
+    const start = new Date(e.start).getTime();
+    return start >= new Date(now).setHours(0, 0, 0, 0) && start < startOfTomorrow.getTime();
+  });
+  const busy = (data?.events ?? []).map((e) => ({ start: e.start, end: e.end, title: e.title }));
 
   return (
     <main className="hero-gradient relative min-h-screen px-6 py-16 sm:px-10 lg:px-16">
@@ -54,6 +69,27 @@ export default function CalendarPage() {
 
       <div className="flex flex-col gap-6">
         <ScheduleSuggestions />
+
+        {data?.connected && (
+          <GlassCard delay={0.08}>
+            <CalendarAgentPanel busy={busy} onCreated={refresh} />
+          </GlassCard>
+        )}
+
+        {data?.connected && (
+          <GlassCard delay={0.1}>
+            <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
+              <Clock size={16} className="text-accent-career" aria-hidden />
+              היום, שעה אחר שעה
+            </p>
+            <VerticalTimeline
+              day={now}
+              now={now}
+              events={todayEvents}
+              chronotype={chronotype}
+            />
+          </GlassCard>
+        )}
 
         {data && !data.connected ? (
           <GlassCard delay={0.12} className="flex flex-col items-center gap-3 py-10 text-center">
