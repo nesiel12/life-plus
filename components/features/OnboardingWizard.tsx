@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CalendarHeart, Check, Plus, Sparkles, Sunrise, Target, Trash2, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { useApiCall } from "@/hooks/useApiCall";
@@ -44,7 +44,19 @@ const STEPS = [
 let draftCounter = 0;
 const nextDraftId = () => `draft-${(draftCounter += 1)}`;
 
-export function OnboardingWizard({ onDone }: { onDone: () => void }) {
+export function OnboardingWizard({
+  onDone,
+  reduceStepMotion = false,
+}: {
+  onDone: () => void;
+  /** Skip the animated step transition — always true under
+   *  prefers-reduced-motion, and settable directly for the dev preview
+   *  harness (app/dev/onboarding-preview), where the tab is never
+   *  foregrounded so framer-motion's rAF-driven exit animation can never
+   *  complete. Renders the current step as a plain div instead of an
+   *  AnimatePresence-wrapped motion.div, so it needs no animation to finish. */
+  reduceStepMotion?: boolean;
+}) {
   const saveOnboardingWizard = useAtlasStore((s) => s.saveOnboardingWizard);
   const userName = useAtlasStore((s) => s.user.hebrewName);
 
@@ -74,6 +86,45 @@ export function OnboardingWizard({ onDone }: { onDone: () => void }) {
   const [habitDraft, setHabitDraft] = useState("");
 
   const isLast = step === STEPS.length - 1;
+  const skipStepMotion = useReducedMotion() || reduceStepMotion;
+
+  const stepBody = (
+    <>
+      {step === 0 && (
+        <IdentityStep
+          fullName={fullName}
+          onFullName={setFullName}
+          birthDate={birthDate}
+          onBirthDate={setBirthDate}
+          priorities={priorities}
+          onPriorities={setPriorities}
+        />
+      )}
+      {step === 1 && (
+        <ChronotypeStep
+          wakeTime={wakeTime}
+          onWakeTime={setWakeTime}
+          sleepTime={sleepTime}
+          onSleepTime={setSleepTime}
+          peakFocus={peakFocus}
+          onPeakFocus={setPeakFocus}
+          lowEnergy={lowEnergy}
+          onLowEnergy={setLowEnergy}
+        />
+      )}
+      {step === 2 && <PeopleStep people={people} onChange={setPeople} />}
+      {step === 3 && (
+        <GoalsStep
+          goals={goals}
+          onGoals={setGoals}
+          habits={habits}
+          onHabits={setHabits}
+          habitDraft={habitDraft}
+          onHabitDraft={setHabitDraft}
+        />
+      )}
+    </>
+  );
 
   const payload = useMemo((): OnboardingWizardPayload => {
     const chronotype: ChronotypeSettings = {};
@@ -124,59 +175,35 @@ export function OnboardingWizard({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <StepIndicator step={step} />
+      <StepIndicator step={step} skipMotion={skipStepMotion} />
 
       <div>
         <h2 className="text-lg font-semibold tracking-tight text-foreground">{STEPS[step].title}</h2>
         <p className="mt-1 text-sm text-muted">{STEPS[step].hint}</p>
       </div>
 
-      {/* mode="wait" so the outgoing step can't overlap the incoming one and
-          double the panel height mid-transition. */}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, x: 16 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -16 }}
-          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-          className="min-h-[16rem]"
-        >
-          {step === 0 && (
-            <IdentityStep
-              fullName={fullName}
-              onFullName={setFullName}
-              birthDate={birthDate}
-              onBirthDate={setBirthDate}
-              priorities={priorities}
-              onPriorities={setPriorities}
-            />
-          )}
-          {step === 1 && (
-            <ChronotypeStep
-              wakeTime={wakeTime}
-              onWakeTime={setWakeTime}
-              sleepTime={sleepTime}
-              onSleepTime={setSleepTime}
-              peakFocus={peakFocus}
-              onPeakFocus={setPeakFocus}
-              lowEnergy={lowEnergy}
-              onLowEnergy={setLowEnergy}
-            />
-          )}
-          {step === 2 && <PeopleStep people={people} onChange={setPeople} />}
-          {step === 3 && (
-            <GoalsStep
-              goals={goals}
-              onGoals={setGoals}
-              habits={habits}
-              onHabits={setHabits}
-              habitDraft={habitDraft}
-              onHabitDraft={setHabitDraft}
-            />
-          )}
-        </motion.div>
-      </AnimatePresence>
+      {skipStepMotion ? (
+        // No exit animation to wait on, so the step swaps the instant `step`
+        // changes — the correct behavior under prefers-reduced-motion, and
+        // also what makes this branch usable for visual QA in an environment
+        // that can never complete a real animation (see reduceStepMotion above).
+        <div className="min-h-[16rem]">{stepBody}</div>
+      ) : (
+        // mode="wait" so the outgoing step can't overlap the incoming one and
+        // double the panel height mid-transition.
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="min-h-[16rem]"
+          >
+            {stepBody}
+          </motion.div>
+        </AnimatePresence>
+      )}
 
       {saveError && (
         <p role="alert" className="text-xs text-accent-family">
@@ -223,20 +250,31 @@ export function OnboardingWizard({ onDone }: { onDone: () => void }) {
 // ─── Step indicator ────────────────────────────────────────────────────────
 // The bar is a plain flex row: the document is dir="rtl", so it already fills
 // right-to-left in reading order without any manual reversing.
-function StepIndicator({ step }: { step: number }) {
+function StepIndicator({ step, skipMotion }: { step: number; skipMotion: boolean }) {
   return (
     <div>
       <div className="flex items-center gap-2" role="presentation">
-        {STEPS.map((s, i) => (
-          <div key={s.title} className="h-1 flex-1 overflow-hidden rounded-full bg-fill-subtle">
-            <motion.div
-              className="h-full rounded-full bg-[var(--gold)]"
-              initial={false}
-              animate={{ width: i <= step ? "100%" : "0%" }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
-            />
-          </div>
-        ))}
+        {STEPS.map((s, i) => {
+          const filled = i <= step;
+          return (
+            <div key={s.title} className="h-1 flex-1 overflow-hidden rounded-full bg-fill-subtle">
+              {skipMotion ? (
+                // Same reasoning as the step body: under prefers-reduced-motion
+                // (or the dev preview's instant mode) there is no fill-in to
+                // animate, so this jumps straight to its resting width instead
+                // of an animate target that could sit mid-transition forever.
+                <div className="h-full rounded-full bg-[var(--gold)]" style={{ width: filled ? "100%" : "0%" }} />
+              ) : (
+                <motion.div
+                  className="h-full rounded-full bg-[var(--gold)]"
+                  initial={false}
+                  animate={{ width: filled ? "100%" : "0%" }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
       <p className="mt-2 text-xs text-muted">
         שלב {step + 1} מתוך {STEPS.length}
