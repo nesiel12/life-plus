@@ -2,10 +2,13 @@
 // onto the app's existing shapes (camelCase, per types/index.ts) — kept in
 // one place so the store/components never need to know the DB's column
 // naming, and so a schema column rename only ever touches this file.
-import { LIFE_AREAS } from "@/lib/lifeAreas";
-import type { Database } from "@/types/database";
+import { LIFE_AREAS, LIFE_AREA_LIST } from "@/lib/lifeAreas";
+import { isDayPart } from "@/lib/onboarding/chronotype";
+import type { Database, Json } from "@/types/database";
 import type {
   Book,
+  ChronotypeSettings,
+  DayPart,
   ChatMessage,
   Goal,
   Habit,
@@ -15,6 +18,7 @@ import type {
   LearningResource,
   LearningTopic,
   LifeArea,
+  LifeAreaKey,
   ManualEvent,
   Meal,
   Moment,
@@ -169,8 +173,48 @@ export function toInsight(row: InsightRow): Insight {
   };
 }
 
+// jsonb is schemaless on the way out, so both structured columns are parsed
+// defensively rather than cast: a hand-edited row or a shape from an older
+// build must not crash the dashboard on hydrate.
+function toChronotype(value: unknown): ChronotypeSettings {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const raw = value as Record<string, unknown>;
+  const parts = (key: string): DayPart[] | undefined => {
+    const list = raw[key];
+    if (!Array.isArray(list)) return undefined;
+    const valid = list.filter(isDayPart);
+    return valid.length > 0 ? valid : undefined;
+  };
+  return {
+    wakeTime: typeof raw.wakeTime === "string" ? raw.wakeTime : undefined,
+    sleepTime: typeof raw.sleepTime === "string" ? raw.sleepTime : undefined,
+    peakFocusHours: parts("peakFocusHours"),
+    lowEnergyHours: parts("lowEnergyHours"),
+  };
+}
+
+function toCorePriorities(value: unknown): LifeAreaKey[] {
+  if (!Array.isArray(value)) return [];
+  const keys = new Set(LIFE_AREA_LIST.map((area) => area.key));
+  // Dedupe as well as validate — order carries the ranking, so a repeated
+  // key would silently outrank whatever followed it.
+  const seen = new Set<LifeAreaKey>();
+  const out: LifeAreaKey[] = [];
+  for (const entry of value) {
+    if (typeof entry === "string" && keys.has(entry as LifeAreaKey) && !seen.has(entry as LifeAreaKey)) {
+      seen.add(entry as LifeAreaKey);
+      out.push(entry as LifeAreaKey);
+    }
+  }
+  return out;
+}
+
 export function toPersonalDNA(row: PersonalDnaRow | null): PersonalDNA {
   return {
+    fullName: row?.full_name ?? undefined,
+    birthDate: row?.birth_date ?? undefined,
+    chronotype: toChronotype(row?.chronotype_settings),
+    corePriorities: toCorePriorities(row?.core_priorities),
     peakFocusHours: row?.peak_focus_hours ?? undefined,
     learningStyle: row?.learning_style ?? undefined,
     familyCheckInIntervalDays: row?.family_check_in_interval_days ?? undefined,
@@ -188,6 +232,10 @@ export function toPersonalDNA(row: PersonalDnaRow | null): PersonalDNA {
 // values for without clobbering the rest on upsert.
 export function toPersonalDnaPatch(patch: Partial<PersonalDNA>): PersonalDnaUpdate {
   const row: PersonalDnaUpdate = {};
+  if (patch.fullName !== undefined) row.full_name = patch.fullName || null;
+  if (patch.birthDate !== undefined) row.birth_date = patch.birthDate || null;
+  if (patch.chronotype !== undefined) row.chronotype_settings = patch.chronotype as Json;
+  if (patch.corePriorities !== undefined) row.core_priorities = patch.corePriorities as Json;
   if (patch.peakFocusHours !== undefined) row.peak_focus_hours = patch.peakFocusHours;
   if (patch.learningStyle !== undefined) row.learning_style = patch.learningStyle;
   if (patch.familyCheckInIntervalDays !== undefined) row.family_check_in_interval_days = patch.familyCheckInIntervalDays;

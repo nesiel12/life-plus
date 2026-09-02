@@ -8,6 +8,7 @@ import { ONBOARDING_QUESTIONS } from "@/lib/constants";
 import { Logo } from "@/components/ui/Logo";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
 import { DeepOnboardingChat } from "@/components/features/DeepOnboardingChat";
+import { OnboardingWizard } from "@/components/features/OnboardingWizard";
 import { useApiCall } from "@/hooks/useApiCall";
 import type { PersonalDNA } from "@/types";
 
@@ -120,8 +121,17 @@ function StaticOnboardingForm() {
   );
 }
 
+// The wizard is the default path: it collects structured DNA (priorities,
+// chronotype) that a free-text conversation can't reliably produce. The AI
+// conversation stays reachable behind a toggle rather than being deleted —
+// it's a real feature, and it's also the only path that can pick up a
+// half-finished session from its own transcript. The static question list
+// remains the fallback for when no AI provider is configured.
+type OnboardingMode = "wizard" | "chat";
+
 export function OnboardingFlow() {
   const onboardingComplete = useAtlasStore((s) => s.onboardingComplete);
+  const [mode, setMode] = useState<OnboardingMode>("wizard");
   const [useStaticForm, setUseStaticForm] = useState(false);
   // Closing hides the modal for now without marking onboarding complete —
   // reloading the page (or just coming back later) brings it back exactly
@@ -138,7 +148,7 @@ export function OnboardingFlow() {
       closeOnEscape
       zIndex={Z_INDEX.onboarding}
       backdropClassName="items-center bg-black/60 pt-0"
-      panelClassName="max-w-md flex flex-col gap-6 p-8"
+      panelClassName="max-w-xl flex flex-col gap-6 p-8"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -154,7 +164,17 @@ export function OnboardingFlow() {
         </button>
       </div>
 
-      {useStaticForm ? (
+      {mode === "wizard" ? (
+        <>
+          <OnboardingWizard onDone={() => setDismissed(true)} />
+          <button
+            onClick={() => setMode("chat")}
+            className="focus-ring -mt-2 self-center rounded-lg text-xs text-muted transition-colors hover:text-gold-ink"
+          >
+            מעדיף לספר לי בשיחה? עבור לשיחה עם Life Plus
+          </button>
+        </>
+      ) : useStaticForm ? (
         <StaticOnboardingForm />
       ) : (
         <DeepOnboardingChat onUnavailable={() => setUseStaticForm(true)} />

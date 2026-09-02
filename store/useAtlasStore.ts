@@ -47,10 +47,15 @@ import {
 } from "@/app/actions/calendar-events";
 import { updateLifeAreaScoreAction } from "@/app/actions/lifeAreas";
 import { updatePersonalDNAAction, completeOnboardingAction } from "@/app/actions/personalDna";
+import {
+  saveOnboardingWizardAction,
+  type OnboardingWizardPayload,
+} from "@/app/actions/onboarding";
 import { addGoalAction, toggleMilestoneAction, removeGoalAction } from "@/app/actions/goals";
 import { addUpcomingEventAction } from "@/app/actions/upcomingEvents";
 import { setTodayIntentionAction } from "@/app/actions/dailyIntention";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
+import { EMPTY_PERSONAL_DNA } from "@/types";
 import type {
   Book,
   ChatMessage,
@@ -224,6 +229,7 @@ interface AtlasState extends HydratedState {
 
   updatePersonalDNA: (patch: Partial<PersonalDNA>) => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  saveOnboardingWizard: (payload: OnboardingWizardPayload) => Promise<void>;
   // Local-only, no network call: app/api/onboarding/message already
   // persisted these server-side (Deep Onboarding, docs/ATLAS_ARCHITECTURE_
   // VISION.md §12) — this just merges the response into the store so the
@@ -256,7 +262,7 @@ const EMPTY_STATE: HydratedState = {
   knowledgeEntries: [],
   chatHistory: [],
   insights: [],
-  personalDNA: { habitNotes: [], motivationTriggers: [] },
+  personalDNA: EMPTY_PERSONAL_DNA,
   onboardingComplete: false,
   goals: [],
   todayIntention: "",
@@ -615,6 +621,20 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   completeOnboarding: async () => {
     set({ onboardingComplete: true });
     await completeOnboardingAction();
+  },
+
+  // Unlike completeOnboarding, this does NOT set onboardingComplete
+  // optimistically: the wizard writes people and goals as well, and the
+  // action only flips the flag once those have landed. Closing the modal on a
+  // write that then failed would strand the person with no way back in.
+  saveOnboardingWizard: async (payload) => {
+    const { personalDNA, newPeople, newGoals } = await saveOnboardingWizardAction(payload);
+    set((state) => ({
+      personalDNA,
+      onboardingComplete: true,
+      people: newPeople.length > 0 ? [...newPeople, ...state.people] : state.people,
+      goals: newGoals.length > 0 ? [...newGoals, ...state.goals] : state.goals,
+    }));
   },
 
   applyOnboardingProgress: ({ personalDNA, newPeople }) => {

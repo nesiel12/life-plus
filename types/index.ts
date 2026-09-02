@@ -210,7 +210,30 @@ export interface UpcomingEvent {
   googleEventId?: string; // set when this row is backed by a real Google Calendar event
 }
 
+// Coarse windows of the day, the vocabulary the chronotype step speaks in.
+// Labels and ordering live in lib/onboarding/chronotype.ts.
+export type DayPart = "earlyMorning" | "morning" | "afternoon" | "evening" | "night";
+
+export interface ChronotypeSettings {
+  /** "HH:MM", 24h. */
+  wakeTime?: string;
+  sleepTime?: string;
+  peakFocusHours?: DayPart[];
+  lowEnergyHours?: DayPart[];
+}
+
 export interface PersonalDNA {
+  /** What the person asked to be called — not necessarily users.name, which
+   *  is whatever Google returned at sign-in. */
+  fullName?: string;
+  /** "YYYY-MM-DD". */
+  birthDate?: string;
+  chronotype: ChronotypeSettings;
+  /** Ranked life areas, most important first. */
+  corePriorities: LifeAreaKey[];
+  /** Free-text rendering of chronotype.peakFocusHours, kept in sync by the
+   *  wizard because the AI signal pipeline and two UI surfaces still read the
+   *  original column. See summarizePeakFocus(). */
   peakFocusHours?: string;
   learningStyle?: string;
   familyCheckInIntervalDays?: number;
@@ -220,8 +243,22 @@ export interface PersonalDNA {
   motivationTriggers: string[];
 }
 
+export const EMPTY_PERSONAL_DNA: PersonalDNA = {
+  chronotype: {},
+  corePriorities: [],
+  habitNotes: [],
+  motivationTriggers: [],
+};
+
+// The legacy one-question-at-a-time fallback only drives the free-text
+// fields; the structured ones (chronotype, priorities) are the wizard's job.
+export type OnboardingTextField = Extract<
+  keyof PersonalDNA,
+  "peakFocusHours" | "learningStyle" | "familyCheckInIntervalDays" | "sleepNotes" | "careerNotes"
+>;
+
 export interface OnboardingQuestion {
-  id: keyof PersonalDNA;
+  id: OnboardingTextField;
   prompt: string;
 }
 

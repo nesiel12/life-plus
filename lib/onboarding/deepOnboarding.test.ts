@@ -7,9 +7,10 @@ import {
   isValidBirthday,
   mergePersonalDnaPatch,
 } from "@/lib/onboarding/deepOnboarding";
+import { EMPTY_PERSONAL_DNA } from "@/types";
 import type { PersonalDNA } from "@/types";
 
-const EMPTY_DNA: PersonalDNA = { habitNotes: [], motivationTriggers: [] };
+const EMPTY_DNA: PersonalDNA = EMPTY_PERSONAL_DNA;
 
 describe("deriveCoveredTopics", () => {
   it("returns nothing covered from a blank profile with no family", () => {
@@ -33,6 +34,8 @@ describe("deriveCoveredTopics", () => {
     const dna: PersonalDNA = {
       habitNotes: ["קם מוקדם"],
       motivationTriggers: [],
+      chronotype: {},
+      corePriorities: [],
       careerNotes: "מהנדס תוכנה",
       sleepNotes: "7 שעות בלילה",
       peakFocusHours: "06:00-09:00",
@@ -88,7 +91,7 @@ describe("mergePersonalDnaPatch", () => {
   });
 
   it("accumulates and dedupes array fields instead of replacing them", () => {
-    const existing: PersonalDNA = { habitNotes: ["קם מוקדם"], motivationTriggers: [] };
+    const existing: PersonalDNA = { ...EMPTY_PERSONAL_DNA, habitNotes: ["קם מוקדם"] };
     const patch = mergePersonalDnaPatch(existing, {
       people: [],
       habitNotes: ["קם מוקדם", "מתפלל בבוקר"],

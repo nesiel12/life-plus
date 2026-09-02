@@ -3,6 +3,10 @@
 //   npx supabase gen types typescript --linked > types/database.ts
 // and reconcile any drift — this file should not be hand-edited after that.
 
+// Postgres jsonb. Structured shapes live in types/index.ts
+// (ChronotypeSettings, LifeAreaKey[]); this is the transport type.
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
 export type LifeAreaKeyDb = "faith" | "family" | "knowledge" | "health" | "career";
 export type MomentCategoryDb = LifeAreaKeyDb | "general";
 export type ChatRoleDb = "user" | "assistant" | "system";
@@ -250,6 +254,11 @@ export interface Database {
           career_notes: string | null;
           motivation_triggers: string[];
           onboarding_complete: boolean;
+          full_name: string | null;
+          birth_date: string | null;
+          chronotype_settings: Json;
+          core_priorities: Json;
+          created_at: string;
           updated_at: string;
         },
         {
@@ -262,6 +271,10 @@ export interface Database {
           career_notes?: string | null;
           motivation_triggers?: string[];
           onboarding_complete?: boolean;
+          full_name?: string | null;
+          birth_date?: string | null;
+          chronotype_settings?: Json;
+          core_priorities?: Json;
         },
         {
           user_id?: string;
@@ -273,6 +286,10 @@ export interface Database {
           career_notes?: string | null;
           motivation_triggers?: string[];
           onboarding_complete?: boolean;
+          full_name?: string | null;
+          birth_date?: string | null;
+          chronotype_settings?: Json;
+          core_priorities?: Json;
         }
       >;
       goals: TableDef<
