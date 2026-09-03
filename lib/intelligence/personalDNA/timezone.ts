@@ -40,3 +40,29 @@ export function getLocalDayOfWeek(isoDateTime: string, timeZone: string = DEFAUL
 export function getLocalDateKey(isoDateTime: string, timeZone: string = DEFAULT_TIMEZONE): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date(isoDateTime));
 }
+
+// "YYYY-MM-DDTHH:MM" local wall clock — the exact shape lib/ai/agents/
+// calendarAgent.ts's parseLocalDateTime expects as "nowLocal" (its natural
+// counterpart, going the other direction). CalendarAgentPanel's own client-
+// side localNow() reads the browser's clock in the browser's own timezone;
+// this is that same idea for a server route with no browser to ask (the
+// Section AI Router, Sprint 6, resolving a scheduling request typed into
+// the main chat rather than the dedicated Calendar page) — so it falls back
+// to this module's DEFAULT_TIMEZONE, the same single-user assumption
+// getLocalHour/getLocalDayOfWeek/getLocalDateKey already make.
+export function getLocalWallClock(isoDateTime: string, timeZone: string = DEFAULT_TIMEZONE): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(new Date(isoDateTime));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  // Intl's 24-hour hour can format midnight as "24" in some engines — clamp
+  // it to "00" the same way getLocalHour already normalizes hour 24 to 0.
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return `${get("year")}-${get("month")}-${get("day")}T${hour}:${get("minute")}`;
+}

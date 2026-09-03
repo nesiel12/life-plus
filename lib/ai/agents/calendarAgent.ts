@@ -1,4 +1,8 @@
+import "server-only";
 import { z } from "zod";
+import { generateStructuredData } from "@/lib/ai";
+import { findFocusSlots, hasConflict, type Interval } from "@/lib/calendar/findFocusSlots";
+import type { ChronotypeSettings } from "@/types";
 
 // The CalendarAgent's own prompt and contract, kept out of the route so the
 // persona is versioned as a unit and can be reused (the Sprint 6 agent router
@@ -68,6 +72,31 @@ export function buildCalendarAgentPrompt(params: {
   ].join("\n");
 }
 
+const MAX_BUSY_SUMMARY_LINES = 60;
+
+/**
+ * Real busy intervals, rendered as the Hebrew lines the prompt above expects
+ * — extracted from app/api/ai/calendar-agent/route.ts (Sprint 1) alongside
+ * resolveCalendarIntent below, for the same reason: one formatting of "what's
+ * already on the calendar" that every caller shares, not a second copy that
+ * could quietly render busy time differently.
+ */
+export function summarizeBusyForPrompt(busy: { start: string; end: string; title?: string }[]): string {
+  return busy
+    .slice(0, MAX_BUSY_SUMMARY_LINES)
+    .map((b) => {
+      const start = new Date(b.start);
+      const end = new Date(b.end);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+      const day = start.toLocaleDateString("he-IL", { weekday: "long", day: "2-digit", month: "2-digit" });
+      const from = start.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+      const to = end.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+      return `- ${day} ${from}-${to}${b.title ? `: ${b.title}` : ""}`;
+    })
+    .filter((line): line is string => line !== null)
+    .join("\n");
+}
+
 /** "YYYY-MM-DDTHH:MM" in the user's local wall clock -> Date. */
 export function parseLocalDateTime(value: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value.trim());
@@ -75,4 +104,120 @@ export function parseLocalDateTime(value: string): Date | null {
   const [, y, mo, d, h, mi] = match.map(Number) as unknown as number[];
   const date = new Date(y, mo - 1, d, h, mi, 0, 0);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export interface ResolvedCalendarEvent {
+  title: string;
+  start: string; // ISO
+  end: string; // ISO
+  durationMinutes: number;
+}
+
+export type ResolveCalendarIntentResult =
+  | { status: "unclear"; clarification: string }
+  | { status: "proposed"; event: ResolvedCalendarEvent; conflict: boolean; alternatives: ReturnType<typeof findFocusSlots> };
+
+const DEFAULT_DURATION_MINUTES = 60;
+
+/**
+ * Classify + resolve, one call: natural language in, a *proposed* event out
+ * (never created — see the module header). Extracted from app/api/ai/
+ * calendar-agent/route.ts (Sprint 1) so a second caller — the Section AI
+ * Router (Sprint 6: a scheduling request typed into the main chat rather
+ * than the dedicated Calendar page) — resolves a request through the exact
+ * same tested pipeline instead of a parallel, potentially-diverging copy.
+ * The route still owns the HTTP contract (rate limiting, auth, the JSON
+ * shape it returns); this owns the actual interpretation.
+ */
+export type BusyEvent = Interval & { title?: string };
+
+export async function resolveCalendarIntent(params: {
+  message: string;
+  nowLocal: string;
+  timeZone: string;
+  busy: BusyEvent[];
+  chronotype: ChronotypeSettings;
+}): Promise<ResolveCalendarIntentResult> {
+  const intent = await generateStructuredData({
+    schema: calendarIntentSchema,
+    system: CALENDAR_AGENT_SYSTEM,
+    prompt: buildCalendarAgentPrompt({
+      message: params.message,
+      nowLocal: params.nowLocal,
+      timeZone: params.timeZone,
+      busySummary: summarizeBusyForPrompt(params.busy),
+    }),
+  });
+
+  if (intent.intent !== "create" || !intent.start || !intent.title) {
+    return {
+      status: "unclear",
+      clarification: intent.clarification ?? "לא הצלחתי להבין מתי לקבוע. אפשר לנסח שוב עם תאריך ושעה?",
+    };
+  }
+
+  const start = parseLocalDateTime(intent.start);
+  if (!start) {
+    return { status: "unclear", clarification: "לא הצלחתי לפענח את הזמן. אפשר לציין תאריך ושעה מפורשים?" };
+  }
+
+  const durationMinutes = intent.durationMinutes ?? DEFAULT_DURATION_MINUTES;
+  const end = new Date(start.getTime() + durationMinutes * 60_000);
+
+  // Conflict detection is ours, not the model's — see the module header.
+  const conflict = hasConflict(start.toISOString(), end.toISOString(), params.busy);
+  const alternatives = conflict
+    ? findFocusSlots({
+        day: start,
+        busy: params.busy,
+        chronotype: params.chronotype,
+        minDurationMinutes: durationMinutes,
+        maxResults: 3,
+      })
+    : [];
+
+  return {
+    status: "proposed",
+    event: { title: intent.title, start: start.toISOString(), end: end.toISOString(), durationMinutes },
+    conflict,
+    alternatives,
+  };
+}
+
+function formatWhen(iso: string): string {
+  return new Date(iso).toLocaleDateString("he-IL", { weekday: "long", day: "2-digit", month: "2-digit" });
+}
+
+function formatRange(start: string, end: string): string {
+  const fmt = (iso: string) => new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+  return `${fmt(start)}–${fmt(end)}`;
+}
+
+/**
+ * A resolved proposal, narrated deterministically rather than asked of the
+ * model a second time — the same reasoning as never asking it to do the
+ * interval arithmetic in the first place: a scheduling proposal is a
+ * structured fact, and restating it in words is exactly where a model can
+ * quietly swap a date or drop a conflict. This never claims the event was
+ * created — see the module header, this route never writes.
+ */
+export function formatCalendarReply(result: ResolveCalendarIntentResult): string {
+  if (result.status === "unclear") return result.clarification;
+
+  const { event, conflict, alternatives } = result;
+  const when = `${formatWhen(event.start)}, ${formatRange(event.start, event.end)}`;
+  const lines = [`אפשר לקבוע "${event.title}" ב-${when}.`];
+
+  if (conflict) {
+    lines.push("שים לב: יש לך משהו אחר קבוע באותו זמן.");
+    if (alternatives.length > 0) {
+      lines.push(
+        "כמה זמנים פנויים חלופיים:",
+        ...alternatives.map((slot) => `- ${formatWhen(slot.start)}, ${formatRange(slot.start, slot.end)}`)
+      );
+    }
+  }
+
+  lines.push('כדי לקבוע את זה בפועל, עבור ליומן החכם ואשר שם.');
+  return lines.join("\n");
 }

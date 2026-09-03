@@ -4,8 +4,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
-import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
-import { TASK_AGENT_SYSTEM, buildTaskAgentPrompt, taskAssistSchema } from "@/lib/ai/agents/taskAgent";
+import { isProviderConfigured } from "@/lib/ai";
+import { resolveTaskAssist } from "@/lib/ai/agents/taskAgent";
 
 // TaskAgent endpoint (Sprint 5): "help me with this task" for one task, one
 // call. See lib/ai/agents/taskAgent.ts for the mode split and the honesty
@@ -41,11 +41,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const assist = await generateStructuredData({
-      schema: taskAssistSchema,
-      system: TASK_AGENT_SYSTEM,
-      prompt: buildTaskAgentPrompt(parsed.data),
-    });
+    const assist = await resolveTaskAssist(parsed.data);
     return NextResponse.json({ assist });
   } catch {
     return NextResponse.json({ error: "עוזר הביצוע לא זמין כרגע. נסה שוב." }, { status: 502 });

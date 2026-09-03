@@ -3,12 +3,26 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { getUserByEmail } from "@/lib/db/users";
+import { transactionsRepo } from "@/lib/db/transactions";
+import { tasksRepo } from "@/lib/db/tasks";
+import { learningTopicsRepo, learningResourcesRepo } from "@/lib/db/learning";
+import { toTransaction, toTask, toLearningTopic, toLearningResource, toPersonalDNA } from "@/lib/mappers";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { encodeBasedOnHeader } from "@/lib/api/basedOnHeader";
 import { buildSystemPrompt } from "@/lib/chatSystemPrompt";
 import { buildAtlasContext } from "@/lib/context/buildAtlasContext";
 import { streamChatReply, isProviderConfigured } from "@/lib/ai";
+import {
+  classifyRouterDomain,
+  groundFinance,
+  groundStudy,
+  groundTaskDomain,
+  type DomainGrounding,
+} from "@/lib/ai/agentRouter";
+import { formatCalendarReply, resolveCalendarIntent, type BusyEvent } from "@/lib/ai/agents/calendarAgent";
+import { buildSnapshot, type AnalyzableTransaction } from "@/lib/finances/analyze";
+import { getLocalWallClock } from "@/lib/intelligence/personalDNA/timezone";
 import { fetchGoogleCalendarEvents, type GoogleCalendarEvent } from "@/lib/googleCalendar/fetchEvents";
 
 export const runtime = "nodejs";
@@ -16,6 +30,7 @@ export const runtime = "nodejs";
 const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 }; // 20 messages / 5 min
 const MAX_BASED_ON = 3;
 const SCHEDULE_CONTEXT_WINDOW_DAYS = 14;
+const DEFAULT_TIME_ZONE = "Asia/Jerusalem"; // matches lib/intelligence/personalDNA/timezone.ts's own default
 
 // AI Context Injection (Smart Calendar & Google Calendar Integration): the
 // same real events app/calendar/page.tsx displays, formatted as prompt-
@@ -88,7 +103,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const user = await getUserByEmail(token.email);
+    // The Section AI Router (Sprint 6): classified in parallel with the user
+    // lookup below since it only needs the message text, not the DB — this
+    // never adds sequential latency to the common case, and a classification
+    // failure degrades to "general" (see classifyRouterDomain), which is
+    // exactly this route's own pre-Sprint-6 behavior. Only three domains
+    // actually change what happens below (finance/tasks/study); "calendar"
+    // and "general" both fall through to the same context-grounded persona
+    // reply this route always gave — see lib/ai/agentRouter.ts's header for
+    // why "calendar" only sometimes shortcuts and "memories" isn't routed
+    // here at all.
+    const [user, routerDomain] = await Promise.all([getUserByEmail(token.email), classifyRouterDomain(message)]);
 
     // AI Context Injection (Smart Calendar & Google Calendar Integration,
     // CRITICAL per the founder's own framing): the real schedule, next 14
@@ -97,6 +122,7 @@ export async function POST(request: NextRequest) {
     // fallback contract. A calendar hiccup should degrade the reply's
     // context, never break the chat itself.
     let scheduledEvents: string[] = [];
+    let scheduledCalendarEvents: GoogleCalendarEvent[] = [];
     const accessToken = token.error ? undefined : token.accessToken;
     if (accessToken) {
       try {
@@ -104,17 +130,76 @@ export async function POST(request: NextRequest) {
         const until = new Date(now.getTime() + SCHEDULE_CONTEXT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
         const events = await fetchGoogleCalendarEvents(accessToken, now.toISOString(), until.toISOString());
         scheduledEvents = events.map(formatScheduledEvent);
+        scheduledCalendarEvents = events;
       } catch {
         // Proceed without calendar context — see comment above.
       }
     }
 
     const context = user ? await buildAtlasContext(user.id, { query: message, scheduledEvents }) : undefined;
+
+    // Calendar is the one domain that short-circuits: a scheduling proposal
+    // is a structured fact (a time, a conflict, real alternatives), and
+    // asking the persona to restate it in words a second time is exactly
+    // where a model could quietly swap the date or drop the conflict — see
+    // formatCalendarReply's own header. Only attempted when there's a real
+    // busy set to check against; with no Google connection there's nothing
+    // honest to propose, so this falls through to the general reply below,
+    // which still has the room to explain that itself from context.
+    if (routerDomain === "calendar" && accessToken && context) {
+      const busy: BusyEvent[] = scheduledCalendarEvents.map((e) => ({ start: e.start, end: e.end, title: e.title }));
+      const nowIso = new Date().toISOString();
+      try {
+        const resolved = await resolveCalendarIntent({
+          message,
+          nowLocal: getLocalWallClock(nowIso, DEFAULT_TIME_ZONE),
+          timeZone: DEFAULT_TIME_ZONE,
+          busy,
+          chronotype: toPersonalDNA(context.personalDNA).chronotype,
+        });
+        return textResponse(formatCalendarReply(resolved), ["סוכן היומן"]);
+      } catch {
+        // Falls through to the general reply below — an unresolved
+        // scheduling request still deserves *an* answer, just not one that
+        // pretends the schedule pipeline is grounding it.
+      }
+    }
+
+    // finance/tasks/study: real repo data, deterministically summarized
+    // (lib/ai/agentRouter.ts), appended to the same persona system prompt
+    // the general path already builds — one voice app-wide, facts the model
+    // never had to invent. Only user-scoped domains get here; "general" (or
+    // "calendar" falling through from above) leaves `grounding` null and the
+    // reply is exactly what this route always produced.
+    let grounding: DomainGrounding | null = null;
+    if (user && (routerDomain === "finance" || routerDomain === "tasks" || routerDomain === "study")) {
+      if (routerDomain === "finance") {
+        const rows = await transactionsRepo.list(user.id);
+        const transactions: AnalyzableTransaction[] = rows
+          .map(toTransaction)
+          .map((t) => ({ amount: t.amount, type: t.type, category: t.category, date: t.date }));
+        grounding = groundFinance(buildSnapshot(transactions));
+      } else if (routerDomain === "tasks") {
+        const rows = await tasksRepo.list(user.id);
+        grounding = await groundTaskDomain(rows.map(toTask), message, new Date());
+      } else {
+        const [topicRows, resourceRows] = await Promise.all([
+          learningTopicsRepo.list(user.id),
+          learningResourcesRepo.list(user.id),
+        ]);
+        grounding = groundStudy(topicRows.map(toLearningTopic), resourceRows.map(toLearningResource));
+      }
+    }
+
     const { prompt, topSignals } = buildSystemPrompt(context);
-    const basedOn = topSignals.slice(0, MAX_BASED_ON).map((signal) => signal.summary);
+    const basePrompt = grounding ? `${prompt}\n\n${grounding.lines.join("\n")}` : prompt;
+    // The routed domain's own real facts are strictly more relevant to cite
+    // for this turn than the general proactive engine's picks, so they
+    // replace basedOn rather than append to it.
+    const basedOn = grounding ? grounding.basedOn : topSignals.slice(0, MAX_BASED_ON).map((signal) => signal.summary);
 
     const result = streamChatReply({
-      system: prompt,
+      system: basePrompt,
       messages: [...history, { role: "user", content: message }],
     });
 

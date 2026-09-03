@@ -4,14 +4,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
-import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
-import {
-  CALENDAR_AGENT_SYSTEM,
-  buildCalendarAgentPrompt,
-  calendarIntentSchema,
-  parseLocalDateTime,
-} from "@/lib/ai/agents/calendarAgent";
-import { findFocusSlots, hasConflict, type Interval } from "@/lib/calendar/findFocusSlots";
+import { isProviderConfigured } from "@/lib/ai";
+import { resolveCalendarIntent } from "@/lib/ai/agents/calendarAgent";
 import { isDayPart } from "@/lib/onboarding/chronotype";
 import type { ChronotypeSettings, DayPart } from "@/types";
 
@@ -22,13 +16,19 @@ import type { ChronotypeSettings, DayPart } from "@/types";
 // the agent understood, including any conflict, and a separate explicit call
 // creates the event. An agent that both interprets and mutates in one step
 // makes a misparse ("next Sunday" -> wrong week) unrecoverable.
+//
+// The actual interpretation (classify -> resolve -> conflict-check ->
+// alternatives) lives in lib/ai/agents/calendarAgent.ts's resolveCalendarIntent
+// — this route owns only the HTTP contract (auth, rate limit, request
+// validation), so the Section AI Router (Sprint 6: the same kind of request
+// typed into the main chat) resolves through the identical tested pipeline
+// rather than a second, potentially-diverging copy of it.
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 };
 const MAX_BUSY = 60;
-const DEFAULT_DURATION_MINUTES = 60;
 
 const intervalSchema = z.object({
   start: z.string(),
@@ -53,30 +53,13 @@ const requestSchema = z.object({
 });
 
 function toChronotype(raw: z.infer<typeof requestSchema>["chronotype"]): ChronotypeSettings {
-  const keep = (values: string[] | undefined): DayPart[] | undefined =>
-    values?.filter(isDayPart);
+  const keep = (values: string[] | undefined): DayPart[] | undefined => values?.filter(isDayPart);
   return {
     wakeTime: raw.wakeTime,
     sleepTime: raw.sleepTime,
     peakFocusHours: keep(raw.peakFocusHours),
     lowEnergyHours: keep(raw.lowEnergyHours),
   };
-}
-
-function summarizeBusy(busy: { start: string; end: string; title?: string }[]): string {
-  return busy
-    .slice(0, MAX_BUSY)
-    .map((b) => {
-      const start = new Date(b.start);
-      const end = new Date(b.end);
-      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
-      const day = start.toLocaleDateString("he-IL", { weekday: "long", day: "2-digit", month: "2-digit" });
-      const from = start.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-      const to = end.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-      return `- ${day} ${from}-${to}${b.title ? `: ${b.title}` : ""}`;
-    })
-    .filter(Boolean)
-    .join("\n");
 }
 
 export async function POST(request: Request) {
@@ -105,63 +88,10 @@ export async function POST(request: Request) {
   const { message, nowLocal, timeZone, busy } = parsed.data;
   const chronotype = toChronotype(parsed.data.chronotype);
 
-  let intent;
   try {
-    intent = await generateStructuredData({
-      schema: calendarIntentSchema,
-      system: CALENDAR_AGENT_SYSTEM,
-      prompt: buildCalendarAgentPrompt({
-        message,
-        nowLocal,
-        timeZone,
-        busySummary: summarizeBusy(busy),
-      }),
-    });
+    const result = await resolveCalendarIntent({ message, nowLocal, timeZone, busy, chronotype });
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: "סוכן היומן לא זמין כרגע. נסה שוב." }, { status: 502 });
   }
-
-  if (intent.intent !== "create" || !intent.start || !intent.title) {
-    return NextResponse.json({
-      status: "unclear" as const,
-      clarification: intent.clarification ?? "לא הצלחתי להבין מתי לקבוע. אפשר לנסח שוב עם תאריך ושעה?",
-    });
-  }
-
-  const start = parseLocalDateTime(intent.start);
-  if (!start) {
-    return NextResponse.json({
-      status: "unclear" as const,
-      clarification: "לא הצלחתי לפענח את הזמן. אפשר לציין תאריך ושעה מפורשים?",
-    });
-  }
-
-  const durationMinutes = intent.durationMinutes ?? DEFAULT_DURATION_MINUTES;
-  const end = new Date(start.getTime() + durationMinutes * 60_000);
-
-  // Conflict detection is ours, not the model's — see the module header.
-  const busyIntervals: Interval[] = busy.map((b) => ({ start: b.start, end: b.end }));
-  const conflict = hasConflict(start.toISOString(), end.toISOString(), busyIntervals);
-
-  const alternatives = conflict
-    ? findFocusSlots({
-        day: start,
-        busy: busyIntervals,
-        chronotype,
-        minDurationMinutes: durationMinutes,
-        maxResults: 3,
-      })
-    : [];
-
-  return NextResponse.json({
-    status: "proposed" as const,
-    event: {
-      title: intent.title,
-      start: start.toISOString(),
-      end: end.toISOString(),
-      durationMinutes,
-    },
-    conflict,
-    alternatives,
-  });
 }

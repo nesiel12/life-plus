@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSnapshot, summarizeByMonth, type AnalyzableTransaction } from "@/lib/finances/analyze";
+import { buildSnapshot, formatSnapshotForPrompt, summarizeByMonth, type AnalyzableTransaction } from "@/lib/finances/analyze";
 
 const tx = (
   date: string,
@@ -103,5 +103,50 @@ describe("buildSnapshot", () => {
   it("returns null when there is nothing to analyse", () => {
     expect(buildSnapshot([])).toBeNull();
     expect(buildSnapshot([tx("2026-01-01", 10, "expense")], "2099-01")).toBeNull();
+  });
+});
+
+describe("formatSnapshotForPrompt", () => {
+  const data = [
+    tx("2026-01-05", 10000, "income", "salary"),
+    tx("2026-01-06", 2000, "expense", "groceries"),
+    tx("2026-02-05", 12000, "income", "salary"),
+    tx("2026-02-06", 3000, "expense", "groceries"),
+  ];
+
+  it("states the real numbers, not a paraphrase — a prompt line the model could subtly reword", () => {
+    const snap = buildSnapshot(data, "2026-02")!;
+    const lines = formatSnapshotForPrompt(snap);
+    expect(lines).toContain("חודש: 2026-02");
+    expect(lines).toContain("הכנסות: 12000 ₪");
+    expect(lines).toContain("הוצאות: 3000 ₪");
+    expect(lines).toContain("נטו: 9000 ₪");
+    expect(lines).toContain("שיעור חיסכון: 75%");
+  });
+
+  it("names the real top category with its real share, not a generic mention", () => {
+    const snap = buildSnapshot(data, "2026-02")!;
+    const lines = formatSnapshotForPrompt(snap);
+    expect(lines.some((l) => l.includes("סופר ומכולת") && l.includes("3000 ₪") && l.includes("100%"))).toBe(true);
+  });
+
+  it("says plainly when savings rate can't be computed, rather than a misleading 0%", () => {
+    const snap = buildSnapshot([tx("2026-01-01", 50, "expense", "groceries")], "2026-01")!;
+    const lines = formatSnapshotForPrompt(snap);
+    expect(lines).toContain("שיעור חיסכון: לא ניתן לחישוב (אין הכנסה)");
+  });
+
+  it("says plainly when there is no prior month, rather than a fabricated delta", () => {
+    const snap = buildSnapshot(data, "2026-01")!;
+    const lines = formatSnapshotForPrompt(snap);
+    expect(lines).toContain("אין חודש קודם להשוואה.");
+  });
+
+  it("signs a positive delta and states a real month-over-month comparison", () => {
+    const snap = buildSnapshot(data, "2026-02")!;
+    const lines = formatSnapshotForPrompt(snap);
+    expect(lines.some((l) => l.startsWith("מול החודש הקודם:") && l.includes("+2000") && l.includes("+1000"))).toBe(
+      true
+    );
   });
 });

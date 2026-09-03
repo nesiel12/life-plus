@@ -11,7 +11,7 @@ import {
   categorizationSchema,
   cfoAnalysisSchema,
 } from "@/lib/ai/agents/financeAgent";
-import { buildSnapshot } from "@/lib/finances/analyze";
+import { buildSnapshot, formatSnapshotForPrompt } from "@/lib/finances/analyze";
 import { EXPENSE_KEYS, INCOME_KEYS, isCategoryKey } from "@/lib/finances/categories";
 
 export const runtime = "nodejs";
@@ -113,27 +113,7 @@ export async function POST(request: Request) {
     const analysis = await generateStructuredData({
       schema: cfoAnalysisSchema,
       system: CFO_SYSTEM,
-      prompt: [
-        `חודש: ${snapshot.month}`,
-        `הכנסות: ${snapshot.income} ₪`,
-        `הוצאות: ${snapshot.expenses} ₪`,
-        `נטו: ${snapshot.net} ₪`,
-        snapshot.savingsRate !== null ? `שיעור חיסכון: ${snapshot.savingsRate}%` : "שיעור חיסכון: לא ניתן לחישוב (אין הכנסה)",
-        "",
-        "קטגוריות ההוצאה הגדולות:",
-        ...snapshot.topCategories.map((c) => `- ${c.label}: ${c.total} ₪ (${Math.round(c.share * 100)}%)`),
-        "",
-        `עסקי: הכנסות ${snapshot.business.income} ₪, הוצאות ${snapshot.business.expenses} ₪`,
-        `אישי: הכנסות ${snapshot.personal.income} ₪, הוצאות ${snapshot.personal.expenses} ₪`,
-        "",
-        snapshot.vsPreviousMonth
-          ? `מול החודש הקודם: הכנסות ${snapshot.vsPreviousMonth.incomeDelta >= 0 ? "+" : ""}${snapshot.vsPreviousMonth.incomeDelta} ₪, הוצאות ${snapshot.vsPreviousMonth.expenseDelta >= 0 ? "+" : ""}${snapshot.vsPreviousMonth.expenseDelta} ₪${snapshot.vsPreviousMonth.expensePctChange !== null ? ` (${snapshot.vsPreviousMonth.expensePctChange}%)` : ""}`
-          : "אין חודש קודם להשוואה.",
-        snapshot.trailingAverageExpenses !== null
-          ? `ממוצע הוצאות בחודשים הקודמים: ${snapshot.trailingAverageExpenses} ₪`
-          : "אין מספיק היסטוריה לממוצע.",
-        `סה"כ חודשים בנתונים: ${snapshot.monthsCovered}`,
-      ].join("\n"),
+      prompt: formatSnapshotForPrompt(snapshot).join("\n"),
     });
 
     return NextResponse.json({ mode: "analyze" as const, snapshot, analysis });

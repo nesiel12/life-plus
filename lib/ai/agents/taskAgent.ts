@@ -1,4 +1,6 @@
+import "server-only";
 import { z } from "zod";
+import { generateStructuredData } from "@/lib/ai";
 
 // TaskAgent (Sprint 5): the "beyond lists" layer. A task title alone rarely
 // says what kind of help it needs, so this is one classifying call rather
@@ -68,4 +70,19 @@ export function buildTaskAgentPrompt(params: { title: string; description?: stri
   const lines = [`כותרת המשימה: ${params.title}`];
   if (params.description?.trim()) lines.push(`תיאור נוסף: ${params.description.trim()}`);
   return lines.join("\n");
+}
+
+/**
+ * The one call site for the classify-and-help step, extracted from
+ * app/api/ai/task-agent/route.ts (Sprint 5) so a second caller — the Section
+ * AI Router (Sprint 6: "עזור לי עם המשימה X" typed into the main chat rather
+ * than clicked from TaskCard) — gets help through the exact same tested
+ * pipeline instead of a parallel copy of the schema/system/prompt wiring.
+ */
+export async function resolveTaskAssist(params: { title: string; description?: string }): Promise<TaskAssist> {
+  return generateStructuredData({
+    schema: taskAssistSchema,
+    system: TASK_AGENT_SYSTEM,
+    prompt: buildTaskAgentPrompt(params),
+  });
 }

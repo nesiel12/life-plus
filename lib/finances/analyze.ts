@@ -150,3 +150,35 @@ export function buildSnapshot(
     monthsCovered: months.length,
   };
 }
+
+/**
+ * The snapshot as fact-lines for an AI prompt — extracted from
+ * app/api/ai/finance-agent's inline prompt build (Sprint 4) so a second
+ * consumer (the Section AI Router, Sprint 6: a finance question asked
+ * through the main chat) states the exact same numbers instead of
+ * re-deriving a formatter that could quietly drift from the CFO panel's own.
+ * One snapshot, one Hebrew rendering of it, everywhere it's shown to a model.
+ */
+export function formatSnapshotForPrompt(snapshot: FinancialSnapshot): string[] {
+  return [
+    `חודש: ${snapshot.month}`,
+    `הכנסות: ${snapshot.income} ₪`,
+    `הוצאות: ${snapshot.expenses} ₪`,
+    `נטו: ${snapshot.net} ₪`,
+    snapshot.savingsRate !== null ? `שיעור חיסכון: ${snapshot.savingsRate}%` : "שיעור חיסכון: לא ניתן לחישוב (אין הכנסה)",
+    "",
+    "קטגוריות ההוצאה הגדולות:",
+    ...snapshot.topCategories.map((c) => `- ${c.label}: ${c.total} ₪ (${Math.round(c.share * 100)}%)`),
+    "",
+    `עסקי: הכנסות ${snapshot.business.income} ₪, הוצאות ${snapshot.business.expenses} ₪`,
+    `אישי: הכנסות ${snapshot.personal.income} ₪, הוצאות ${snapshot.personal.expenses} ₪`,
+    "",
+    snapshot.vsPreviousMonth
+      ? `מול החודש הקודם: הכנסות ${snapshot.vsPreviousMonth.incomeDelta >= 0 ? "+" : ""}${snapshot.vsPreviousMonth.incomeDelta} ₪, הוצאות ${snapshot.vsPreviousMonth.expenseDelta >= 0 ? "+" : ""}${snapshot.vsPreviousMonth.expenseDelta} ₪${snapshot.vsPreviousMonth.expensePctChange !== null ? ` (${snapshot.vsPreviousMonth.expensePctChange}%)` : ""}`
+      : "אין חודש קודם להשוואה.",
+    snapshot.trailingAverageExpenses !== null
+      ? `ממוצע הוצאות בחודשים הקודמים: ${snapshot.trailingAverageExpenses} ₪`
+      : "אין מספיק היסטוריה לממוצע.",
+    `סה"כ חודשים בנתונים: ${snapshot.monthsCovered}`,
+  ];
+}
