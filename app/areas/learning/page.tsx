@@ -6,6 +6,7 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { useApiCall } from "@/hooks/useApiCall";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TopicCard } from "@/components/features/learning/TopicCard";
+import { VideoStudyPanel } from "@/components/features/learning/VideoStudyPanel";
 
 // Learning & Knowledge Space (Phase 7): replaces the previous generic
 // AreaMomentsView placeholder (which just logged free-text "knowledge"
@@ -43,6 +44,11 @@ export default function LearningSpacePage() {
       <p className="mb-8 text-sm text-muted">
         מרחב הלמידה האישי שלך — נושאים, מקורות והדרכה מבוססת AI, כל נושא עם מסלול משלו.
       </p>
+
+      <GlassCard className="mb-8">
+        <p className="mb-4 text-sm font-medium text-muted">צפה ולמד בתוך Life Plus</p>
+        <VideoStudyPanel />
+      </GlassCard>
 
       <GlassCard delay={0} className="mb-6">
         <p className="mb-3 text-sm font-medium text-muted">נושא לימוד חדש</p>
