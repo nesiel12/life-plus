@@ -1,4 +1,5 @@
 import "server-only";
+import { sanitizeEventTitle } from "@/lib/calendar/sanitizeEventTitle";
 
 export interface GoogleCalendarEvent {
   id: string;
@@ -49,7 +50,10 @@ export async function fetchGoogleCalendarEvents(
     .filter((item) => item.start?.dateTime && item.end?.dateTime)
     .map((item) => ({
       id: item.id,
-      title: item.summary ?? "(ללא כותרת)",
+      // Cleaned on read too, not just on write: titles created before the
+      // sanitizer existed (or by any other client) are already in the
+      // user's calendar and would otherwise still render garbled.
+      title: sanitizeEventTitle(item.summary),
       start: item.start?.dateTime as string,
       end: item.end?.dateTime as string,
     }));

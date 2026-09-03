@@ -546,11 +546,25 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     set((state) => ({ learningTopics: [created, ...state.learningTopics] }));
   },
 
+  // Optimistic with rollback (same shape as toggleHabitCompletion above).
+  // The status chip is a tap-to-cycle control, so waiting on a round trip
+  // before the label changes made every tap feel broken.
   updateLearningTopic: async (topicId, patch) => {
-    const updated = await updateLearningTopicAction(topicId, patch);
+    const previous = get().learningTopics;
     set((state) => ({
-      learningTopics: state.learningTopics.map((t) => (t.id === topicId ? updated : t)),
+      learningTopics: state.learningTopics.map((t) => (t.id === topicId ? { ...t, ...patch } : t)),
     }));
+    try {
+      const updated = await updateLearningTopicAction(topicId, patch);
+      // Reconcile with the server's canonical row — the optimistic merge
+      // above is a local guess, this is the truth.
+      set((state) => ({
+        learningTopics: state.learningTopics.map((t) => (t.id === topicId ? updated : t)),
+      }));
+    } catch (err) {
+      set({ learningTopics: previous });
+      throw err;
+    }
   },
 
   deleteLearningTopic: async (topicId) => {
@@ -566,11 +580,23 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     set((state) => ({ learningResources: [...state.learningResources, created] }));
   },
 
+  // Optimistic with rollback. This is the checklist tick: it must flip the
+  // instant it's clicked, not after a server round trip — awaiting the
+  // action first is exactly what made the list feel sluggish.
   updateLearningResource: async (resourceId, patch) => {
-    const updated = await updateLearningResourceAction(resourceId, patch);
+    const previous = get().learningResources;
     set((state) => ({
-      learningResources: state.learningResources.map((r) => (r.id === resourceId ? updated : r)),
+      learningResources: state.learningResources.map((r) => (r.id === resourceId ? { ...r, ...patch } : r)),
     }));
+    try {
+      const updated = await updateLearningResourceAction(resourceId, patch);
+      set((state) => ({
+        learningResources: state.learningResources.map((r) => (r.id === resourceId ? updated : r)),
+      }));
+    } catch (err) {
+      set({ learningResources: previous });
+      throw err;
+    }
   },
 
   deleteLearningResource: async (resourceId) => {

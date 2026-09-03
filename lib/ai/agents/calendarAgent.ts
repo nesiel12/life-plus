@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { generateStructuredData } from "@/lib/ai";
 import { findFocusSlots, hasConflict, type Interval } from "@/lib/calendar/findFocusSlots";
+import { sanitizeEventTitle } from "@/lib/calendar/sanitizeEventTitle";
 import type { ChronotypeSettings } from "@/types";
 
 // The CalendarAgent's own prompt and contract, kept out of the route so the
@@ -69,6 +70,33 @@ export function buildCalendarAgentPrompt(params: {
     params.busySummary || "(אין אירועים)",
     "",
     `בקשת המשתמש: ${params.message}`,
+  ].join("\n");
+}
+
+export interface ClarificationTurn {
+  /** The agent's question. */
+  question: string;
+  /** What the user answered. */
+  answer: string;
+}
+
+/**
+ * Folds a clarification exchange back into a single request string.
+ *
+ * The agent is stateless by design (one message in, one resolution out —
+ * see resolveCalendarIntent), so answering "מחר ב-3" to "באיזה יום?" has to
+ * carry its own context or the agent has no idea what "3" refers to. Rather
+ * than give the route a conversation API it doesn't need, the panel replays
+ * the thread as one self-contained message. Pure and exported so the
+ * composition is testable without an LLM call.
+ */
+export function buildClarifiedMessage(original: string, turns: ClarificationTurn[]): string {
+  if (turns.length === 0) return original;
+  return [
+    `הבקשה המקורית: ${original}`,
+    ...turns.flatMap((turn) => [`שאלת הבהרה: ${turn.question}`, `תשובת המשתמש: ${turn.answer}`]),
+    "",
+    "על סמך כל מה שנאמר עד כה, קבע את האירוע. אל תשאל שוב על פרט שכבר נענה.",
   ].join("\n");
 }
 
@@ -178,7 +206,16 @@ export async function resolveCalendarIntent(params: {
 
   return {
     status: "proposed",
-    event: { title: intent.title, start: start.toISOString(), end: end.toISOString(), durationMinutes },
+    // Sanitized here, at the boundary where a model-generated string first
+    // becomes a real event: this proposal is what the confirm step writes
+    // straight into the user's Google Calendar, so a mangled title fixed
+    // any later is already too late.
+    event: {
+      title: sanitizeEventTitle(intent.title),
+      start: start.toISOString(),
+      end: end.toISOString(),
+      durationMinutes,
+    },
     conflict,
     alternatives,
   };

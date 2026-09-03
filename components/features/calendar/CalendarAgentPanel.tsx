@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { AlertTriangle, CalendarPlus, Check, Send, Sparkles } from "lucide-react";
+import { AlertTriangle, CalendarPlus, Check, CornerDownLeft, Send, Sparkles } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
+import { buildClarifiedMessage, type ClarificationTurn } from "@/lib/ai/agents/calendarAgent";
 import { cn } from "@/lib/utils";
 import type { FocusSlot } from "@/lib/calendar/findFocusSlots";
 
@@ -51,6 +52,14 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
   const chronotype = useAtlasStore((s) => s.personalDNA.chronotype);
 
   const [message, setMessage] = useState("");
+  // The clarification loop's memory. `original` is the request that started
+  // this exchange and `turns` every question/answer since — replayed as one
+  // self-contained message (buildClarifiedMessage) because the agent itself
+  // is stateless, so a bare "מחר ב-3" would otherwise arrive with no idea
+  // what it refers to.
+  const [original, setOriginal] = useState("");
+  const [turns, setTurns] = useState<ClarificationTurn[]>([]);
+  const [reply, setReply] = useState("");
   const [response, setResponse] = useState<AgentResponse | null>(null);
   const [pending, setPending] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -60,6 +69,23 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
   async function interpret() {
     const trimmed = message.trim();
     if (!trimmed || pending) return;
+    setOriginal(trimmed);
+    setTurns([]);
+    setReply("");
+    await send(trimmed);
+  }
+
+  /** Answers the agent's clarifying question in place, keeping the thread. */
+  async function sendClarification() {
+    const answer = reply.trim();
+    if (!answer || pending || response?.status !== "unclear") return;
+    const nextTurns = [...turns, { question: response.clarification, answer }];
+    setTurns(nextTurns);
+    setReply("");
+    await send(buildClarifiedMessage(original, nextTurns));
+  }
+
+  async function send(composed: string) {
     setPending(true);
     setError(null);
     setResponse(null);
@@ -69,7 +95,7 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: trimmed,
+          message: composed,
           nowLocal: localNow(),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           busy,
@@ -155,15 +181,45 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
 
       <AnimatePresence mode="wait">
         {response?.status === "unclear" && (
-          <motion.p
+          <motion.div
             key="unclear"
             initial={reduce ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
-            className="rounded-xl border border-hairline-card bg-surface-sunken px-3 py-2.5 text-sm text-foreground"
+            className="flex flex-col gap-3 rounded-xl border border-hairline-card bg-surface-sunken p-4"
           >
-            {response.clarification}
-          </motion.p>
+            {/* Every answered round stays visible, so a multi-step exchange
+                reads as a conversation rather than a question that keeps
+                replacing itself. */}
+            {turns.map((turn, i) => (
+              <div key={`${turn.question}-${i}`} className="flex flex-col gap-1 text-xs">
+                <p className="text-muted">{turn.question}</p>
+                <p className="text-foreground/80">{turn.answer}</p>
+              </div>
+            ))}
+
+            <p className="text-sm text-foreground">{response.clarification}</p>
+
+            <div className="flex gap-2">
+              <input
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendClarification()}
+                placeholder="ענה כאן…"
+                aria-label="תשובה לשאלת ההבהרה"
+                autoFocus
+                className="focus-ring flex-1 rounded-lg border border-hairline-card bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted"
+              />
+              <button
+                onClick={sendClarification}
+                disabled={!reply.trim() || pending}
+                className="focus-ring flex shrink-0 items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-xs font-medium text-[var(--background)] transition-opacity disabled:opacity-40"
+              >
+                <CornerDownLeft size={13} aria-hidden />
+                {pending ? "שולח…" : "שלח"}
+              </button>
+            </div>
+          </motion.div>
         )}
 
         {response?.status === "proposed" && (

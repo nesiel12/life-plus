@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
+import { invalidate } from "@/lib/api/ttlCache";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,16 @@ const createEventSchema = z.object({
 const deleteEventSchema = z.object({
   googleEventId: z.string().trim().min(1),
 });
+
+// The read routes (app/api/calendar/week, /upcoming) cache Google's response
+// for 60s. Any write here has to drop those entries immediately, or an event
+// the user just created or deleted would keep showing the pre-write calendar
+// for up to a minute — which reads as "it didn't work".
+function invalidateCalendarCaches(email: string): void {
+  const today = new Date().toISOString().slice(0, 10);
+  invalidate(`calendar-week:${email}:${today}`);
+  invalidate(`calendar-upcoming:${email}:${today}`);
+}
 
 interface GoogleEventResponse {
   id?: string;
@@ -73,6 +84,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    invalidateCalendarCaches(token.email);
     return NextResponse.json({ id: data.id, htmlLink: data.htmlLink });
   } catch {
     return NextResponse.json({ error: "Could not reach Google Calendar." }, { status: 502 });
@@ -116,6 +128,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Google Calendar rejected the deletion." }, { status: 502 });
     }
 
+    invalidateCalendarCaches(token.email);
     return NextResponse.json({ deleted: true });
   } catch {
     return NextResponse.json({ error: "Could not reach Google Calendar." }, { status: 502 });
