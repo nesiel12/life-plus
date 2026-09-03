@@ -146,6 +146,69 @@ export function findFocusSlots({
   return slots.sort((a, b) => b.score - a.score || a.start.localeCompare(b.start)).slice(0, maxResults);
 }
 
+const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
+const MAX_HORIZON_DAYS = 21; // a hard ceiling — an undated task must not walk forever
+
+interface FindAcrossDaysOptions {
+  /** Search starts on this day (inclusive). Typically "now". */
+  from: Date;
+  /** Search ends on this day (inclusive) — e.g. a task's due date. */
+  until: Date;
+  busy: Interval[];
+  chronotype: ChronotypeSettings;
+  minDurationMinutes?: number;
+  maxResults?: number;
+}
+
+/**
+ * The task-scheduling entry point (Sprint 5): "put this task somewhere
+ * before it's due" needs a range, not one day. Deterministic for the same
+ * reason findFocusSlots itself is (see the module header) — this only walks
+ * calendar days and delegates every day's actual slot-finding to
+ * findFocusSlots, it never asks the model to reason about free time.
+ *
+ * `from`/`until` are calendar days, not instants — a due date is a day
+ * boundary, not a specific hour, so "until" is inclusive of its whole day.
+ * `until` before `from` (an overdue task) returns no slots rather than
+ * throwing, matching findFocusSlots' own precedent of never proposing a slot
+ * in the past.
+ */
+export function findFocusSlotsAcrossDays({
+  from,
+  until,
+  busy,
+  chronotype,
+  minDurationMinutes = 30,
+  maxResults = 5,
+}: FindAcrossDaysOptions): FocusSlot[] {
+  const dayStart = new Date(from);
+  dayStart.setHours(0, 0, 0, 0);
+  const lastDay = new Date(until);
+  lastDay.setHours(0, 0, 0, 0);
+
+  const spanDays = Math.round((lastDay.getTime() - dayStart.getTime()) / MS_PER_DAY);
+  if (spanDays < 0) return [];
+
+  const results: FocusSlot[] = [];
+  for (let offset = 0; offset <= Math.min(spanDays, MAX_HORIZON_DAYS); offset++) {
+    const day = new Date(dayStart.getTime() + offset * MS_PER_DAY);
+    results.push(
+      ...findFocusSlots({
+        day,
+        busy,
+        chronotype,
+        minDurationMinutes,
+        // Only the first day needs a floor — every later day is entirely in
+        // the future relative to `from`.
+        notBefore: offset === 0 ? from : undefined,
+        maxResults, // each day is already capped; the merge below re-caps overall
+      })
+    );
+  }
+
+  return results.sort((a, b) => b.score - a.score || a.start.localeCompare(b.start)).slice(0, maxResults);
+}
+
 /** True when [start, end) overlaps any busy interval. */
 export function hasConflict(start: string, end: string, busy: Interval[]): boolean {
   const s = new Date(start).getTime();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findFocusSlots, hasConflict, mergeIntervals } from "@/lib/calendar/findFocusSlots";
+import { findFocusSlots, findFocusSlotsAcrossDays, hasConflict, mergeIntervals } from "@/lib/calendar/findFocusSlots";
 import type { ChronotypeSettings } from "@/types";
 
 // Local-time helper: the scheduler works in the user's own day, so tests must
@@ -141,3 +141,77 @@ describe("hasConflict", () => {
     expect(hasConflict(at(8), at(9), busy)).toBe(false);
   });
 });
+
+// 2026-09-15 + offset days, local time — matches DAY/`at()` above.
+function dayPlus(offset: number, hour = 12): Date {
+  return new Date(2026, 8, 15 + offset, hour, 0, 0, 0);
+}
+function atOffset(offset: number, hour: number, minute = 0): string {
+  return new Date(2026, 8, 15 + offset, hour, minute, 0, 0).toISOString();
+}
+
+describe("findFocusSlotsAcrossDays", () => {
+  it("finds slots on a later day when today is fully booked", () => {
+    const slots = findFocusSlotsAcrossDays({
+      from: dayPlus(0),
+      until: dayPlus(2),
+      busy: [{ start: atOffset(0, 0), end: atOffset(0, 23, 59) }],
+      chronotype,
+    });
+    expect(slots.length).toBeGreaterThan(0);
+    expect(slots.every((s) => new Date(s.start).getTime() >= atOffsetTime(1, 0))).toBe(true);
+  });
+
+  it("ranks peak slots across the whole range, not just day one", () => {
+    // Day 0 has only a neutral morning gap (peak hours booked); day 1 is
+    // wide open, so its peak window should win overall.
+    const slots = findFocusSlotsAcrossDays({
+      from: dayPlus(0),
+      until: dayPlus(1),
+      busy: [{ start: atOffset(0, 8), end: atOffset(0, 12) }],
+      chronotype,
+      maxResults: 10,
+    });
+    expect(slots[0].energy).toBe("peak");
+    expect(new Date(slots[0].start).getDate()).toBe(16);
+  });
+
+  it("respects `from` as a same-day floor but not on later days", () => {
+    const slots = findFocusSlotsAcrossDays({
+      from: dayPlus(0, 10), // "now" is 10:00 on day 0
+      until: dayPlus(1),
+      busy: [],
+      chronotype,
+      maxResults: 50,
+    });
+    const day0Starts = slots.filter((s) => new Date(s.start).getDate() === 15).map((s) => new Date(s.start).getHours());
+    expect(day0Starts.every((h) => h >= 10)).toBe(true);
+    const day1Starts = slots.filter((s) => new Date(s.start).getDate() === 16).map((s) => new Date(s.start).getHours());
+    expect(day1Starts.some((h) => h < 10)).toBe(true);
+  });
+
+  it("returns nothing when `until` precedes `from` (an overdue task)", () => {
+    const slots = findFocusSlotsAcrossDays({ from: dayPlus(2), until: dayPlus(0), busy: [], chronotype });
+    expect(slots).toEqual([]);
+  });
+
+  it("treats `from` and `until` on the same day as a single-day search", () => {
+    const slots = findFocusSlotsAcrossDays({ from: dayPlus(0), until: dayPlus(0), busy: [], chronotype });
+    expect(slots.every((s) => new Date(s.start).getDate() === 15)).toBe(true);
+  });
+
+  it("caps results at maxResults across the merged range", () => {
+    const slots = findFocusSlotsAcrossDays({
+      from: dayPlus(0),
+      until: dayPlus(5),
+      busy: [],
+      chronotype,
+      maxResults: 3,
+    });
+    expect(slots.length).toBeLessThanOrEqual(3);
+  });
+});
+
+function atOffsetTime(offset: number, hour: number): number {
+  return new Date(2026, 8, 15 + offset, hour, 0, 0, 0).getTime();
+}

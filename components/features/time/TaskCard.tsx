@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Calendar, Check, Pin, PinOff, Star, Trash2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { TaskAssistPanel, type TaskScheduleContext } from "@/components/features/time/TaskAssistPanel";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/types";
 
@@ -16,6 +17,11 @@ interface TaskCardProps {
    *  high-priority star and shows no pin affordance. */
   pinned?: boolean;
   onTogglePin?: () => void;
+  /** Enables "עזור לי עם המשימה" (Sprint 5): AI research/draft help, plus
+   *  calendar-slot scheduling when `schedule` is also supplied. Omit either
+   *  to hide that half of the panel — e.g. the done list passes no
+   *  `schedule`, since scheduling a finished task makes no sense. */
+  schedule?: TaskScheduleContext;
 }
 
 function formatDueDate(iso: string): string {
@@ -26,7 +32,7 @@ function formatDueDate(iso: string): string {
 // pass — 'in-progress' is a real status the schema and updateTask already
 // support (for the Personal DNA-driven auto-prioritization this phase
 // anticipates), just not surfaced as a third checkbox state yet.
-export function TaskCard({ task, delay, onToggleDone, onDelete, pinned, onTogglePin }: TaskCardProps) {
+export function TaskCard({ task, delay, onToggleDone, onDelete, pinned, onTogglePin, schedule }: TaskCardProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const isDone = task.status === "done";
 
@@ -83,6 +89,9 @@ export function TaskCard({ task, delay, onToggleDone, onDelete, pinned, onToggle
               <span className="ltr">{formatDueDate(task.dueDate)}</span>
             </p>
           )}
+          {/* Helping execute a finished task is meaningless, so this is
+              todo-only — same reasoning as the done list omitting `schedule`. */}
+          {!isDone && <TaskAssistPanel task={task} schedule={schedule} />}
         </div>
 
         {onTogglePin && (

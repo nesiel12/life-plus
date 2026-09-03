@@ -66,7 +66,10 @@ export default function TimeSpacePage() {
   // same progressive-enhancement pattern (useInsights) every other
   // AI/insights-layered screen uses: renders instantly with an empty
   // timeline, layers in real events once the fetch resolves.
-  const { data: weekCalendar } = useInsights<WeekCalendarResponse>("/api/calendar/week", { connected: false, events: [] });
+  const { data: weekCalendar, refresh: refreshWeekCalendar } = useInsights<WeekCalendarResponse>(
+    "/api/calendar/week",
+    { connected: false, events: [] }
+  );
 
   const isSelectedToday = selectedDate === todayKey;
 
@@ -159,6 +162,21 @@ export default function TimeSpacePage() {
     const done = tasks.filter((t) => t.status === "done");
     return { todoTasks: todo, doneTasks: done };
   }, [tasks]);
+
+  // TaskCard's "הצע זמן ביומן" (Sprint 5): reuses the week's already-fetched
+  // Google Calendar events as the busy set, same source the Vertical
+  // Timeline above already renders from — no second calendar fetch. Only
+  // offered when Google Calendar is actually connected; otherwise there is
+  // no real busy set to check against, and the create-event call would just
+  // fail with "not connected" after the user already picked a slot.
+  const taskSchedule = useMemo(() => {
+    if (!weekCalendar?.connected) return undefined;
+    return {
+      busy: weekCalendar.events.map((e) => ({ start: e.start_time, end: e.end_time, title: e.title })),
+      chronotype: personalDNA.chronotype,
+      onScheduled: refreshWeekCalendar,
+    };
+  }, [weekCalendar, personalDNA.chronotype, refreshWeekCalendar]);
 
   function handleToggleDone(task: Task) {
     toggleTask(task.id, { status: task.status === "done" ? "todo" : "done" }).catch(() => {
@@ -293,6 +311,7 @@ export default function TimeSpacePage() {
                 onDelete={handleDelete}
                 pinned={pinned}
                 onTogglePin={togglePin}
+                schedule={taskSchedule}
               />
             )}
           </PinnedList>
