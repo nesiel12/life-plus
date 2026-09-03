@@ -12,6 +12,7 @@ import { EnergyLevelBadge } from "@/components/features/EnergyLevelBadge";
 import { ScreenTimeWidget } from "@/components/features/ScreenTimeWidget";
 import { GoalsPanel } from "@/components/features/GoalsPanel";
 import { RecentActivityCard } from "@/components/features/RecentActivityCard";
+import { MemoryCards } from "@/components/features/memories/MemoryCards";
 import { BentoGrid, BentoCard } from "@/components/magicui/bento-grid";
 import { RetroGrid } from "@/components/magicui/retro-grid";
 import { LightRays } from "@/components/magicui/light-rays";
@@ -237,6 +238,10 @@ export default function Home() {
           </BentoCard>
 
           {/* A dense form panel — tilt is off here so inputs stay crisp. */}
+          <BentoCard className="sm:col-span-2 lg:col-span-3" tilt={false}>
+            <MemoryCards />
+          </BentoCard>
+
           <BentoCard className="sm:col-span-2 lg:col-span-3" tilt={false}>
             <GoalsPanel bare />
           </BentoCard>

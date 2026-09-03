@@ -928,6 +928,102 @@ export interface Database {
           max_per_day?: number;
         }
       >;
+
+      // Sprint 3 — Google Photos. See supabase/migrations/20260903000000_photo_memories.sql.
+      photo_memories: TableDef<
+        {
+          id: string;
+          user_id: string;
+          taken_at: string;
+          google_media_id: string | null;
+          source: string;
+          // bytea. Arrives from PostgREST as a "\x…" hex string, not a Buffer.
+          image_data: string;
+          mime_type: string;
+          width: number;
+          height: number;
+          byte_size: number;
+          caption: string | null;
+          caption_generated_at: string | null;
+          created_at: string;
+        },
+        {
+          user_id: string;
+          taken_at: string;
+          google_media_id?: string | null;
+          source?: string;
+          image_data: string;
+          mime_type?: string;
+          width: number;
+          height: number;
+          byte_size: number;
+          caption?: string | null;
+          caption_generated_at?: string | null;
+        },
+        {
+          taken_at?: string;
+          google_media_id?: string | null;
+          source?: string;
+          image_data?: string;
+          mime_type?: string;
+          width?: number;
+          height?: number;
+          byte_size?: number;
+          caption?: string | null;
+          caption_generated_at?: string | null;
+        }
+      >;
+      google_photos_credentials: TableDef<
+        {
+          user_id: string;
+          access_token: string;
+          refresh_token: string | null;
+          expires_at: string;
+          scope: string;
+          connected_at: string;
+          updated_at: string;
+        },
+        {
+          user_id: string;
+          access_token: string;
+          refresh_token?: string | null;
+          expires_at: string;
+          scope: string;
+          updated_at?: string;
+        },
+        {
+          access_token?: string;
+          refresh_token?: string | null;
+          expires_at?: string;
+          scope?: string;
+          updated_at?: string;
+        }
+      >;
+      google_photos_picker_sessions: TableDef<
+        {
+          id: string;
+          user_id: string;
+          purpose: string;
+          target_person_id: string | null;
+          picker_uri: string;
+          expire_time: string | null;
+          media_items_set: boolean;
+          created_at: string;
+        },
+        {
+          id: string;
+          user_id: string;
+          purpose: string;
+          target_person_id?: string | null;
+          picker_uri: string;
+          expire_time?: string | null;
+          media_items_set?: boolean;
+        },
+        {
+          media_items_set?: boolean;
+          expire_time?: string | null;
+        }
+      >;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Trash2, Upload, X } from "lucide-react";
+import { ImagePlus, Loader2, Trash2, Upload, X } from "lucide-react";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
 import { PersonAvatar } from "@/components/ui/PersonAvatar";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { useApiCall } from "@/hooks/useApiCall";
 import { resizeImageToDataUrl } from "@/lib/media/resizeImageToDataUrl";
+import { usePhotoPicker } from "@/hooks/usePhotoPicker";
 import type { Person } from "@/types";
 
 const DATE_PATTERN = /^\d{2}-\d{2}$/;
@@ -42,6 +43,13 @@ function draftFor(person: Person): PersonDraft {
 // "add a date" InlineDateField stays as the fast path when a date is
 // still unset; this modal is the comprehensive one.
 export function EditPersonModal({ person, onClose }: { person: Person | null; onClose: () => void }) {
+  // Closing on success is the refresh: the server wrote avatar_url directly,
+  // so the modal's local draft is stale by definition.
+  const avatarPicker = usePhotoPicker(onClose);
+  const avatarBusy =
+    avatarPicker.state === "opening" ||
+    avatarPicker.state === "waiting" ||
+    avatarPicker.state === "importing";
   const updatePerson = useAtlasStore((s) => s.updatePerson);
   const deletePerson = useAtlasStore((s) => s.deletePerson);
 
@@ -149,7 +157,38 @@ export function EditPersonModal({ person, onClose }: { person: Person | null; on
             onChange={(e) => handleAvatarChange(e.target.files?.[0])}
           />
         </label>
+
+        {/* Picking from Google Photos writes people.avatar_url server-side, so
+            the modal's local draft won't reflect it — onDone closes the modal
+            and the refreshed store shows the new avatar. */}
+        <button
+          type="button"
+          onClick={() => avatarPicker.start("avatar", person.id)}
+          disabled={avatarBusy}
+          className="focus-ring flex items-center gap-1 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-muted transition-colors hover:bg-fill hover:text-foreground disabled:opacity-40"
+        >
+          {avatarBusy ? (
+            <Loader2 size={12} className="animate-spin" aria-hidden />
+          ) : (
+            <ImagePlus size={12} aria-hidden />
+          )}
+          {avatarPicker.state === "waiting" ? "ממתין לבחירה…" : "מ-Google Photos"}
+        </button>
       </div>
+
+      {avatarPicker.needsConnect && (
+        <a
+          href="/api/photos/connect"
+          className="focus-ring rounded-lg bg-gold-soft px-3 py-2 text-center text-xs font-medium text-gold-ink"
+        >
+          חבר את Google Photos
+        </a>
+      )}
+      {avatarPicker.error && !avatarPicker.needsConnect && (
+        <p role="alert" className="text-xs text-accent-family">
+          {avatarPicker.error}
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <input

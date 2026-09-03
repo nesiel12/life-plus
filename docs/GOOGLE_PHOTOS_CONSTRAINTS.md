@@ -75,11 +75,31 @@ verification posture. Use incremental authorization — a separate opt-in flow
 with its own token row — so sign-in stays light and a stalled Photos review
 doesn't block the rest of the app.
 
-## OPEN DECISION (blocks the connector)
+## DECISION ON RECORD — 2026-09-03
 
-Storing downscaled derivatives is the only approach that actually works. It is
-also the thing the brief explicitly said not to do. That conflict is the user's
-to resolve, not ours.
+The account owner explicitly approved overriding the original "zero-download"
+instruction for this feature, having been shown why it is unimplementable.
+
+**What we do:** download and store a *downscaled derivative* of photos the user
+explicitly picked — never the original, never anything not picked.
+
+- Card derivatives: 640px long edge. Avatars: 256px. Hard ceiling 400KB, with
+  one lower-quality retry before a photo is rejected outright.
+- Stored as `bytea`, not a data: URL — base64 would inflate every row by ~33%,
+  and bloat was an explicit concern. Bytes are streamed by
+  `/api/photos/image/[id]`, never embedded in list JSON.
+- **EXIF is stripped.** Camera photos carry GPS, and there is no reason for a
+  memories feature to accumulate the user's location history as a side effect.
+  Orientation is applied before the metadata is dropped.
+- The Google media id is stored too, which Google explicitly permits
+  indefinitely. It is kept for de-duplication and provenance, *not* relied on
+  for re-fetching — it is not resolvable.
+
+**Why this is defensible:** only user-picked content, only downscaled
+derivatives, never redistributed, deletable on request. Google's 60-minute
+caching guidance is scoped on its own page to the Library API, so its force
+here is genuinely ambiguous — this is a judgement call, recorded rather than
+made silently.
 
 ## Human-only steps
 
