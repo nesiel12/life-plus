@@ -7,6 +7,8 @@ import { useApiCall } from "@/hooks/useApiCall";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TransactionRow } from "@/components/features/finances/TransactionRow";
 import { NewTransactionModal } from "@/components/features/finances/NewTransactionModal";
+import { CfoPanel } from "@/components/features/finances/CfoPanel";
+import { StatementImport } from "@/components/features/finances/StatementImport";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/types";
 
@@ -76,7 +78,15 @@ export default function FinancesSpacePage() {
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+            <GlassCard className="mb-6">
+        <CfoPanel />
+      </GlassCard>
+
+      <GlassCard className="mb-6">
+        <StatementImport />
+      </GlassCard>
+
+<div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="mb-1 text-2xl font-medium tracking-tight">כספים</h1>
           <p className="text-sm text-muted">מעקב אחר הכנסות והוצאות שלך.</p>
