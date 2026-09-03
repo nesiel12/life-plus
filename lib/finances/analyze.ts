@@ -182,3 +182,51 @@ export function formatSnapshotForPrompt(snapshot: FinancialSnapshot): string[] {
     `סה"כ חודשים בנתונים: ${snapshot.monthsCovered}`,
   ];
 }
+
+export type FinanceAlertKind = "overspent" | "unusual-expenses";
+
+export interface FinanceAlert {
+  kind: FinanceAlertKind;
+  message: string;
+}
+
+// Threshold picked to mean "genuinely unusual," not "any month-to-month
+// noise" — a 30% jump over the trailing average is well past ordinary
+// variance (one big irregular purchase, a slow month elsewhere), so it
+// reads as a real signal rather than a monthly nag.
+const UNUSUAL_EXPENSE_MULTIPLIER = 1.3;
+
+/**
+ * The dashboard's "Financial Alert" (Sprint 6, the Unified Dashboard) —
+ * deterministic, same division of labour as everywhere else in this module:
+ * no LLM call, no interpretation, just two real, explainable conditions
+ * against the snapshot's own numbers. Returns null far more often than not
+ * by design — "nothing alarming this month" is the common case, and the
+ * quiet-empty-state convention every other dashboard surface already holds
+ * to (AIBriefing, EnergyLevelBadge) means silence here, not a manufactured
+ * "you're doing great!" filler card.
+ */
+export function deriveFinanceAlert(snapshot: FinancialSnapshot | null): FinanceAlert | null {
+  if (!snapshot) return null;
+
+  if (snapshot.net < 0) {
+    return {
+      kind: "overspent",
+      message: `החודש (${snapshot.month}) ההוצאות עברו את ההכנסות ב-${Math.abs(snapshot.net)} ₪.`,
+    };
+  }
+
+  if (
+    snapshot.trailingAverageExpenses !== null &&
+    snapshot.trailingAverageExpenses > 0 &&
+    snapshot.expenses > snapshot.trailingAverageExpenses * UNUSUAL_EXPENSE_MULTIPLIER
+  ) {
+    const pctOver = Math.round((snapshot.expenses / snapshot.trailingAverageExpenses - 1) * 100);
+    return {
+      kind: "unusual-expenses",
+      message: `ההוצאות החודש (${snapshot.expenses} ₪) גבוהות ב-${pctOver}% מהממוצע הרגיל שלך.`,
+    };
+  }
+
+  return null;
+}

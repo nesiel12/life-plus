@@ -13,6 +13,9 @@ import { ScreenTimeWidget } from "@/components/features/ScreenTimeWidget";
 import { GoalsPanel } from "@/components/features/GoalsPanel";
 import { RecentActivityCard } from "@/components/features/RecentActivityCard";
 import { MemoryCards } from "@/components/features/memories/MemoryCards";
+import { TodayTimelineCard } from "@/components/features/dashboard/TodayTimelineCard";
+import { FinanceAlertCard } from "@/components/features/dashboard/FinanceAlertCard";
+import { NextCourseCard } from "@/components/features/dashboard/NextCourseCard";
 import { BentoGrid, BentoCard } from "@/components/magicui/bento-grid";
 import { RetroGrid } from "@/components/magicui/retro-grid";
 import { LightRays } from "@/components/magicui/light-rays";
@@ -185,6 +188,10 @@ export default function Home() {
           </BentoCard>
 
           <BentoCard>
+            <TodayTimelineCard />
+          </BentoCard>
+
+          <BentoCard>
             <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
               <PenLine size={16} className="text-gold-ink" aria-hidden />
               הכוונה של היום
@@ -235,6 +242,16 @@ export default function Home() {
 
           <BentoCard>
             <RecentActivityCard />
+          </BentoCard>
+
+          <BentoCard>
+            <FinanceAlertCard />
+          </BentoCard>
+
+          {/* A dense form panel (video controls) — tilt is off so the
+              embedded player stays crisp. */}
+          <BentoCard tilt={false}>
+            <NextCourseCard />
           </BentoCard>
 
           {/* A dense form panel — tilt is off here so inputs stay crisp. */}

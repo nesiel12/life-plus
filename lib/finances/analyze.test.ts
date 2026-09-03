@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildSnapshot, formatSnapshotForPrompt, summarizeByMonth, type AnalyzableTransaction } from "@/lib/finances/analyze";
+import {
+  buildSnapshot,
+  deriveFinanceAlert,
+  formatSnapshotForPrompt,
+  summarizeByMonth,
+  type AnalyzableTransaction,
+} from "@/lib/finances/analyze";
 
 const tx = (
   date: string,
@@ -148,5 +154,72 @@ describe("formatSnapshotForPrompt", () => {
     expect(lines.some((l) => l.startsWith("מול החודש הקודם:") && l.includes("+2000") && l.includes("+1000"))).toBe(
       true
     );
+  });
+});
+
+describe("deriveFinanceAlert", () => {
+  it("returns null when there is no snapshot", () => {
+    expect(deriveFinanceAlert(null)).toBeNull();
+  });
+
+  it("returns null for an ordinary month — quiet by default", () => {
+    const snap = buildSnapshot([
+      tx("2026-01-05", 5000, "income", "salary"),
+      tx("2026-01-06", 2000, "expense", "groceries"),
+      tx("2026-02-05", 5000, "income", "salary"),
+      tx("2026-02-06", 2100, "expense", "groceries"),
+    ], "2026-02")!;
+    expect(deriveFinanceAlert(snap)).toBeNull();
+  });
+
+  it("flags a real negative net with the real real shortfall amount", () => {
+    const snap = buildSnapshot([tx("2026-01-05", 1000, "income", "salary"), tx("2026-01-06", 1500, "expense", "rent")])!;
+    const alert = deriveFinanceAlert(snap);
+    expect(alert?.kind).toBe("overspent");
+    expect(alert?.message).toContain("500 ₪");
+  });
+
+  it("flags a real jump over the trailing average, stating the real percentage", () => {
+    const data = [
+      tx("2026-01-05", 10000, "income", "salary"),
+      tx("2026-01-06", 2000, "expense", "groceries"),
+      tx("2026-02-05", 10000, "income", "salary"),
+      tx("2026-02-06", 2000, "expense", "groceries"),
+      tx("2026-03-05", 10000, "income", "salary"),
+      tx("2026-03-06", 3000, "expense", "groceries"), // 50% over the 2000 trailing average
+    ];
+    const alert = deriveFinanceAlert(buildSnapshot(data, "2026-03")!);
+    expect(alert?.kind).toBe("unusual-expenses");
+    expect(alert?.message).toContain("50%");
+  });
+
+  it("does not flag a mild, ordinary-variance increase", () => {
+    const data = [
+      tx("2026-01-05", 10000, "income", "salary"),
+      tx("2026-01-06", 2000, "expense", "groceries"),
+      tx("2026-02-05", 10000, "income", "salary"),
+      tx("2026-02-06", 2000, "expense", "groceries"),
+      tx("2026-03-05", 10000, "income", "salary"),
+      tx("2026-03-06", 2200, "expense", "groceries"), // only 10% over — ordinary
+    ];
+    expect(deriveFinanceAlert(buildSnapshot(data, "2026-03")!)).toBeNull();
+  });
+
+  it("prefers the overspent alert when both conditions are technically true", () => {
+    const data = [
+      tx("2026-01-05", 10000, "income", "salary"),
+      tx("2026-01-06", 1000, "expense", "groceries"),
+      tx("2026-02-05", 100, "income", "salary"),
+      tx("2026-02-06", 5000, "expense", "groceries"), // net negative AND a huge jump
+    ];
+    const alert = deriveFinanceAlert(buildSnapshot(data, "2026-02")!);
+    expect(alert?.kind).toBe("overspent");
+  });
+
+  it("never divides by a zero trailing average", () => {
+    // No prior month at all -> trailingAverageExpenses is null, not 0.
+    const snap = buildSnapshot([tx("2026-01-05", 1000, "income", "salary"), tx("2026-01-06", 50, "expense", "groceries")])!;
+    expect(() => deriveFinanceAlert(snap)).not.toThrow();
+    expect(deriveFinanceAlert(snap)).toBeNull();
   });
 });
