@@ -13,6 +13,7 @@ import { ScreenTimeWidget } from "@/components/features/ScreenTimeWidget";
 import { GoalsPanel } from "@/components/features/GoalsPanel";
 import { RecentActivityCard } from "@/components/features/RecentActivityCard";
 import { MemoryCards } from "@/components/features/memories/MemoryCards";
+import { DecisionStream } from "@/components/features/dashboard/DecisionStream";
 import { TodayTimelineCard } from "@/components/features/dashboard/TodayTimelineCard";
 import { FinanceAlertCard } from "@/components/features/dashboard/FinanceAlertCard";
 import { NextCourseCard } from "@/components/features/dashboard/NextCourseCard";
@@ -188,6 +189,14 @@ export default function Home() {
               stay opaque: a blurred, shifting backdrop behind an input is
               where glass stops being decoration and starts costing
               legibility. */}
+          {/* The Decision Stream leads the grid on purpose (LifeOS Pillar 3):
+              if the dashboard is meant to have zero cognitive overload, the
+              at-most-three things actually needing a decision have to be the
+              first thing read, above the briefing and the timeline. */}
+          <BentoCard glass>
+            <DecisionStream />
+          </BentoCard>
+
           <BentoCard className="sm:col-span-2" glass>
             <AIBriefing bare />
           </BentoCard>

@@ -286,16 +286,16 @@ body::before {
   }
 }
 
-/* ── Liquid Glass ──────────────────────────────────────────────────────────
-   The CSS half of components/ui/LiquidGlass.tsx. See that file's header for
-   why this is backdrop-filter + an SVG displacement map rather than a port
-   of liquid-glass-js's WebGL/html2canvas approach.
+/* ── Frosted surfaces ──────────────────────────────────────────────────────
+   Deliberately lightweight. An earlier pass drove these with an SVG
+   feTurbulence + feDisplacementMap for real edge refraction; that is a
+   per-frame filter on a compositing layer and it cost real FPS, so it is
+   gone. What's left is what the GPU does cheaply: one backdrop blur, a solid
+   tint, and a crisp hairline. No displacement maps, no blend modes, no WebGL.
 
-   Design rule that governs every value below: the frost must never cost
-   legibility. Hebrew body text over a blurred backdrop is the first thing
-   to break in a glass UI, so the tint floor is opaque enough to hold text
-   contrast on its own, and the blur does the rest. --glass-tint is a solid
-   colour mix, not a translucent wash over nothing. */
+   The tint is near-opaque on purpose — text contrast comes from the solid
+   colour underneath, so the blur is decoration rather than something
+   legibility depends on. */
 .liquid-glass {
   position: relative;
   isolation: isolate;
@@ -306,29 +306,22 @@ body::before {
     0 1px 2px rgba(16, 16, 20, 0.04),
     0 18px 44px -28px rgba(16, 16, 20, 0.28);
   overflow: hidden;
+  /* Prefixed first, standard last: Lightning CSS collapses the pair and
+     keeps the last declaration, so the standard property has to win. */
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
 }
 
-/* The frost. backdrop-filter (not filter) so it samples what's behind the
-   card and leaves the card's own content perfectly sharp — the SVG
-   displacement reference is composed into this same value by the component,
-   so the refraction warps the backdrop only. */
-.liquid-glass {
-  -webkit-backdrop-filter: var(--glass-backdrop, blur(16px) saturate(1.6));
-  backdrop-filter: var(--glass-backdrop, blur(16px) saturate(1.6));
-}
-
-/* Rim light along the top edge and a soft specular corner — what sells a
-   surface as glass rather than as a flat translucent panel. */
+/* A single static top-edge highlight. No mix-blend-mode — blend modes force
+   an extra compositing pass per paint, which is exactly the kind of cost
+   this pass exists to remove. */
 .liquid-glass__sheen {
   position: absolute;
   inset: 0;
   z-index: 0;
   border-radius: inherit;
   pointer-events: none;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 42%),
-    radial-gradient(120% 70% at 12% -10%, color-mix(in srgb, var(--gold) 14%, transparent), transparent 60%);
-  mix-blend-mode: soft-light;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 10%, transparent) 0%, transparent 38%);
 }
 
 .liquid-glass__content {
@@ -336,31 +329,27 @@ body::before {
   z-index: 1;
 }
 
-.liquid-glass[data-glass-tone="gold"] {
-  border-color: var(--gold-line);
-  box-shadow:
-    0 1px 2px rgba(16, 16, 20, 0.04),
-    0 18px 44px -28px color-mix(in srgb, var(--gold) 40%, transparent);
-}
-
 :root {
-  /* Near-opaque on light: white surface, faintly warmed. */
-  --glass-tint: color-mix(in srgb, var(--surface) 82%, transparent);
+  --glass-tint: color-mix(in srgb, var(--surface) 88%, transparent);
   --glass-rim: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 :root[data-theme="dark"] {
-  --glass-tint: color-mix(in srgb, var(--surface) 76%, transparent);
+  /* Solid dark ground behind the blur, per the Luxe fallback rule. */
+  --glass-tint: color-mix(in srgb, var(--surface) 86%, transparent);
   --glass-rim: rgba(255, 255, 255, 0.1);
 }
-:root[data-theme="dark"] .liquid-glass__sheen {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 42%),
-    radial-gradient(120% 70% at 12% -10%, color-mix(in srgb, var(--gold) 18%, transparent), transparent 60%);
+
+/* GPU guardrails. `will-change` is scoped to the surfaces that actually
+   animate (tilt/hover) rather than sprayed everywhere — promoting every
+   element to its own layer costs more memory than it saves in paint. */
+.liquid-glass,
+.glass-panel {
+  will-change: transform, opacity;
 }
 
-/* Fallback: no backdrop-filter support means the tint would sit over raw
-   page content with nothing blurring it, which is precisely the unreadable
-   case. Fall back to the plain opaque Luxe card instead. */
+/* Both escape hatches: with no backdrop-filter the tint would sit over
+   unblurred content, and "reduce transparency" is set by exactly the people
+   a frosted UI hurts most. Either way, fall back to the plain opaque card. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .liquid-glass {
     background: var(--surface);
@@ -369,9 +358,6 @@ body::before {
     display: none;
   }
 }
-
-/* Respect the OS-level "reduce transparency" accessibility setting — the
-   people who enable it are exactly the people a frosted UI hurts most. */
 @media (prefers-reduced-transparency: reduce) {
   .liquid-glass {
     background: var(--surface);
@@ -380,5 +366,18 @@ body::before {
   }
   .liquid-glass__sheen {
     display: none;
+  }
+}
+
+/* Motion guardrail: honour the OS setting globally rather than per
+   component, so nothing added later can miss it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -25,7 +25,7 @@ import type { ChronotypeSettings, DayPart } from "@/types";
 // rather than a second, potentially-diverging copy of it.
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 };
 const MAX_BUSY = 60;

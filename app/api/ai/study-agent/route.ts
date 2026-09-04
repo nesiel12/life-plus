@@ -18,7 +18,7 @@ import {
 // transcript and share a persona — see lib/ai/agents/studyAgent.ts.
 
 export const runtime = "nodejs";
-export const maxDuration = 45;
+export const maxDuration = 60;
 
 const RATE_LIMIT = { limit: 30, windowMs: 5 * 60 * 1000 };
 

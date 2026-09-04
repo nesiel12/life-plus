@@ -26,6 +26,9 @@ import { getLocalWallClock } from "@/lib/intelligence/personalDNA/timezone";
 import { fetchGoogleCalendarEvents, type GoogleCalendarEvent } from "@/lib/googleCalendar/fetchEvents";
 
 export const runtime = "nodejs";
+// Above lib/ai/service.ts's internal timeouts, so the app's own graceful
+// fallback fires before the platform aborts the request.
+export const maxDuration = 60;
 
 const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 }; // 20 messages / 5 min
 const MAX_BASED_ON = 3;
@@ -121,22 +124,32 @@ export async function POST(request: NextRequest) {
     // session, exactly like every other calendar-touching route's honest-
     // fallback contract. A calendar hiccup should degrade the reply's
     // context, never break the chat itself.
-    let scheduledEvents: string[] = [];
-    let scheduledCalendarEvents: GoogleCalendarEvent[] = [];
     const accessToken = token.error ? undefined : token.accessToken;
-    if (accessToken) {
-      try {
-        const now = new Date();
-        const until = new Date(now.getTime() + SCHEDULE_CONTEXT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-        const events = await fetchGoogleCalendarEvents(accessToken, now.toISOString(), until.toISOString());
-        scheduledEvents = events.map(formatScheduledEvent);
-        scheduledCalendarEvents = events;
-      } catch {
-        // Proceed without calendar context — see comment above.
-      }
-    }
 
-    const context = user ? await buildAtlasContext(user.id, { query: message, scheduledEvents }) : undefined;
+    // Run in parallel, not in series. buildAtlasContext treats
+    // scheduledEvents as pure pass-through (see its own comment), so it has
+    // no real dependency on the Google round trip — awaiting the calendar
+    // first and the DB queries second simply added the two latencies
+    // together on every single chat turn, which is a direct contributor to
+    // the timeouts. Merged below instead.
+    const [calendarEvents, baseContext] = await Promise.all([
+      (async (): Promise<GoogleCalendarEvent[]> => {
+        if (!accessToken) return [];
+        try {
+          const now = new Date();
+          const until = new Date(now.getTime() + SCHEDULE_CONTEXT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+          return await fetchGoogleCalendarEvents(accessToken, now.toISOString(), until.toISOString());
+        } catch {
+          // Proceed without calendar context — see comment above.
+          return [];
+        }
+      })(),
+      user ? buildAtlasContext(user.id, { query: message }) : Promise.resolve(undefined),
+    ]);
+
+    const scheduledCalendarEvents = calendarEvents;
+    const scheduledEvents = calendarEvents.map(formatScheduledEvent);
+    const context = baseContext ? { ...baseContext, scheduledEvents } : undefined;
 
     // Calendar is the one domain that short-circuits: a scheduling proposal
     // is a structured fact (a time, a conflict, real alternatives), and

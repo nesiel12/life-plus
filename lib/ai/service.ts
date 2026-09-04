@@ -23,7 +23,14 @@ export interface ChatMessage {
 // (e.g. a "flash-latest" alias returning 503s for an hour, 2026-08-31) must
 // fail to the caller's honest fallback, never hang the request. Passed as an
 // abortSignal so it cancels the underlying fetch, not just the awaited promise.
-const GENERATION_TIMEOUT_MS = 30_000;
+// These are the INNER bound, and every AI route's `maxDuration` must sit
+// above them. Routes previously declared maxDuration = 30 while structured
+// generation waited 45s, so the platform killed the request before the app's
+// own timeout could fire — the user got a raw "operation was aborted"
+// instead of the graceful Hebrew fallback each route already has ready.
+// Keeping the app's deadline strictly inside the platform's is what makes
+// those fallbacks reachable.
+const GENERATION_TIMEOUT_MS = 40_000;
 const STRUCTURED_TIMEOUT_MS = 45_000; // generateObject re-prompts on schema mismatch — give it more room
 
 // Returns the SDK's own stream result as-is (callers use its
@@ -38,6 +45,7 @@ export async function generateChatText(params: { system: string; prompt: string 
     model: getChatModel(),
     system: params.system,
     prompt: params.prompt,
+    maxRetries: 1,
     abortSignal: AbortSignal.timeout(GENERATION_TIMEOUT_MS),
   });
   return text;
@@ -49,6 +57,15 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: { s
     schema: params.schema,
     system: params.system,
     prompt: params.prompt,
+    // Bound the re-prompt loop explicitly. generateObject retries when the
+    // model returns output that doesn't match the schema, and each retry is
+    // a full round trip — the SDK's default of 2 means a worst case of three
+    // sequential calls, which is how a request that "should" take 8s ends up
+    // hitting the deadline. One retry is enough to recover a genuine
+    // one-off malformed response; a schema the model consistently can't
+    // satisfy should fail fast to the caller's fallback instead of
+    // burning the whole budget rediscovering that.
+    maxRetries: 1,
     abortSignal: AbortSignal.timeout(STRUCTURED_TIMEOUT_MS),
   });
   return object;

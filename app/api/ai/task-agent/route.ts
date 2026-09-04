@@ -12,7 +12,7 @@ import { resolveTaskAssist } from "@/lib/ai/agents/taskAgent";
 // constraint around not having live web access.
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 };
 

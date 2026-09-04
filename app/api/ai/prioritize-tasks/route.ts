@@ -12,7 +12,7 @@ import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
 // this route makes no writes itself.
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const RATE_LIMIT = { limit: 10, windowMs: 5 * 60 * 1000 }; // 10 prioritizations / 5 min
 

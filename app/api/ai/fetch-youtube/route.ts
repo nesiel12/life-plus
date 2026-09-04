@@ -18,7 +18,7 @@ import { rateLimitResponse } from "@/lib/api/rateLimit";
 // single-responsibility split as extract's PDF/audio branches.
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const RATE_LIMIT = { limit: 10, windowMs: 5 * 60 * 1000 }; // 10 fetches / 5 min
 

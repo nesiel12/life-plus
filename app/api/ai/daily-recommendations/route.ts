@@ -12,7 +12,7 @@ import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
 // structured-output shape as every other AI route in this app.
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const RATE_LIMIT = { limit: 10, windowMs: 5 * 60 * 1000 }; // 10 analyses / 5 min
 

@@ -15,6 +15,9 @@ import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
 import { fetchGoogleCalendarEvents } from "@/lib/googleCalendar/fetchEvents";
 
 export const runtime = "nodejs";
+// Above lib/ai/service.ts's internal timeouts, so the app's own graceful
+// fallback fires before the platform aborts the request.
+export const maxDuration = 60;
 
 const RATE_LIMIT = { limit: 15, windowMs: 5 * 60 * 1000 }; // 15 commands / 5 min
 
