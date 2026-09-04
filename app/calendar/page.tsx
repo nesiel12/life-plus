@@ -1,16 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
-import { CalendarClock, CalendarHeart, Clock } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarHeart, Clock } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ScheduleSuggestions } from "@/components/features/ScheduleSuggestions";
 import { VerticalTimeline } from "@/components/features/calendar/VerticalTimeline";
 import { CalendarAgentPanel } from "@/components/features/calendar/CalendarAgentPanel";
+import { MonthView } from "@/components/features/calendar/MonthView";
 import { useInsights } from "@/hooks/useInsights";
 import { groupUpcomingEvents } from "@/lib/calendar/groupUpcomingEvents";
-import { daysUntil } from "@/lib/utils";
+import { cn, daysUntil } from "@/lib/utils";
 import type { GoogleCalendarEvent } from "@/lib/googleCalendar/fetchEvents";
 
 interface UpcomingResponse {
@@ -37,6 +39,10 @@ export default function CalendarPage() {
   const upcomingEvents = useAtlasStore((s) => s.upcomingEvents);
   const chronotype = useAtlasStore((s) => s.personalDNA.chronotype);
   const { data, refresh } = useInsights<UpcomingResponse>("/api/calendar/upcoming", FALLBACK);
+  // Day is the default: the hour-by-hour timeline is what this page is
+  // for day to day, and the month view is the step back you take
+  // occasionally. The month's events are only fetched once it is opened.
+  const [range, setRange] = useState<"day" | "month">("day");
   const groups = data ? groupUpcomingEvents(data.events, new Date()) : [];
 
   // The vertical timeline shows today only; groupUpcomingEvents already
@@ -78,16 +84,50 @@ export default function CalendarPage() {
 
         {data?.connected && (
           <GlassCard delay={0.1}>
-            <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
-              <Clock size={16} className="text-accent-career" aria-hidden />
-              היום, שעה אחר שעה
-            </p>
-            <VerticalTimeline
-              day={now}
-              now={now}
-              events={todayEvents}
-              chronotype={chronotype}
-            />
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="flex items-center gap-2 text-sm font-medium text-muted">
+                {range === "day" ? (
+                  <Clock size={16} className="text-accent-career" aria-hidden />
+                ) : (
+                  <CalendarDays size={16} className="text-accent-career" aria-hidden />
+                )}
+                {range === "day" ? "היום, שעה אחר שעה" : "החודש כולו"}
+              </p>
+
+              <div
+                role="tablist"
+                aria-label="טווח תצוגה"
+                className="flex items-center gap-1 rounded-lg border border-hairline-card p-0.5"
+              >
+                {(
+                  [
+                    { key: "day", label: "יום" },
+                    { key: "month", label: "חודש" },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.key}
+                    role="tab"
+                    aria-selected={range === option.key}
+                    onClick={() => setRange(option.key)}
+                    className={cn(
+                      "focus-ring rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                      range === option.key
+                        ? "bg-fill-subtle text-foreground"
+                        : "text-muted hover:text-foreground"
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {range === "day" ? (
+              <VerticalTimeline day={now} now={now} events={todayEvents} chronotype={chronotype} />
+            ) : (
+              <MonthView />
+            )}
           </GlassCard>
         )}
 

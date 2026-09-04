@@ -8,7 +8,6 @@ import {
   ChevronDown,
   FileText,
   Headphones,
-  Link2,
   Loader2,
   Sparkles,
   SquarePlay,
@@ -17,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { ResourceLauncher } from "@/components/features/learning/ResourceLauncher";
 import { useApiCall } from "@/hooks/useApiCall";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { cn } from "@/lib/utils";
@@ -161,20 +161,30 @@ export function TopicCard({ topic, resources, expanded, onToggleExpanded, delay 
             {resources.map((resource) => {
               const Icon = RESOURCE_ICON[resource.type];
               return (
-                <div key={resource.id} className="flex items-start gap-2 rounded-lg bg-fill-subtle px-3 py-2">
+                <div key={resource.id} className="flex items-start gap-3 rounded-lg bg-fill-subtle px-3.5 py-2.5">
+                  {/* The visual tick stays 16px, but the *hit area* is 32px:
+                      padding plus a matching negative margin grows the target
+                      without moving anything on screen. A 16px control is
+                      under the 24px minimum and is a real part of why this
+                      checklist felt bad to use. */}
                   <button
                     onClick={() => toggleResource(resource.id, { isCompleted: !resource.isCompleted }).catch(() => {})}
+                    aria-pressed={resource.isCompleted}
                     aria-label={
                       resource.isCompleted ? `סמן את "${resource.title}" כלא הושלם` : `סמן את "${resource.title}" כהושלם`
                     }
-                    className={cn(
-                      "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                      resource.isCompleted
-                        ? "border-accent-learning bg-accent-learning/20 text-accent-learning"
-                        : "border-glass-border text-transparent"
-                    )}
+                    className="focus-ring -m-2 shrink-0 rounded-lg p-2"
                   >
-                    <Check size={10} aria-hidden />
+                    <span
+                      className={cn(
+                        "flex size-4 items-center justify-center rounded border transition-colors",
+                        resource.isCompleted
+                          ? "border-accent-learning bg-accent-learning/20 text-accent-learning"
+                          : "border-glass-border text-transparent"
+                      )}
+                    >
+                      <Check size={10} aria-hidden />
+                    </span>
                   </button>
                   <Icon size={14} className="mt-0.5 shrink-0 text-accent-learning" aria-hidden />
                   <div className="min-w-0 flex-1">
@@ -184,17 +194,7 @@ export function TopicCard({ topic, resources, expanded, onToggleExpanded, delay 
                     {resource.notes && (
                       <p className="mt-0.5 whitespace-pre-line text-xs text-muted">{resource.notes}</p>
                     )}
-                    {resource.url && (
-                      <a
-                        href={resource.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ltr mt-0.5 flex w-fit items-center gap-1 text-xs text-accent-learning hover:underline"
-                      >
-                        <Link2 size={10} aria-hidden />
-                        {resource.url}
-                      </a>
-                    )}
+                    {resource.url && <ResourceLauncher url={resource.url} title={resource.title} />}
                   </div>
                   <button
                     onClick={() => removeResource(resource.id).catch(() => {})}

@@ -25,9 +25,12 @@ const deleteEventSchema = z.object({
 // the user just created or deleted would keep showing the pre-write calendar
 // for up to a minute — which reads as "it didn't work".
 function invalidateCalendarCaches(email: string): void {
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   invalidate(`calendar-week:${email}:${today}`);
   invalidate(`calendar-upcoming:${email}:${today}`);
+  invalidate(`calendar-month:${email}:${month}`);
 }
 
 interface GoogleEventResponse {

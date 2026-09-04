@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, CalendarPlus, Check, CornerDownLeft, Send, Sparkles } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
-import { buildClarifiedMessage, type ClarificationTurn } from "@/lib/ai/agents/calendarAgent";
+import { buildClarifiedMessage, type ClarificationTurn } from "@/lib/calendar/clarification";
 import { cn } from "@/lib/utils";
 import type { FocusSlot } from "@/lib/calendar/findFocusSlots";
 
