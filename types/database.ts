@@ -99,6 +99,9 @@ export interface Database {
           note: string | null;
           phone: string | null;
           avatar_url: string | null;
+          gender: string | null;
+          role: string | null;
+          message_template: string | null;
           created_at: string;
           updated_at: string;
         },
@@ -114,6 +117,9 @@ export interface Database {
           note?: string | null;
           phone?: string | null;
           avatar_url?: string | null;
+          gender?: string | null;
+          role?: string | null;
+          message_template?: string | null;
         },
         {
           id?: string;
@@ -127,6 +133,9 @@ export interface Database {
           note?: string | null;
           phone?: string | null;
           avatar_url?: string | null;
+          gender?: string | null;
+          role?: string | null;
+          message_template?: string | null;
         }
       >;
       moments: TableDef<

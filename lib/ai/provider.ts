@@ -30,6 +30,11 @@ const OPENAI_CHAT_MODEL_ID = "gpt-4o-mini";
 // starts erroring here again, check model availability with a direct REST
 // call before assuming it's the key — see docs/BACKLOG.md.
 const GEMINI_CHAT_MODEL_ID = "gemini-flash-lite-latest";
+// Secondary aliases used only as failover links in the chain below. Both are
+// Google-maintained aliases rather than pinned dated ids, for exactly the
+// reason documented above.
+const GEMINI_FALLBACK_MODEL_ID = "gemini-flash-latest";
+const OPENAI_FALLBACK_MODEL_ID = "gpt-4o-mini";
 const TRANSCRIPTION_MODEL_ID = "whisper-1";
 
 function currentChatProvider(): ChatProvider {
@@ -52,6 +57,54 @@ export function getChatModel() {
   // (which will itself fail loudly on a missing key) is more honest than
   // silently picking a provider nothing asked for.
   return currentChatProvider() === "gemini" ? getGoogleProvider()(GEMINI_CHAT_MODEL_ID) : openai(OPENAI_CHAT_MODEL_ID);
+}
+
+export interface ChatModelCandidate {
+  /** For logging — which model actually served the request. */
+  label: string;
+  model: ReturnType<typeof openai>;
+}
+
+/**
+ * The ordered failover chain (system-wide AI resiliency).
+ *
+ * A provider returning 503 "high demand" is a capacity problem, and the one
+ * reliable cure is a different model — ideally on a different provider,
+ * since an overloaded provider tends to be overloaded across its whole
+ * fleet. So the chain crosses providers first when both keys exist, then
+ * falls back to the same provider's alternate alias.
+ *
+ * Ordering keeps the current primary first, so nothing about the normal,
+ * healthy path changes — this only ever engages after a real failure.
+ */
+export function getChatModelChain(): ChatModelCandidate[] {
+  const provider = currentChatProvider();
+  const hasOpenAi = Boolean(process.env.OPENAI_API_KEY);
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY);
+
+  const openaiPrimary: ChatModelCandidate[] = hasOpenAi
+    ? [{ label: `openai:${OPENAI_CHAT_MODEL_ID}`, model: openai(OPENAI_CHAT_MODEL_ID) }]
+    : [];
+  const geminiPrimary: ChatModelCandidate[] = hasGemini
+    ? [{ label: `gemini:${GEMINI_CHAT_MODEL_ID}`, model: getGoogleProvider()(GEMINI_CHAT_MODEL_ID) }]
+    : [];
+  const geminiAlternate: ChatModelCandidate[] = hasGemini
+    ? [{ label: `gemini:${GEMINI_FALLBACK_MODEL_ID}`, model: getGoogleProvider()(GEMINI_FALLBACK_MODEL_ID) }]
+    : [];
+  const openaiAlternate: ChatModelCandidate[] =
+    hasOpenAi && OPENAI_FALLBACK_MODEL_ID !== OPENAI_CHAT_MODEL_ID
+      ? [{ label: `openai:${OPENAI_FALLBACK_MODEL_ID}`, model: openai(OPENAI_FALLBACK_MODEL_ID) }]
+      : [];
+
+  const chain =
+    provider === "gemini"
+      ? [...geminiPrimary, ...openaiPrimary, ...geminiAlternate]
+      : [...openaiPrimary, ...geminiPrimary, ...openaiAlternate, ...geminiAlternate];
+
+  // Never hand back an empty chain: callers gate on isProviderConfigured(),
+  // and an empty array would look like "succeeded with no result" rather
+  // than failing loudly on a missing key.
+  return chain.length > 0 ? chain : [{ label: `openai:${OPENAI_CHAT_MODEL_ID}`, model: openai(OPENAI_CHAT_MODEL_ID) }];
 }
 
 export function getTranscriptionModel() {

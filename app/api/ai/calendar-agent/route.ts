@@ -6,6 +6,9 @@ import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { isProviderConfigured } from "@/lib/ai";
 import { resolveCalendarIntent } from "@/lib/ai/agents/calendarAgent";
+import { parseHebrewEvent } from "@/lib/calendar/parseHebrewEvent";
+import { sanitizeEventTitle } from "@/lib/calendar/sanitizeEventTitle";
+import { hasConflict, type Interval } from "@/lib/calendar/findFocusSlots";
 import { isDayPart } from "@/lib/onboarding/chronotype";
 import type { ChronotypeSettings, DayPart } from "@/types";
 
@@ -91,7 +94,39 @@ export async function POST(request: Request) {
   try {
     const result = await resolveCalendarIntent({ message, nowLocal, timeZone, busy, chronotype });
     return NextResponse.json(result);
-  } catch {
-    return NextResponse.json({ error: "סוכן היומן לא זמין כרגע. נסה שוב." }, { status: 502 });
+  } catch (err) {
+    // Every model in the failover chain is down. Rather than tell the user
+    // the calendar is unavailable, try the deterministic local parser: an AI
+    // outage should not stop someone putting "מחר פגישה ב-13:00" in their
+    // calendar. It returns null unless it finds a real, explicit time, so
+    // this never invents an event — see lib/calendar/parseHebrewEvent.ts.
+    console.error("[calendar-agent] all models failed, trying local parser:", err);
+
+    const parsed = parseHebrewEvent(message, new Date());
+    if (parsed) {
+      const start = new Date(`${parsed.start}:00`);
+      const end = new Date(start.getTime() + parsed.durationMinutes * 60_000);
+      const intervals: Interval[] = busy.map((b) => ({ start: b.start, end: b.end }));
+      return NextResponse.json({
+        status: "proposed" as const,
+        event: {
+          title: sanitizeEventTitle(parsed.title),
+          start: start.toISOString(),
+          end: end.toISOString(),
+          durationMinutes: parsed.durationMinutes,
+        },
+        conflict: hasConflict(start.toISOString(), end.toISOString(), intervals),
+        // Alternatives come from ranking free slots, which is fine to skip
+        // here — the proposal itself is what matters when the AI is down.
+        alternatives: [],
+        // So the UI can say the reading was local, not the agent's.
+        degraded: true,
+      });
+    }
+
+    return NextResponse.json({
+      status: "unclear" as const,
+      clarification: "שירותי ה-AI עמוסים כרגע. אפשר לנסח עם תאריך ושעה מפורשים, למשל: מחר פגישה ב-13:00",
+    });
   }
 }

@@ -20,6 +20,7 @@ import {
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ConfidenceBar } from "@/components/ui/ConfidenceBar";
 import { PersonAvatar } from "@/components/ui/PersonAvatar";
+import { WhatsAppComposer } from "@/components/features/family/WhatsAppComposer";
 import { daysUntilNextAnnualDate } from "@/lib/utils";
 import type { Person } from "@/types";
 import type { PersonInsight, RelationshipHealth, SuggestedActionType } from "@/lib/family/types";
@@ -305,15 +306,6 @@ export function PersonRelationshipCard({
             >
               <Phone size={14} />
             </a>
-            <a
-              href={`https://wa.me/${person.phone.replace(/[^\d]/g, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`שלח הודעת WhatsApp ל${displayName}`}
-              className="focus-ring flex size-8 items-center justify-center rounded-full bg-accent-health/15 text-accent-health transition-transform hover:scale-110 hover:bg-accent-health/25"
-            >
-              <MessageCircle size={14} />
-            </a>
           </>
         )}
 
@@ -323,6 +315,10 @@ export function PersonRelationshipCard({
         >
           רשום רגע איתם
         </button>
+
+        {/* Replaces the old bare wa.me link, which opened an empty chat and
+            left the user to type the message themselves. */}
+        <WhatsAppComposer person={person} displayName={displayName} />
 
         <button
           onClick={handleSuggestMeetup}

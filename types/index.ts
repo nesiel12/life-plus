@@ -8,11 +8,23 @@ export interface LifeArea {
   lastTouched?: string; // ISO date
 }
 
+// Hebrew conjugates the second person by gender, so a message to a contact
+// cannot be written correctly without knowing it. Optional on purpose: unset
+// means the neutral phrasing is used (lib/family/whatsapp.ts), never a guess.
+export type PersonGender = "male" | "female";
+
+/** Drives the per-role message templates in lib/family/whatsapp.ts. */
+export type PersonRole = "mother" | "father" | "grandfather" | "grandmother" | "friend" | "other";
+
 export interface Person {
   id: string;
   name: string;
   hebrewName?: string;
   relation: string;
+  gender?: PersonGender;
+  role?: PersonRole;
+  /** The user's own wording for this contact's default message. */
+  messageTemplate?: string;
   lastMeaningfulInteraction?: string; // ISO date
   birthday?: string; // "MM-DD"
   anniversary?: string; // "MM-DD"

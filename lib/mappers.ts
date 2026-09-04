@@ -100,6 +100,9 @@ export function toPerson(row: PersonRow): Person {
     note: row.note ?? undefined,
     phone: row.phone ?? undefined,
     avatarUrl: row.avatar_url ?? undefined,
+    gender: (row.gender as Person["gender"]) ?? undefined,
+    role: (row.role as Person["role"]) ?? undefined,
+    messageTemplate: row.message_template ?? undefined,
   };
 }
 
@@ -117,6 +120,9 @@ export function toPersonPatch(patch: Partial<Person>): PersonUpdate {
   if (patch.note !== undefined) row.note = patch.note || null;
   if (patch.phone !== undefined) row.phone = patch.phone || null;
   if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl || null;
+  if (patch.gender !== undefined) row.gender = patch.gender || null;
+  if (patch.role !== undefined) row.role = patch.role || null;
+  if (patch.messageTemplate !== undefined) row.message_template = patch.messageTemplate || null;
   return row;
 }
 

@@ -19,6 +19,11 @@ interface Briefing {
   conflicts: string[];
 }
 
+// No bytes for this long means the stream is stalled, not merely slow.
+// Comfortably above the server's own 50s bound, so the server's cleaner
+// error wins the race whenever it is the one that gives out first.
+const STREAM_STALL_MS = 55_000;
+
 const FRIENDLY_ERROR = "לא הצלחתי להתחבר כרגע. נסה שוב עוד רגע.";
 
 // AI Companion Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §10): the
@@ -107,11 +112,28 @@ export function AICompanion() {
   async function streamReply(message: string, history: { role: string; content: string }[]) {
     setSending(true);
     setStreamingReply("");
+
+    // Stall watchdog. The read loop below awaits the next chunk, and if the
+    // provider accepts the connection and then goes quiet that await never
+    // resolves *or* rejects — the spinner sits on "Life Plus חושב…" forever.
+    // The timer is armed before the request and re-armed on every chunk, so
+    // a slow-but-alive stream is never cut off; only a genuinely stalled one
+    // is. Aborting the fetch makes reader.read() reject, which lands in the
+    // catch below and produces an honest message instead of a hang.
+    const controller = new AbortController();
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    const armStallTimer = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => controller.abort(), STREAM_STALL_MS);
+    };
+
     try {
+      armStallTimer();
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, history }),
+        signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error("Chat request failed");
 
@@ -123,6 +145,7 @@ export function AICompanion() {
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
+        armStallTimer();
         fullText += decoder.decode(value, { stream: true });
         setStreamingReply(fullText);
       }
@@ -134,6 +157,9 @@ export function AICompanion() {
     } catch {
       await addChatMessage({ role: "assistant", content: FRIENDLY_ERROR });
     } finally {
+      // Clearing the timer here matters as much as setting it: a timer left
+      // armed after a successful reply would abort the *next* request.
+      if (stallTimer) clearTimeout(stallTimer);
       setStreamingReply(null);
       setSending(false);
     }
@@ -239,7 +265,7 @@ export function AICompanion() {
         <div className="flex items-center justify-between border-b border-glass-border px-4 py-3">
           <div className="flex items-center gap-2">
             <Logo size={22} />
-            <span className="text-sm font-medium text-foreground">מרחב ההשתקפות</span>
+            <span className="text-sm font-medium text-foreground">Life Plus Assistant</span>
           </div>
           <div className="flex items-center gap-1">
             {mode === "chat" && chatHistory.length > 0 && (
