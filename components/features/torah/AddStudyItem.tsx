@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ExternalLink, Loader2, NotebookPen, Plus, Video, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
-import { nextOrder } from "@/lib/summaries/ordering";
+import { nextSortOrder } from "@/lib/torah/studyHub";
 import { youtubeVideoId } from "@/lib/learning/youtube";
 import { cn } from "@/lib/utils";
 import type { StudyItemKind, Summary } from "@/types";
@@ -60,14 +60,6 @@ export function AddStudyItem({ sectionId, entityType, entityId, onWriteSummary }
     setSaving(true);
     setError(null);
     try {
-      // Ordered against the items it will actually sit beside, so a new item
-      // lands at the end of its own list rather than of everything.
-      const siblings = summaries
-        .filter((s) =>
-          sectionId ? s.sectionId === sectionId : s.entityType === entityType && s.entityId === entityId
-        )
-        .map((s) => ({ id: s.id, sortOrder: s.sortOrder ?? 0 }));
-
       await addSummary({
         title: trimmedTitle,
         content: "",
@@ -76,7 +68,9 @@ export function AddStudyItem({ sectionId, entityType, entityId, onWriteSummary }
         sectionId,
         entityType,
         entityId,
-        sortOrder: nextOrder(siblings),
+        // Shared with the rich editor's create path, so a quick-added video
+        // and a written summary land in the same place in the same list.
+        sortOrder: nextSortOrder(summaries, { sectionId, entityType, entityId }),
       });
       reset();
     } catch {

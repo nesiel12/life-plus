@@ -100,6 +100,22 @@ export interface Rabbi {
 }
 
 /** A user-defined top-level grouping for summaries (פרשת שבוע, דברי תורה, …). */
+/**
+ * Everything an @mention can point at.
+ *
+ * Sections are mentionable but deliberately not *filable*: a summary belongs
+ * to a section through `sectionId`, which is a real column, while
+ * `entity_type` is constrained by the schema to the four record kinds (see
+ * 20260905000000_summaries_rich_text.sql). Modelling that split in the types
+ * rather than widening the column keeps the two ways of relating to a section
+ * — filed in it, or referred to it — from collapsing into one ambiguous
+ * field.
+ */
+export type EntityType = "book" | "rabbi" | "person" | "topic" | "section";
+
+/** The subset the `entity_type` column accepts. */
+export type FiledEntityType = Exclude<EntityType, "section">;
+
 export interface SummarySection {
   id: string;
   name: string;
@@ -124,10 +140,10 @@ export interface Summary {
   /** Unfinished — powers pause-and-resume. */
   isDraft?: boolean;
   /** The entity this summary is about, if any. */
-  entityType?: "book" | "rabbi" | "person" | "topic";
+  entityType?: FiledEntityType;
   entityId?: string;
   /** Entities @mentioned in the body. */
-  mentions?: { type: "book" | "rabbi" | "person" | "topic"; id: string; label: string }[];
+  mentions?: { type: EntityType; id: string; label: string }[];
   /** The section this summary is filed under. Unassigned is valid. */
   sectionId?: string;
   /** Position within its section. */

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { FileText, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { SummaryEditor, type SummaryDraft } from "@/components/features/summaries/SummaryEditor";
+import { nextSortOrder } from "@/lib/torah/studyHub";
 import type { EntitySources } from "@/lib/summaries/entityRef";
 import type { Summary } from "@/types";
 
@@ -13,6 +14,8 @@ interface SummaryWorkspaceProps {
   /** The entity this summary is about, when opened from an entity page. */
   entityType?: Summary["entityType"];
   entityId?: string;
+  /** The section this summary belongs to, when opened from a section. */
+  sectionId?: string;
   onClose: () => void;
 }
 
@@ -24,17 +27,37 @@ interface SummaryWorkspaceProps {
 // would end up with a dozen near-identical rows. The id is held in a ref
 // rather than state because the autosave callback closes over it and must see
 // the value written by the previous save, not the one from its own render.
-export function SummaryWorkspace({ existing, entityType, entityId, onClose }: SummaryWorkspaceProps) {
+export function SummaryWorkspace({
+  existing,
+  entityType,
+  entityId,
+  sectionId,
+  onClose,
+}: SummaryWorkspaceProps) {
   const books = useAtlasStore((s) => s.books);
   const rabbis = useAtlasStore((s) => s.rabbis);
   const people = useAtlasStore((s) => s.people);
+  const sections = useAtlasStore((s) => s.summarySections);
+  const summaries = useAtlasStore((s) => s.summaries);
   const addSummary = useAtlasStore((s) => s.addSummary);
   const updateSummary = useAtlasStore((s) => s.updateSummary);
 
   const summaryId = useRef<string | null>(existing?.id ?? null);
   const [closing, setClosing] = useState(false);
 
-  const sources: EntitySources = { books, rabbis, people };
+  // Topics have no table — they exist only as labels the user has already
+  // typed. Harvesting them from existing tags is what makes "@" able to
+  // suggest a topic at all; without it the topic kind is permanently empty
+  // and the picker silently advertises four kinds instead of five.
+  const topics = useMemo(
+    () => [...new Set(summaries.flatMap((s) => s.tags ?? []))].sort((a, b) => a.localeCompare(b, "he")),
+    [summaries]
+  );
+
+  const sources: EntitySources = useMemo(
+    () => ({ books, rabbis, people, sections, topics }),
+    [books, rabbis, people, sections, topics]
+  );
 
   const persist = useCallback(
     async (draft: SummaryDraft, isDraft: boolean) => {
@@ -43,19 +66,35 @@ export function SummaryWorkspace({ existing, entityType, entityId, onClose }: Su
         content: draft.text,
         contentHtml: draft.html,
         isDraft,
-        entityType,
-        entityId,
         mentions: draft.mentions,
       };
 
       if (summaryId.current) {
+        // Deliberately without the filing fields. A hub shows items that
+        // merely @mention it alongside its own, and opening one of those to
+        // edit would otherwise re-file it into the hub being viewed —
+        // silently moving someone's note out of the section they put it in.
+        // Where an item lives is changed by moving it, not by reading it.
         await updateSummary(summaryId.current, payload);
       } else {
-        const created = await addSummary(payload);
+        // Where the editor was opened from *is* the filing decision for a new
+        // summary. Asking again after the user already navigated into a
+        // rabbi's hub or a section re-asks a question they have answered.
+        const created = await addSummary({
+          ...payload,
+          entityType,
+          entityId,
+          sectionId,
+          sortOrder: nextSortOrder(summaries, { sectionId, entityType, entityId }),
+        });
         summaryId.current = created.id;
       }
     },
-    [addSummary, updateSummary, entityType, entityId]
+    // `summaries` is read only on the insert branch, which runs once — the
+    // ref guard means later autosaves take the update path and never re-read
+    // it. Including it keeps the dependency list honest; the cost is a
+    // recreated callback the editor debounces anyway.
+    [addSummary, updateSummary, entityType, entityId, sectionId, summaries]
   );
 
   // Autosaves land as drafts; only an explicit finish clears the flag. That

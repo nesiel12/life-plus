@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { FileText, UploadCloud, FileAudio, Sparkles, Plus, Link2, Search } from "lucide-react";
 import { AiSummaryModal } from "@/components/features/torah/AiSummaryModal";
 import { useAtlasStore } from "@/store/useAtlasStore";
@@ -12,7 +13,8 @@ import { TorahTabs, isCustomTab, type TorahTab } from "@/components/features/tor
 import { EntityHub } from "@/components/features/torah/EntityHub";
 import { AddStudyItem } from "@/components/features/torah/AddStudyItem";
 import { StudyItemList } from "@/components/features/torah/StudyItemList";
-import { sectionItems } from "@/lib/torah/studyHub";
+import { buildSectionHub } from "@/lib/torah/studyHub";
+import type { EntityRef, EntitySources } from "@/lib/summaries/entityRef";
 import { BookCard } from "@/components/features/torah/BookCard";
 import { RabbiCard } from "@/components/features/torah/RabbiCard";
 import { SummaryCard } from "@/components/features/torah/SummaryCard";
@@ -196,8 +198,54 @@ export default function TorahSpacePage() {
   // The book or rabbi whose hub is open. One state for both — the hub
   // component is shared, so the page only needs to know which entity.
   const [openEntity, setOpenEntity] = useState<{ type: "book" | "rabbi"; id: string } | null>(null);
+  const router = useRouter();
   const [sectionEditorTarget, setSectionEditorTarget] = useState<string | null>(null);
   const addSummarySection = useAtlasStore((s) => s.addSummarySection);
+  const people = useAtlasStore((s) => s.people);
+
+  // Shared by the section view so a borrowed item can name where it lives.
+  const mentionSources: EntitySources = useMemo(
+    () => ({ books, rabbis, people, sections: summarySections }),
+    [books, rabbis, people, summarySections]
+  );
+
+  // Following an @mention chip. This is what turns a mention from a label
+  // into a link: a note filed in one section that names a rabbi becomes a way
+  // to reach him, in one click, from where you were reading.
+  //
+  // Every hop is checked against current data first. References carry no
+  // foreign key (see entityRef), so a chip can name something that has since
+  // been deleted — landing on an empty hub or a tab that no longer exists is
+  // worse than the click simply doing nothing.
+  const handleMentionNavigate = useCallback(
+    (ref: EntityRef) => {
+      switch (ref.type) {
+        case "book":
+        case "rabbi": {
+          const exists =
+            ref.type === "book" ? books.some((b) => b.id === ref.id) : rabbis.some((r) => r.id === ref.id);
+          if (!exists) return;
+          setActiveTab(ref.type === "book" ? "books" : "rabbis");
+          setOpenEntity({ type: ref.type, id: ref.id });
+          return;
+        }
+        case "section": {
+          if (!summarySections.some((sec) => sec.id === ref.id)) return;
+          setOpenEntity(null);
+          setSectionEditorTarget(null);
+          setActiveTab({ sectionId: ref.id });
+          return;
+        }
+        case "person":
+          router.push("/areas/family");
+          return;
+        case "topic":
+          // A topic is a label, not a record — there is nowhere to go.
+          return;
+      }
+    },
+    [books, rabbis, summarySections, router]
+  );
   const { loading: addingSummary, error: addSummaryError, run: createSummary } = useApiCall(addSummary);
 
   // Filtered by the active tab, then ordered by the user's own arrangement.
@@ -327,6 +375,7 @@ export default function TorahSpacePage() {
                 : rabbis.find((r) => r.id === openEntity.id)?.title
             }
             onBack={() => setOpenEntity(null)}
+            onEntityClick={handleMentionNavigate}
           />
         </GlassCard>
       )}
@@ -342,6 +391,8 @@ export default function TorahSpacePage() {
                     ? undefined
                     : summaries.find((s) => s.id === sectionEditorTarget)
                 }
+                // The section the user is standing in files the summary.
+                sectionId={activeTab.sectionId}
                 onClose={() => setSectionEditorTarget(null)}
               />
             </GlassCard>
@@ -353,10 +404,11 @@ export default function TorahSpacePage() {
           )}
 
           <StudyItemList
-            items={sectionItems(summaries, activeTab.sectionId)}
+            items={buildSectionHub({ sectionId: activeTab.sectionId, summaries, sources: mentionSources })}
             onDelete={handleDeleteSummary}
             onEdit={(id) => setSectionEditorTarget(id)}
             onMove={(id, delta) => reorderSummaryInSection(id, delta).catch(() => {})}
+            onEntityClick={handleMentionNavigate}
             emptyLabel="המדור הזה עדיין ריק. הוסף סיכום, שיעור וידאו או מקור."
           />
         </div>

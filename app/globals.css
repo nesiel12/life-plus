@@ -519,11 +519,66 @@ body::before {
 
 /* @mention chip. Reads as a link without being one — clicking navigates from
    the rendered view, not from inside the editor. */
+/* @mention chip. Rendered from stored HTML, so the styling hangs off the
+   class and the data attribute the sanitiser already allows — no extra
+   attribute needed on the saved markup. */
 .entity-mention {
-  background: var(--gold-soft);
-  color: var(--gold-ink);
-  border-radius: 0.4rem;
-  padding: 0.05rem 0.35rem;
+  background: var(--fill-subtle);
+  color: var(--foreground);
+  border: 1px solid var(--hairline-card);
+  border-radius: 0.45rem;
+  padding: 0.05rem 0.4rem;
   font-weight: 500;
   white-space: nowrap;
+}
+
+/* The kind is carried by a coloured dot rather than coloured text: the raw
+   ribbon accents sit near 3:1 against the chip fill, below the 4.5:1 small
+   text needs, and --gold-ink is the only accent vetted for it. A decorative
+   dot keeps the type legible at a glance without putting meaning in colour
+   alone — the "@" and the label already say what it is.
+   Inline-block rather than a flex child: an inline-flex chip takes its
+   baseline from its first item, which would be this dot, and the whole chip
+   would ride high against the surrounding prose. */
+.entity-mention::before {
+  content: "";
+  display: inline-block;
+  inline-size: 0.4em;
+  block-size: 0.4em;
+  margin-inline-end: 0.3em;
+  vertical-align: 0.08em;
+  border-radius: 50%;
+  background: var(--accent-knowledge);
+}
+
+.entity-mention[data-entity-type="book"]::before {
+  background: var(--accent-faith);
+}
+.entity-mention[data-entity-type="rabbi"]::before {
+  background: var(--accent-learning);
+}
+.entity-mention[data-entity-type="person"]::before {
+  background: var(--accent-family);
+}
+.entity-mention[data-entity-type="section"]::before {
+  background: var(--accent-time);
+}
+.entity-mention[data-entity-type="topic"]::before {
+  background: var(--accent-career);
+}
+
+/* Interactive only where a host wired navigation up — SummaryContent sets
+   role="link" on render. Inside the editor a chip is text being edited, and
+   a pointer cursor there would promise a click that does nothing. */
+.entity-mention[role="link"] {
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.entity-mention[role="link"]:hover,
+.entity-mention[role="link"]:focus-visible {
+  background: var(--gold-soft);
+  border-color: var(--gold-line);
 }

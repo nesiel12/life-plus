@@ -1,4 +1,4 @@
-import type { Book, Person, Rabbi } from "@/types";
+import type { Book, EntityType, Person, Rabbi, SummarySection } from "@/types";
 
 // The entity layer behind summaries and @mentions.
 //
@@ -12,7 +12,9 @@ import type { Book, Person, Rabbi } from "@/types";
 // here is written to tolerate a dangling reference — a deleted book must
 // degrade to plain text, never to a broken link or a crash.
 
-export type EntityType = "book" | "rabbi" | "person" | "topic";
+// EntityType is defined in @/types (the canonical domain vocabulary) and
+// re-exported here so the mention layer stays the one import for callers.
+export type { EntityType };
 
 export interface EntityRef {
   type: EntityType;
@@ -34,6 +36,8 @@ export interface EntitySources {
   books: Book[];
   rabbis: Rabbi[];
   people: Person[];
+  /** The user's own top-level sections. */
+  sections: SummarySection[];
   /** Free-form topics have no table; they exist only as labels. */
   topics?: string[];
 }
@@ -44,6 +48,7 @@ const HREF: Record<EntityType, string | null> = {
   person: "/areas/family",
   // A topic is a label, not a record, so there is nowhere to navigate to.
   topic: null,
+  section: "/areas/torah",
 };
 
 export const ENTITY_LABELS: Record<EntityType, string> = {
@@ -51,6 +56,7 @@ export const ENTITY_LABELS: Record<EntityType, string> = {
   rabbi: "רב",
   person: "איש קשר",
   topic: "נושא",
+  section: "מדור",
 };
 
 function nameOf(sources: EntitySources, type: EntityType, id: string): string | null {
@@ -66,6 +72,8 @@ function nameOf(sources: EntitySources, type: EntityType, id: string): string | 
     case "topic":
       // A topic's id *is* its label; it always resolves to itself.
       return id;
+    case "section":
+      return sources.sections.find((s) => s.id === id)?.name ?? null;
   }
 }
 
@@ -111,25 +119,53 @@ export function allCandidates(sources: EntitySources): EntityCandidate[] {
       label: p.hebrewName ?? p.name,
       detail: p.relation,
     })),
+    ...sources.sections.map((s) => ({ type: "section" as const, id: s.id, label: s.name })),
     ...(sources.topics ?? []).map((t) => ({ type: "topic" as const, id: t, label: t })),
   ];
 }
 
 const MAX_SUGGESTIONS = 8;
 
+/** Round-robin across kinds, so one crowded kind cannot fill the list. */
+function interleaveByType(candidates: EntityCandidate[], limit: number): EntityCandidate[] {
+  const queues = new Map<EntityType, EntityCandidate[]>();
+  for (const candidate of candidates) {
+    const queue = queues.get(candidate.type);
+    if (queue) queue.push(candidate);
+    else queues.set(candidate.type, [candidate]);
+  }
+
+  const out: EntityCandidate[] = [];
+  const lists = [...queues.values()];
+  for (let round = 0; out.length < limit; round++) {
+    const before = out.length;
+    for (const list of lists) {
+      if (round < list.length && out.length < limit) out.push(list[round]);
+    }
+    // Every queue is exhausted; without this the loop spins forever when
+    // there are fewer candidates than the limit.
+    if (out.length === before) break;
+  }
+  return out;
+}
+
 /**
  * Ranks candidates for the @mention picker.
  *
  * Prefix matches rank above substring matches, because someone typing "@דנ"
  * almost always means a name starting with those letters, and burying it
- * under a mid-word match makes the picker feel wrong. An empty query returns
- * the head of the list rather than nothing, so typing "@" alone still shows
- * something to pick.
+ * under a mid-word match makes the picker feel wrong.
+ *
+ * The empty query — "@" typed alone — is answered by round-robin across
+ * kinds rather than the head of the flat list. Flat order is books, rabbis,
+ * people, sections, topics, so a user with a shelf of books would see eight
+ * books and no evidence that rabbis or their own sections are mentionable at
+ * all. Interleaving makes the first keystroke advertise the whole vocabulary.
  */
 export function searchEntities(query: string, sources: EntitySources, limit = MAX_SUGGESTIONS): EntityCandidate[] {
   const candidates = allCandidates(sources);
   const q = query.trim().toLowerCase();
-  if (!q) return candidates.slice(0, limit);
+  if (!q) return interleaveByType(candidates, limit);
 
   const scored: { candidate: EntityCandidate; score: number }[] = [];
   for (const candidate of candidates) {
@@ -169,8 +205,14 @@ export function extractMentions(html: string): EntityRef[] {
   return found;
 }
 
-function isEntityType(value: string): value is EntityType {
-  return value === "book" || value === "rabbi" || value === "person" || value === "topic";
+export function isEntityType(value: string): value is EntityType {
+  return (
+    value === "book" ||
+    value === "rabbi" ||
+    value === "person" ||
+    value === "topic" ||
+    value === "section"
+  );
 }
 
 /** HTML attribute values arrive escaped; mention labels are user text. */

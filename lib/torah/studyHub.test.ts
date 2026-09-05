@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildStudyHub, sectionItems } from "@/lib/torah/studyHub";
+import { buildSectionHub, buildStudyHub, nextSortOrder } from "@/lib/torah/studyHub";
+import type { EntitySources } from "@/lib/summaries/entityRef";
 import type { KnowledgeEntry, Summary } from "@/types";
 
 function item(overrides: Partial<Summary> & Pick<Summary, "id">): Summary {
@@ -174,30 +175,183 @@ describe("buildStudyHub", () => {
   });
 });
 
-describe("sectionItems", () => {
-  const summaries = [
-    item({ id: "b", sectionId: "s1", sortOrder: 200 }),
+const SOURCES: EntitySources = {
+  books: [{ id: "b1", title: "עט הלב" }],
+  rabbis: [{ id: "r1", name: "הרב דניאל כהן" }],
+  people: [],
+  sections: [{ id: "s1", name: "פרשת שבוע", sortOrder: 100 }],
+};
+
+describe("item origin", () => {
+  it("names the section a borrowed item actually lives in", () => {
+    const hub = buildStudyHub({
+      ...RABBI,
+      sources: SOURCES,
+      summaries: [
+        item({ id: "a", sectionId: "s1", mentions: [{ type: "rabbi", id: "r1", label: "x" }] }),
+      ],
+    });
+    expect(hub.summaries[0]).toMatchObject({ relation: "mentioned", origin: "פרשת שבוע" });
+  });
+
+  it("names the entity when the item is filed under one instead", () => {
+    const hub = buildStudyHub({
+      ...RABBI,
+      sources: SOURCES,
+      summaries: [
+        item({
+          id: "a",
+          entityType: "book",
+          entityId: "b1",
+          mentions: [{ type: "rabbi", id: "r1", label: "x" }],
+        }),
+      ],
+    });
+    expect(hub.summaries[0].origin).toBe("עט הלב");
+  });
+
+  // Same dangling-reference tolerance as the mention layer: a deleted book
+  // must produce no origin rather than a stale one.
+  it("has no origin when the entity it was filed under is gone", () => {
+    const hub = buildStudyHub({
+      ...RABBI,
+      sources: SOURCES,
+      summaries: [
+        item({
+          id: "a",
+          entityType: "book",
+          entityId: "deleted",
+          mentions: [{ type: "rabbi", id: "r1", label: "x" }],
+        }),
+      ],
+    });
+    expect(hub.summaries[0].origin).toBeUndefined();
+  });
+
+  it("has no origin for a loose item filed nowhere", () => {
+    const hub = buildStudyHub({
+      ...RABBI,
+      sources: SOURCES,
+      summaries: [item({ id: "a", mentions: [{ type: "rabbi", id: "r1", label: "x" }] })],
+    });
+    expect(hub.summaries[0].origin).toBeUndefined();
+  });
+
+  it("omits origin entirely when no sources are supplied", () => {
+    const hub = buildStudyHub({
+      ...RABBI,
+      summaries: [item({ id: "a", sectionId: "s1", entityType: "rabbi", entityId: "r1" })],
+    });
+    expect(hub.summaries[0].origin).toBeUndefined();
+  });
+});
+
+describe("buildSectionHub", () => {
+  it("returns the section's own items, in the user's order", () => {
+    const items = buildSectionHub({
+      sectionId: "s1",
+      summaries: [
+        item({ id: "b", sectionId: "s1", sortOrder: 200 }),
+        item({ id: "a", sectionId: "s1", sortOrder: 100 }),
+        item({ id: "other", sectionId: "s2", sortOrder: 50 }),
+      ],
+    });
+    expect(items.map((i) => i.summary.id)).toEqual(["a", "b"]);
+    expect(items.every((i) => i.relation === "filed")).toBe(true);
+  });
+
+  it("keeps every kind in one stream rather than splitting them", () => {
+    const items = buildSectionHub({
+      sectionId: "s1",
+      summaries: [
+        item({ id: "v", sectionId: "s1", sortOrder: 100, kind: "video" }),
+        item({ id: "n", sectionId: "s1", sortOrder: 200, kind: "summary" }),
+        item({ id: "u", sectionId: "s1", sortOrder: 300, kind: "source" }),
+      ],
+    });
+    expect(items.map((i) => i.summary.id)).toEqual(["v", "n", "u"]);
+  });
+
+  // The reverse direction: mentioning a section from a rabbi's page has to
+  // show up in the section, or the link is one-way.
+  it("also collects items that @mention the section from elsewhere", () => {
+    const items = buildSectionHub({
+      sectionId: "s1",
+      sources: SOURCES,
+      summaries: [
+        item({
+          id: "elsewhere",
+          entityType: "rabbi",
+          entityId: "r1",
+          mentions: [{ type: "section", id: "s1", label: "פרשת שבוע" }],
+        }),
+      ],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ relation: "mentioned", origin: "הרב דניאל כהן" });
+  });
+
+  it("puts the section's own items ahead of borrowed ones", () => {
+    const items = buildSectionHub({
+      sectionId: "s1",
+      summaries: [
+        item({ id: "borrowed", sortOrder: 10, mentions: [{ type: "section", id: "s1", label: "x" }] }),
+        item({ id: "own", sectionId: "s1", sortOrder: 900 }),
+      ],
+    });
+    expect(items.map((i) => i.summary.id)).toEqual(["own", "borrowed"]);
+  });
+
+  it("counts an item once when it is both filed here and mentions the section", () => {
+    const items = buildSectionHub({
+      sectionId: "s1",
+      summaries: [
+        item({ id: "a", sectionId: "s1", mentions: [{ type: "section", id: "s1", label: "x" }] }),
+      ],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0].relation).toBe("filed");
+  });
+
+  it("ignores a mention of a different section", () => {
+    const items = buildSectionHub({
+      sectionId: "s1",
+      summaries: [item({ id: "a", mentions: [{ type: "section", id: "s2", label: "x" }] })],
+    });
+    expect(items).toEqual([]);
+  });
+});
+
+describe("nextSortOrder", () => {
+  const existing = [
     item({ id: "a", sectionId: "s1", sortOrder: 100 }),
-    item({ id: "v", sectionId: "s1", sortOrder: 300, kind: "video" }),
-    item({ id: "other", sectionId: "s2", sortOrder: 50 }),
+    item({ id: "b", sectionId: "s1", sortOrder: 200 }),
+    item({ id: "c", entityType: "rabbi", entityId: "r1", sortOrder: 700 }),
   ];
 
-  it("returns only that section's items, in order", () => {
-    expect(sectionItems(summaries, "s1").map((s) => s.id)).toEqual(["a", "b", "v"]);
+  it("puts a new section item after the section's last one", () => {
+    expect(nextSortOrder(existing, { sectionId: "s1" })).toBeGreaterThan(200);
   });
 
-  it("filters by kind when asked", () => {
-    expect(sectionItems(summaries, "s1", "video").map((s) => s.id)).toEqual(["v"]);
-    expect(sectionItems(summaries, "s1", "summary").map((s) => s.id)).toEqual(["a", "b"]);
+  // The bug this exists to prevent: ranking against everything would drop a
+  // new note into an arbitrary position in its own list.
+  it("ignores items filed somewhere else", () => {
+    expect(nextSortOrder(existing, { sectionId: "s1" })).toBeLessThan(700);
   });
 
-  it("returns nothing for an unknown section", () => {
-    expect(sectionItems(summaries, "missing")).toEqual([]);
+  it("orders an entity item against that entity's own items", () => {
+    expect(nextSortOrder(existing, { entityType: "rabbi", entityId: "r1" })).toBeGreaterThan(700);
   });
 
-  it("does not mutate the input", () => {
-    const before = summaries.map((s) => s.id);
-    sectionItems(summaries, "s1");
-    expect(summaries.map((s) => s.id)).toEqual(before);
+  it("does not treat a borrowed mention as a sibling", () => {
+    const withMention = [
+      ...existing,
+      item({ id: "m", sortOrder: 9000, mentions: [{ type: "section", id: "s1", label: "x" }] }),
+    ];
+    expect(nextSortOrder(withMention, { sectionId: "s1" })).toBeLessThan(9000);
+  });
+
+  it("handles an empty destination", () => {
+    expect(nextSortOrder([], { sectionId: "fresh" })).toBeGreaterThan(0);
   });
 });

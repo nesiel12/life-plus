@@ -18,6 +18,10 @@ const sources: EntitySources = {
     { id: "r2", name: "הרב שלמה לוי" },
   ],
   people: [{ id: "p1", name: "Dana", hebrewName: "דנה", relation: "אחות" }],
+  sections: [
+    { id: "s1", name: "פרשת שבוע", sortOrder: 100 },
+    { id: "s2", name: "הלכות שבת", sortOrder: 200 },
+  ],
   topics: ["מוסר"],
 };
 
@@ -72,17 +76,73 @@ describe("resolveEntity", () => {
 describe("allCandidates", () => {
   it("includes every entity kind", () => {
     const types = new Set(allCandidates(sources).map((c) => c.type));
-    expect(types).toEqual(new Set(["book", "rabbi", "person", "topic"]));
+    expect(types).toEqual(new Set(["book", "rabbi", "person", "topic", "section"]));
   });
 
   it("survives absent topics", () => {
-    expect(() => allCandidates({ books: [], rabbis: [], people: [] })).not.toThrow();
+    expect(() => allCandidates({ books: [], rabbis: [], people: [], sections: [] })).not.toThrow();
+  });
+});
+
+describe("sections as mentionable entities", () => {
+  it("offers the user's own sections in the picker", () => {
+    const hits = searchEntities("הלכות", sources);
+    expect(hits[0]).toMatchObject({ type: "section", id: "s2", label: "הלכות שבת" });
+  });
+
+  it("resolves a section mention to its current name", () => {
+    const r = resolveEntity({ type: "section", id: "s1", label: "פרשת השבוע" }, sources);
+    expect(r.exists).toBe(true);
+    expect(r.currentLabel).toBe("פרשת שבוע");
+    expect(r.href).toBe("/areas/torah");
+  });
+
+  it("degrades to the stored label when the section is deleted", () => {
+    const r = resolveEntity({ type: "section", id: "gone", label: "מדור ישן" }, sources);
+    expect(r.exists).toBe(false);
+    expect(r.currentLabel).toBe("מדור ישן");
+    expect(r.href).toBeNull();
+  });
+
+  it("reads a section mention back out of saved HTML", () => {
+    const html = '<p><span data-entity-type="section" data-entity-id="s1" data-label="פרשת שבוע">@פרשת שבוע</span></p>';
+    expect(extractMentions(html)).toEqual([{ type: "section", id: "s1", label: "פרשת שבוע" }]);
   });
 });
 
 describe("searchEntities", () => {
-  it("returns a head of the list for an empty query, so '@' alone shows something", () => {
+  it("returns something for an empty query, so '@' alone shows a list", () => {
     expect(searchEntities("", sources).length).toBeGreaterThan(0);
+  });
+
+  // A shelf of books must not crowd out the other kinds, or the first
+  // keystroke teaches the user that only books are mentionable.
+  it("spreads an empty query across kinds instead of taking the flat head", () => {
+    const many: EntitySources = {
+      books: Array.from({ length: 20 }, (_, i) => ({ id: `b${i}`, title: `ספר ${i}` })),
+      rabbis: [{ id: "r1", name: "הרב לוי" }],
+      people: [],
+      sections: [{ id: "s1", name: "פרשת שבוע", sortOrder: 100 }],
+    };
+    const kinds = new Set(searchEntities("", many).map((c) => c.type));
+    expect(kinds).toEqual(new Set(["book", "rabbi", "section"]));
+  });
+
+  it("still fills the list from one kind when it is the only one", () => {
+    const only: EntitySources = {
+      books: Array.from({ length: 20 }, (_, i) => ({ id: `b${i}`, title: `ספר ${i}` })),
+      rabbis: [],
+      people: [],
+      sections: [],
+    };
+    expect(searchEntities("", only)).toHaveLength(8);
+  });
+
+  // The interleave loop must terminate when the pool is smaller than the
+  // limit rather than spinning on exhausted queues.
+  it("returns everything, and terminates, when there is less than a full page", () => {
+    expect(searchEntities("", { books: [{ id: "b", title: "ספר" }], rabbis: [], people: [], sections: [] }))
+      .toHaveLength(1);
   });
 
   it("finds by prefix", () => {
@@ -96,6 +156,7 @@ describe("searchEntities", () => {
       books: [{ id: "x", title: "ספר על דנה" }],
       rabbis: [],
       people: [{ id: "p1", name: "דנה", relation: "אחות" }],
+      sections: [],
     };
     expect(searchEntities("דנה", local)[0].type).toBe("person");
   });

@@ -1,18 +1,21 @@
 "use client";
 
-import { ChevronDown, ChevronUp, ExternalLink, NotebookPen, Trash2, Video } from "lucide-react";
+import { ChevronDown, ChevronUp, CornerUpLeft, ExternalLink, NotebookPen, Trash2, Video } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { SummaryContent } from "@/components/features/summaries/SummaryContent";
 import { InlineVideoPlayer } from "@/components/features/learning/InlineVideoPlayer";
 import { youtubeVideoId } from "@/lib/learning/youtube";
 import { isFirst, isLast } from "@/lib/summaries/ordering";
-import type { Summary } from "@/types";
+import type { HubItem } from "@/lib/torah/studyHub";
+import type { EntityRef } from "@/lib/summaries/entityRef";
 
 interface StudyItemListProps {
-  items: Summary[];
+  items: HubItem[];
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
   onMove?: (id: string, delta: number) => void;
+  /** Makes @mention chips inside item bodies navigable. */
+  onEntityClick?: (ref: EntityRef) => void;
   emptyLabel?: string;
 }
 
@@ -31,8 +34,15 @@ function hostOf(url: string): string {
 // a note *and* the shiur *and* the source text, and splitting them by type
 // would scatter one topic across three places, which is the fragmentation
 // this overhaul is meant to remove. Each item renders according to its kind.
-export function StudyItemList({ items, onDelete, onEdit, onMove, emptyLabel }: StudyItemListProps) {
-  const orderable = items.map((i) => ({ id: i.id, sortOrder: i.sortOrder ?? 0 }));
+//
+// Takes HubItem rather than Summary so an item that is only *mentioned* here
+// can say so. A borrowed row shown identically to a filed one implies the
+// user put it here, and its reorder arrows would be a lie — they would move
+// it within a list it does not belong to. Mentioned items are therefore
+// labelled with where they actually live, and are not reorderable.
+export function StudyItemList({ items, onDelete, onEdit, onMove, onEntityClick, emptyLabel }: StudyItemListProps) {
+  const filed = items.filter((i) => i.relation === "filed");
+  const orderable = filed.map((i) => ({ id: i.summary.id, sortOrder: i.summary.sortOrder ?? 0 }));
 
   if (items.length === 0) {
     return <p className="text-sm text-muted">{emptyLabel ?? "אין כאן עדיין תוכן."}</p>;
@@ -40,9 +50,10 @@ export function StudyItemList({ items, onDelete, onEdit, onMove, emptyLabel }: S
 
   return (
     <div className="flex flex-col gap-4">
-      {items.map((item, i) => {
+      {items.map(({ summary: item, relation, origin }, i) => {
         const kind = item.kind ?? "summary";
         const videoId = kind === "video" && item.url ? youtubeVideoId(item.url) : null;
+        const borrowed = relation === "mentioned";
 
         return (
           <GlassCard key={item.id} delay={Math.min(i * 0.04, 0.3)} className="p-4">
@@ -64,7 +75,7 @@ export function StudyItemList({ items, onDelete, onEdit, onMove, emptyLabel }: S
               </span>
 
               <span className="flex shrink-0 items-center gap-1">
-                {onMove && (
+                {onMove && !borrowed && (
                   <>
                     <button
                       onClick={() => onMove(item.id, -1)}
@@ -93,7 +104,10 @@ export function StudyItemList({ items, onDelete, onEdit, onMove, emptyLabel }: S
                     <NotebookPen size={12} aria-hidden />
                   </button>
                 )}
-                {onDelete && (
+                {/* Never on a borrowed row: it would delete the item from
+                    the section that actually owns it, from a page that only
+                    references it. */}
+                {onDelete && !borrowed && (
                   <button
                     onClick={() => onDelete(item.id)}
                     aria-label={`מחק את ${item.title}`}
@@ -104,6 +118,16 @@ export function StudyItemList({ items, onDelete, onEdit, onMove, emptyLabel }: S
                 )}
               </span>
             </div>
+
+            {/* Why this row is here, when it is not filed here. Rendered
+                before the content so the reader knows what they are looking
+                at before they read it. */}
+            {borrowed && (
+              <p className="mb-2 flex items-center gap-1.5 text-[0.7rem] text-muted">
+                <CornerUpLeft size={11} className="shrink-0" aria-hidden />
+                {origin ? `הוזכר כאן · מתוך ${origin}` : "הוזכר כאן"}
+              </p>
+            )}
 
             {videoId && (
               <div className="mb-3">
@@ -129,6 +153,7 @@ export function StudyItemList({ items, onDelete, onEdit, onMove, emptyLabel }: S
               <SummaryContent
                 html={item.contentHtml}
                 text={item.content}
+                onEntityClick={onEntityClick}
                 className="text-sm text-foreground/80"
               />
             )}

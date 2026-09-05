@@ -6,9 +6,9 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { AddStudyItem } from "@/components/features/torah/AddStudyItem";
 import { StudyItemList } from "@/components/features/torah/StudyItemList";
 import { SummaryWorkspace } from "@/components/features/summaries/SummaryWorkspace";
-import { buildStudyHub } from "@/lib/torah/studyHub";
+import { buildStudyHub, type HubItem } from "@/lib/torah/studyHub";
+import type { EntityRef, EntitySources } from "@/lib/summaries/entityRef";
 import { cn } from "@/lib/utils";
-import type { Summary } from "@/types";
 
 interface EntityHubProps {
   entityType: "book" | "rabbi";
@@ -17,6 +17,8 @@ interface EntityHubProps {
   /** Author for a book, title for a rabbi. */
   subtitle?: string;
   onBack: () => void;
+  /** Following an @mention out of this hub. The page owns where that goes. */
+  onEntityClick?: (ref: EntityRef) => void;
 }
 
 type HubTab = "all" | "summaries" | "videos" | "sources";
@@ -31,28 +33,38 @@ type HubTab = "all" | "summaries" | "videos" | "sources";
 // material filed *about* the entity and material that merely @mentions it,
 // and marks which is which — so a note about another book that quotes this
 // rabbi shows up here, labelled, rather than being invisible.
-export function EntityHub({ entityType, entityId, name, subtitle, onBack }: EntityHubProps) {
+export function EntityHub({ entityType, entityId, name, subtitle, onBack, onEntityClick }: EntityHubProps) {
   const summaries = useAtlasStore((s) => s.summaries);
   const knowledgeEntries = useAtlasStore((s) => s.knowledgeEntries);
+  const books = useAtlasStore((s) => s.books);
+  const rabbis = useAtlasStore((s) => s.rabbis);
+  const people = useAtlasStore((s) => s.people);
+  const sections = useAtlasStore((s) => s.summarySections);
   const deleteSummary = useAtlasStore((s) => s.deleteSummary);
   const reorderSummaryInSection = useAtlasStore((s) => s.reorderSummaryInSection);
 
   const [tab, setTab] = useState<HubTab>("all");
   const [editorTarget, setEditorTarget] = useState<string | null>(null);
 
-  const hub = useMemo(
-    () => buildStudyHub({ entityType, entityId, entityName: name, summaries, knowledgeEntries }),
-    [entityType, entityId, name, summaries, knowledgeEntries]
+  // Passed to the aggregator so each item can say where it actually lives.
+  const sources: EntitySources = useMemo(
+    () => ({ books, rabbis, people, sections }),
+    [books, rabbis, people, sections]
   );
 
-  const visible: Summary[] = useMemo(() => {
+  const hub = useMemo(
+    () => buildStudyHub({ entityType, entityId, entityName: name, summaries, knowledgeEntries, sources }),
+    [entityType, entityId, name, summaries, knowledgeEntries, sources]
+  );
+
+  const visible: HubItem[] = useMemo(() => {
     const pick =
       tab === "summaries" ? hub.summaries : tab === "videos" ? hub.videos : tab === "sources" ? hub.sources : null;
-    if (pick) return pick.map((i) => i.summary);
+    if (pick) return pick;
     // "All" keeps the kind grouping rather than interleaving — written
     // material first, then lessons, then sources, which is the order a
     // person actually studies in.
-    return [...hub.summaries, ...hub.videos, ...hub.sources].map((i) => i.summary);
+    return [...hub.summaries, ...hub.videos, ...hub.sources];
   }, [tab, hub]);
 
   const TABS: { key: HubTab; label: string; count: number }[] = [
@@ -125,6 +137,7 @@ export function EntityHub({ entityType, entityId, name, subtitle, onBack }: Enti
         onDelete={(id) => deleteSummary(id).catch(() => {})}
         onEdit={(id) => setEditorTarget(id)}
         onMove={(id, delta) => reorderSummaryInSection(id, delta).catch(() => {})}
+        onEntityClick={onEntityClick}
         emptyLabel={
           entityType === "book"
             ? "אין עדיין חומרים לספר הזה. הוסף סיכום, שיעור או מקור."
