@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Check, Pin, PinOff, Star, Trash2 } from "lucide-react";
+import { Calendar, Check, Focus, Pin, PinOff, Star, Trash2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TaskAssistPanel, type TaskScheduleContext } from "@/components/features/time/TaskAssistPanel";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,8 @@ interface TaskCardProps {
    *  to hide that half of the panel — e.g. the done list passes no
    *  `schedule`, since scheduling a finished task makes no sense. */
   schedule?: TaskScheduleContext;
+  /** Opens deep-work Focus Mode tethered to this task. */
+  onFocus?: () => void;
 }
 
 function formatDueDate(iso: string): string {
@@ -32,7 +34,7 @@ function formatDueDate(iso: string): string {
 // pass — 'in-progress' is a real status the schema and updateTask already
 // support (for the Personal DNA-driven auto-prioritization this phase
 // anticipates), just not surfaced as a third checkbox state yet.
-export function TaskCard({ task, delay, onToggleDone, onDelete, pinned, onTogglePin, schedule }: TaskCardProps) {
+export function TaskCard({ task, delay, onToggleDone, onDelete, pinned, onTogglePin, schedule, onFocus }: TaskCardProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const isDone = task.status === "done";
 
@@ -93,6 +95,16 @@ export function TaskCard({ task, delay, onToggleDone, onDelete, pinned, onToggle
               todo-only — same reasoning as the done list omitting `schedule`. */}
           {!isDone && <TaskAssistPanel task={task} schedule={schedule} />}
         </div>
+
+        {onFocus && !isDone && (
+          <button
+            onClick={onFocus}
+            aria-label={`היכנס למצב ריכוז עם ${task.title}`}
+            className="focus-ring z-20 grid size-7 shrink-0 place-items-center rounded-lg text-muted opacity-0 transition-all duration-200 hover:bg-fill-subtle hover:text-gold-ink focus-visible:opacity-100 group-hover/task:opacity-100"
+          >
+            <Focus size={13} aria-hidden />
+          </button>
+        )}
 
         {onTogglePin && (
           <button

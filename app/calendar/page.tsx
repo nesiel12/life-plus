@@ -10,6 +10,7 @@ import { ScheduleSuggestions } from "@/components/features/ScheduleSuggestions";
 import { VerticalTimeline } from "@/components/features/calendar/VerticalTimeline";
 import { CalendarAgentPanel } from "@/components/features/calendar/CalendarAgentPanel";
 import { MonthView } from "@/components/features/calendar/MonthView";
+import { ScheduleCopilotBar } from "@/components/features/calendar/ScheduleCopilotBar";
 import { useInsights } from "@/hooks/useInsights";
 import { groupUpcomingEvents } from "@/lib/calendar/groupUpcomingEvents";
 import { cn, daysUntil } from "@/lib/utils";
@@ -75,6 +76,12 @@ export default function CalendarPage() {
 
       <div className="flex flex-col gap-6">
         <ScheduleSuggestions />
+
+        {data?.connected && (
+          <GlassCard delay={0.06}>
+            <ScheduleCopilotBar busy={busy} onScheduled={refresh} />
+          </GlassCard>
+        )}
 
         {data?.connected && (
           <GlassCard delay={0.08}>

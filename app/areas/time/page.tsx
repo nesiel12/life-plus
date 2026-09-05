@@ -9,6 +9,7 @@ import { useInsights } from "@/hooks/useInsights";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TaskCard } from "@/components/features/time/TaskCard";
 import { PinnedList } from "@/components/ui/PinnedList";
+import { FocusModeHost } from "@/components/features/focus/FocusMode";
 import { NewTaskModal } from "@/components/features/time/NewTaskModal";
 import { NewManualEventModal } from "@/components/features/time/NewManualEventModal";
 import { TaskSuggestions } from "@/components/features/time/TaskSuggestions";
@@ -54,6 +55,9 @@ export default function TimeSpacePage() {
   const habitLogs = useAtlasStore((s) => s.habitLogs);
 
   const [modalOpen, setModalOpen] = useState(false);
+  // Focus Mode is tethered to a specific task, so the overlay can show what
+  // is being worked on and offer to complete it on the way out.
+  const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const { error: toggleError, run: toggleTask } = useApiCall(updateTask);
   const { error: deleteError, run: removeTask } = useApiCall(deleteTask);
@@ -312,6 +316,7 @@ export default function TimeSpacePage() {
                 pinned={pinned}
                 onTogglePin={togglePin}
                 schedule={taskSchedule}
+                onFocus={() => setFocusTaskId(task.id)}
               />
             )}
           </PinnedList>
@@ -339,6 +344,12 @@ export default function TimeSpacePage() {
           </PinnedList>
         </section>
       </div>
+
+      <FocusModeHost
+        open={focusTaskId !== null}
+        task={tasks.find((t) => t.id === focusTaskId) ?? null}
+        onClose={() => setFocusTaskId(null)}
+      />
 
       <NewTaskModal open={modalOpen} onClose={() => setModalOpen(false)} onCreate={addTask} />
       <NewManualEventModal

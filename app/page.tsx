@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
-import { CalendarHeart, ArrowLeft, PenLine } from "lucide-react";
+import { CalendarHeart, ArrowLeft } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { AIBriefing } from "@/components/features/AIBriefing";
 import { EnergyLevelBadge } from "@/components/features/EnergyLevelBadge";
@@ -14,6 +14,7 @@ import { GoalsPanel } from "@/components/features/GoalsPanel";
 import { RecentActivityCard } from "@/components/features/RecentActivityCard";
 import { MemoryCards } from "@/components/features/memories/MemoryCards";
 import { DecisionStream } from "@/components/features/dashboard/DecisionStream";
+import { IntentionComposer } from "@/components/features/dashboard/IntentionComposer";
 import { TodayTimelineCard } from "@/components/features/dashboard/TodayTimelineCard";
 import { FinanceAlertCard } from "@/components/features/dashboard/FinanceAlertCard";
 import { NextCourseCard } from "@/components/features/dashboard/NextCourseCard";
@@ -35,9 +36,6 @@ export default function Home() {
   const user = useAtlasStore((s) => s.user);
   const goals = useAtlasStore((s) => s.goals);
   const upcomingEvents = useAtlasStore((s) => s.upcomingEvents);
-  const todayIntention = useAtlasStore((s) => s.todayIntention);
-  const setTodayIntention = useAtlasStore((s) => s.setTodayIntention);
-  const [draft, setDraft] = useState(todayIntention);
 
   // Real time-of-day, computed after mount from the user's own browser clock.
   const [greeting, setGreeting] = useState<string | null>(null);
@@ -200,20 +198,8 @@ export default function Home() {
             <TodayTimelineCard />
           </BentoCard>
 
-          <BentoCard>
-            <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
-              <PenLine size={16} className="text-gold-ink" aria-hidden />
-              הכוונה של היום
-            </p>
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={() => setTodayIntention(draft)}
-              placeholder="על מה תרצה להתמקד היום?"
-              aria-label="הכוונה של היום"
-              rows={5}
-              className="focus-ring w-full min-h-[8rem] flex-1 resize-none rounded-xl border border-hairline-card bg-surface-sunken/70 px-3.5 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted"
-            />
+          <BentoCard tilt={false}>
+            <IntentionComposer />
           </BentoCard>
 
           <BentoCard className="sm:col-span-2" href="/calendar" cta="ליומן החכם">
