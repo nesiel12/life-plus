@@ -57,14 +57,19 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
       href={item.href}
       className={cn(
         "focus-ring group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
-        active ? "text-foreground" : "text-muted hover:text-foreground"
+        // Glass only on hover for inactive rows; the active row gets its
+        // frost from the accent pill below, which keeps its own colour.
+        active ? "text-foreground" : "glass-control-hover text-muted hover:text-foreground"
       )}
     >
       {active && (
         <motion.span
           layoutId="sidebar-active"
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="absolute inset-0 rounded-xl"
+          // .glass-control supplies the backdrop blur and inset sheen; the
+          // inline style below still wins for background/border/shadow, so
+          // this row's life-area accent colour is exactly as it was.
+          className="glass-control absolute inset-0 rounded-xl"
           style={{
             background: `linear-gradient(135deg, color-mix(in srgb, var(${item.colorVar}) 22%, transparent), color-mix(in srgb, var(${item.colorVar}) 6%, transparent))`,
             border: `1px solid color-mix(in srgb, var(${item.colorVar}) 35%, transparent)`,

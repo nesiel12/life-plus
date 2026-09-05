@@ -7,6 +7,7 @@ import { useApiCall } from "@/hooks/useApiCall";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TopicCard } from "@/components/features/learning/TopicCard";
 import { VideoStudyPanel } from "@/components/features/learning/VideoStudyPanel";
+import { LearningSplitView } from "@/components/features/learning/LearningSplitView";
 
 // Learning & Knowledge Space (Phase 7): replaces the previous generic
 // AreaMomentsView placeholder (which just logged free-text "knowledge"
@@ -22,8 +23,14 @@ export default function LearningSpacePage() {
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
+  // The topic currently open in the 50/50 study view. Separate from
+  // `expandedTopicId` (the inline resource checklist) because they are two
+  // different modes: skim the track, or sit down and study it.
+  const [studyingTopicId, setStudyingTopicId] = useState<string | null>(null);
 
   const { loading: adding, error: addError, run: createTopic } = useApiCall(addLearningTopic);
+
+  const studyingTopic = learningTopics.find((t) => t.id === studyingTopicId) ?? null;
 
   function handleAdd() {
     const title = newTitle.trim();
@@ -81,6 +88,18 @@ export default function LearningSpacePage() {
         {addError && <p className="mt-2 text-xs text-accent-family">{addError}</p>}
       </GlassCard>
 
+      {studyingTopic && (
+        <GlassCard className="mb-8">
+          <LearningSplitView
+            topicTitle={studyingTopic.title}
+            videoUrl={
+              learningResources.find((r) => r.topicId === studyingTopic.id && r.type === "youtube" && r.url)?.url
+            }
+            onClose={() => setStudyingTopicId(null)}
+          />
+        </GlassCard>
+      )}
+
       <div className="flex flex-col gap-4">
         {learningTopics.map((topic, i) => (
           <TopicCard
@@ -89,6 +108,7 @@ export default function LearningSpacePage() {
             resources={learningResources.filter((r) => r.topicId === topic.id)}
             expanded={expandedTopicId === topic.id}
             onToggleExpanded={() => setExpandedTopicId((prev) => (prev === topic.id ? null : topic.id))}
+            onStudy={() => setStudyingTopicId(topic.id)}
             delay={Math.min(i * 0.06, 0.3)}
           />
         ))}

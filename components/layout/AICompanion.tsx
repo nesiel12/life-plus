@@ -296,7 +296,9 @@ export function AICompanion() {
             onClick={() => setMode("chat")}
             className={cn(
               "focus-ring rounded-lg px-2.5 py-1 text-xs transition-colors",
-              mode === "chat" ? "bg-fill-subtle text-foreground" : "text-muted hover:text-foreground"
+              mode === "chat"
+                ? "glass-control glass-control-active text-foreground"
+                : "glass-control-hover text-muted hover:text-foreground"
             )}
           >
             שיחה
@@ -305,7 +307,9 @@ export function AICompanion() {
             onClick={() => setMode("command")}
             className={cn(
               "focus-ring rounded-lg px-2.5 py-1 text-xs transition-colors",
-              mode === "command" ? "bg-fill-subtle text-foreground" : "text-muted hover:text-foreground"
+              mode === "command"
+                ? "glass-control glass-control-active text-foreground"
+                : "glass-control-hover text-muted hover:text-foreground"
             )}
           >
             פקודה
@@ -517,7 +521,7 @@ export function AICompanion() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="שתף מחשבה…"
-            aria-label="הודעה ל-Life Plus"
+            aria-label="הודעה ל-Life Plus Assistant"
             className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
           />
           <button

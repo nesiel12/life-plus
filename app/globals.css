@@ -183,7 +183,7 @@ body::before {
   box-shadow: 0 16px 48px -24px rgba(16, 16, 20, 0.16);
 }
 
-/* Same two escape hatches the .liquid-glass surfaces honour: with no
+/* Same two escape hatches the glass controls honour: with no
    backdrop-filter the tint sits over unblurred content, and "reduce
    transparency" is set by exactly the people a frosted UI hurts most. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -286,86 +286,114 @@ body::before {
   }
 }
 
-/* ── Frosted surfaces ──────────────────────────────────────────────────────
-   Deliberately lightweight. An earlier pass drove these with an SVG
-   feTurbulence + feDisplacementMap for real edge refraction; that is a
-   per-frame filter on a compositing layer and it cost real FPS, so it is
-   gone. What's left is what the GPU does cheaply: one backdrop blur, a solid
-   tint, and a crisp hairline. No displacement maps, no blend modes, no WebGL.
+/* ── Liquid Glass: controls only ───────────────────────────────────────────
+   Scoped deliberately and narrowly to interactive chrome — sidebar nav
+   items, action buttons, tab toggles. Main cards and the app background are
+   explicitly excluded: an earlier pass put frost on the bento cards and it
+   both fought the Luxe card language and cost paint on the largest surfaces
+   on screen. Controls are small, few, and already compositing on hover, so
+   the effect is nearly free there and reads as intentional.
 
-   The tint is near-opaque on purpose — text contrast comes from the solid
-   colour underneath, so the blur is decoration rather than something
-   legibility depends on. */
-.liquid-glass {
+   No SVG displacement, no blend modes, no WebGL — just one backdrop blur, a
+   translucent fill and a light rim, which is what the GPU does cheaply.
+
+   Readability is non-negotiable: every token below keeps a solid-enough
+   fill that label text sits on colour rather than on whatever happens to be
+   behind the control, and the whole effect drops to an opaque fill under
+   both @supports and prefers-reduced-transparency. */
+.glass-control {
   position: relative;
   isolation: isolate;
-  border-radius: 1rem;
-  background: var(--glass-tint);
-  border: 1px solid var(--glass-rim);
+  background: var(--control-glass-bg);
+  border: 1px solid var(--control-glass-rim);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
   box-shadow:
-    0 1px 2px rgba(16, 16, 20, 0.04),
-    0 18px 44px -28px rgba(16, 16, 20, 0.28);
-  overflow: hidden;
-  /* Prefixed first, standard last: Lightning CSS collapses the pair and
-     keeps the last declaration, so the standard property has to win. */
+    inset 0 1px 0 var(--control-glass-sheen),
+    0 2px 10px -4px rgba(16, 16, 20, 0.18);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+  /* Scoped to the elements that actually animate on hover. */
+  will-change: transform;
+}
+
+.glass-control:hover {
+  background: var(--control-glass-bg-hover);
+  border-color: var(--control-glass-rim-hover);
+}
+
+.glass-control:active {
+  transform: translateY(1px);
+}
+
+/* Hover-only glass, for chrome that should stay invisible at rest — the
+   inactive sidebar rows. Frosting all of them permanently would turn a quiet
+   nav rail into eight competing panels. */
+.glass-control-hover {
+  border: 1px solid transparent;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    backdrop-filter 180ms ease;
+}
+.glass-control-hover:hover {
+  background: var(--control-glass-bg);
+  border-color: var(--control-glass-rim);
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
   backdrop-filter: blur(14px) saturate(1.4);
 }
 
-/* A single static top-edge highlight. No mix-blend-mode — blend modes force
-   an extra compositing pass per paint, which is exactly the kind of cost
-   this pass exists to remove. */
-.liquid-glass__sheen {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 10%, transparent) 0%, transparent 38%);
-}
-
-.liquid-glass__content {
-  position: relative;
-  z-index: 1;
+/* The selected state of a tab toggle or an active nav item — same material,
+   turned up, with the brand's gold rather than a neutral rim. */
+.glass-control-active {
+  background: var(--control-glass-bg-active);
+  border-color: var(--gold-line);
+  box-shadow:
+    inset 0 1px 0 var(--control-glass-sheen),
+    0 0 20px -8px color-mix(in srgb, var(--gold) 50%, transparent);
 }
 
 :root {
-  --glass-tint: color-mix(in srgb, var(--surface) 88%, transparent);
-  --glass-rim: color-mix(in srgb, var(--ink) 8%, transparent);
+  /* Light theme: the fill stays high so dark label text keeps its contrast
+     against whatever scrolls underneath. */
+  --control-glass-bg: rgba(255, 255, 255, 0.62);
+  --control-glass-bg-hover: rgba(255, 255, 255, 0.78);
+  --control-glass-bg-active: color-mix(in srgb, var(--gold) 14%, rgba(255, 255, 255, 0.72));
+  --control-glass-rim: rgba(16, 16, 20, 0.1);
+  --control-glass-rim-hover: rgba(16, 16, 20, 0.16);
+  --control-glass-sheen: rgba(255, 255, 255, 0.75);
 }
+
 :root[data-theme="dark"] {
-  /* Solid dark ground behind the blur, per the Luxe fallback rule. */
-  --glass-tint: color-mix(in srgb, var(--surface) 86%, transparent);
-  --glass-rim: rgba(255, 255, 255, 0.1);
+  --control-glass-bg: rgba(255, 255, 255, 0.07);
+  --control-glass-bg-hover: rgba(255, 255, 255, 0.13);
+  --control-glass-bg-active: color-mix(in srgb, var(--gold) 18%, rgba(255, 255, 255, 0.08));
+  --control-glass-rim: rgba(255, 255, 255, 0.14);
+  --control-glass-rim-hover: rgba(255, 255, 255, 0.22);
+  --control-glass-sheen: rgba(255, 255, 255, 0.12);
 }
 
-/* GPU guardrails. `will-change` is scoped to the surfaces that actually
-   animate (tilt/hover) rather than sprayed everywhere — promoting every
-   element to its own layer costs more memory than it saves in paint. */
-.liquid-glass,
-.glass-panel {
-  will-change: transform, opacity;
-}
-
-/* Both escape hatches: with no backdrop-filter the tint would sit over
-   unblurred content, and "reduce transparency" is set by exactly the people
-   a frosted UI hurts most. Either way, fall back to the plain opaque card. */
+/* Without backdrop-filter the translucent fill would sit over raw scrolling
+   content, which is the unreadable case — go opaque instead. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .liquid-glass {
-    background: var(--surface);
+  :root {
+    --control-glass-bg: var(--surface);
+    --control-glass-bg-hover: var(--surface);
   }
-  .liquid-glass__sheen {
-    display: none;
+  :root[data-theme="dark"] {
+    --control-glass-bg: var(--surface);
+    --control-glass-bg-hover: var(--surface-sunken);
   }
 }
+
 @media (prefers-reduced-transparency: reduce) {
-  .liquid-glass {
-    background: var(--surface);
+  .glass-control {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-  }
-  .liquid-glass__sheen {
-    display: none;
+    background: var(--surface);
   }
 }
 

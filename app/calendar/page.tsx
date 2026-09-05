@@ -97,7 +97,7 @@ export default function CalendarPage() {
               <div
                 role="tablist"
                 aria-label="טווח תצוגה"
-                className="flex items-center gap-1 rounded-lg border border-hairline-card p-0.5"
+                className="glass-control flex items-center gap-1 rounded-lg p-0.5"
               >
                 {(
                   [
@@ -113,7 +113,7 @@ export default function CalendarPage() {
                     className={cn(
                       "focus-ring rounded-md px-3 py-1 text-xs font-medium transition-colors",
                       range === option.key
-                        ? "bg-fill-subtle text-foreground"
+                        ? "glass-control glass-control-active text-foreground"
                         : "text-muted hover:text-foreground"
                     )}
                   >

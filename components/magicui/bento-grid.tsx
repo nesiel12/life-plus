@@ -38,12 +38,6 @@ const CARD_SURFACE = cn(
   "shadow-[0_1px_2px_rgba(16,16,20,0.03),0_18px_44px_-28px_rgba(16,16,20,0.22)]"
 );
 
-// The glass variant carries its own border, background and shadow from
-// .liquid-glass, so only layout and padding come from here — repeating the
-// opaque surface's border/bg would sit a second, solid card on top of the
-// frost and cancel it out.
-const GLASS_SURFACE = cn("group/card relative flex h-full flex-col rounded-2xl p-6 sm:p-7");
-
 interface BentoGridProps {
   children: ReactNode;
   className?: string;
@@ -74,8 +68,6 @@ interface BentoCardProps {
   cta?: string;
   /** 3D pointer tilt. Off for dense form panels. */
   tilt?: boolean;
-  /** Frosted Liquid Glass surface instead of the opaque Luxe card. */
-  glass?: boolean;
   /** Grid spans live here — applied to the cell, not the surface. */
   className?: string;
 }
@@ -86,15 +78,13 @@ export function BentoCard({
   href,
   cta,
   tilt = true,
-  glass = false,
   className,
 }: BentoCardProps) {
   return (
     // min-w-0 lets long Hebrew strings wrap instead of forcing the track wider
     // (the usual cause of squeezed / overlapping bento columns).
     <motion.div variants={CELL_VARIANTS} className={cn("min-w-0", className)}>
-      <TiltCard disabled={!tilt} className={glass ? cn("liquid-glass", GLASS_SURFACE) : CARD_SURFACE}>
-        {glass && <span aria-hidden className="liquid-glass__sheen" />}
+      <TiltCard disabled={!tilt} className={CARD_SURFACE}>
         {background && (
           <div aria-hidden className="pointer-events-none absolute inset-0">
             {background}

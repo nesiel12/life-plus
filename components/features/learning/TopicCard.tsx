@@ -8,6 +8,7 @@ import {
   ChevronDown,
   FileText,
   Headphones,
+  GraduationCap,
   Loader2,
   Sparkles,
   SquarePlay,
@@ -50,10 +51,12 @@ interface TopicCardProps {
   resources: LearningResource[];
   expanded: boolean;
   onToggleExpanded: () => void;
+  /** Opens the 50/50 study view for this topic. */
+  onStudy?: () => void;
   delay?: number;
 }
 
-export function TopicCard({ topic, resources, expanded, onToggleExpanded, delay = 0 }: TopicCardProps) {
+export function TopicCard({ topic, resources, expanded, onToggleExpanded, onStudy, delay = 0 }: TopicCardProps) {
   const updateLearningTopic = useAtlasStore((s) => s.updateLearningTopic);
   const deleteLearningTopic = useAtlasStore((s) => s.deleteLearningTopic);
   const updateLearningResource = useAtlasStore((s) => s.updateLearningResource);
@@ -155,6 +158,16 @@ export function TopicCard({ topic, resources, expanded, onToggleExpanded, delay 
             {building ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
             {building ? "בונה מסלול לימוד…" : "בנה לי מסלול"}
           </button>
+
+          {onStudy && (
+            <button
+              onClick={onStudy}
+              className="focus-ring glass-control flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-foreground"
+            >
+              <GraduationCap size={14} className="text-accent-learning" aria-hidden />
+              המשך בלמידה
+            </button>
+          )}
           {buildError && <p className="text-xs text-accent-family">{buildError}</p>}
 
           <div className="flex flex-col gap-2">

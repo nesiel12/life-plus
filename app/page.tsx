@@ -184,24 +184,19 @@ export default function Home() {
       {/* ─── Bento dashboard ──────────────────────────────────────────────── */}
       <div className="mx-auto max-w-6xl px-6 pb-16 sm:px-10 lg:px-16">
         <BentoGrid>
-          {/* Liquid Glass on the four read-only summary cards only. The
-              form-bearing cards below (intention textarea, goals, memories)
-              stay opaque: a blurred, shifting backdrop behind an input is
-              where glass stops being decoration and starts costing
-              legibility. */}
           {/* The Decision Stream leads the grid on purpose (LifeOS Pillar 3):
               if the dashboard is meant to have zero cognitive overload, the
               at-most-three things actually needing a decision have to be the
               first thing read, above the briefing and the timeline. */}
-          <BentoCard glass>
+          <BentoCard>
             <DecisionStream />
           </BentoCard>
 
-          <BentoCard className="sm:col-span-2" glass>
+          <BentoCard className="sm:col-span-2">
             <AIBriefing bare />
           </BentoCard>
 
-          <BentoCard glass>
+          <BentoCard>
             <TodayTimelineCard />
           </BentoCard>
 
@@ -258,13 +253,13 @@ export default function Home() {
             <RecentActivityCard />
           </BentoCard>
 
-          <BentoCard glass>
+          <BentoCard>
             <FinanceAlertCard />
           </BentoCard>
 
           {/* A dense form panel (video controls) — tilt is off so the
               embedded player stays crisp. */}
-          <BentoCard tilt={false} glass>
+          <BentoCard tilt={false}>
             <NextCourseCard />
           </BentoCard>
 
