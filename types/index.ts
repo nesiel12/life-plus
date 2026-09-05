@@ -108,6 +108,12 @@ export interface SummarySection {
   sortOrder: number;
 }
 
+/**
+ * What a study item is. The table is still called `summaries` — see the
+ * migration for why renaming it was not worth breaking every consumer.
+ */
+export type StudyItemKind = "summary" | "video" | "source";
+
 export interface Summary {
   id: string;
   title: string;
@@ -128,6 +134,10 @@ export interface Summary {
   sortOrder?: number;
   /** Free-text labels the user typed. */
   tags?: string[];
+  /** summary = written note, video = YouTube lesson, source = reference. */
+  kind?: StudyItemKind;
+  /** The YouTube or reference URL, for video and source items. */
+  url?: string;
   date: string; // ISO date
 }
 

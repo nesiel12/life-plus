@@ -530,6 +530,8 @@ export interface Database {
           section_id: string | null;
           sort_order: number;
           tags: Json;
+          kind: string;
+          url: string | null;
           summary_date: string;
           created_at: string;
           updated_at: string;
@@ -547,6 +549,8 @@ export interface Database {
           section_id?: string | null;
           sort_order?: number;
           tags?: Json;
+          kind?: string;
+          url?: string | null;
           summary_date?: string;
         },
         {
@@ -562,6 +566,8 @@ export interface Database {
           section_id?: string | null;
           sort_order?: number;
           tags?: Json;
+          kind?: string;
+          url?: string | null;
           summary_date?: string;
         }
       >;

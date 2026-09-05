@@ -178,6 +178,11 @@ interface AtlasState extends HydratedState {
     entityType?: Summary["entityType"];
     entityId?: string;
     mentions?: Summary["mentions"];
+    sectionId?: string;
+    sortOrder?: number;
+    tags?: string[];
+    kind?: Summary["kind"];
+    url?: string;
   }) => Promise<Summary>;
   updateSummary: (summaryId: string, patch: Partial<Summary>) => Promise<void>;
   loadSummarySections: () => Promise<void>;

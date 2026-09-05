@@ -8,7 +8,11 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { LearningInsightsHero } from "@/components/features/LearningInsightsHero";
 import { KnowledgeLibraryCard } from "@/components/features/KnowledgeLibraryCard";
-import { TorahTabs, type TorahTab } from "@/components/features/torah/TorahTabs";
+import { TorahTabs, isCustomTab, type TorahTab } from "@/components/features/torah/TorahTabs";
+import { EntityHub } from "@/components/features/torah/EntityHub";
+import { AddStudyItem } from "@/components/features/torah/AddStudyItem";
+import { StudyItemList } from "@/components/features/torah/StudyItemList";
+import { sectionItems } from "@/lib/torah/studyHub";
 import { BookCard } from "@/components/features/torah/BookCard";
 import { RabbiCard } from "@/components/features/torah/RabbiCard";
 import { SummaryCard } from "@/components/features/torah/SummaryCard";
@@ -17,8 +21,6 @@ import { SectionManager } from "@/components/features/summaries/SectionManager";
 import { isFirst, isLast, sorted as sortedByOrder } from "@/lib/summaries/ordering";
 import { EditBookModal } from "@/components/features/torah/EditBookModal";
 import { EditRabbiModal } from "@/components/features/torah/EditRabbiModal";
-import { RabbiProfileModal } from "@/components/features/torah/RabbiProfileModal";
-import { BookProfileModal } from "@/components/features/torah/BookProfileModal";
 import { useApiCall } from "@/hooks/useApiCall";
 import { useInsights } from "@/hooks/useInsights";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
@@ -161,7 +163,6 @@ export default function TorahSpacePage() {
   const [newBookTitle, setNewBookTitle] = useState("");
   const [newBookAuthor, setNewBookAuthor] = useState("");
   const [editingBook, setEditingBook] = useState<Book | null>(null);
-  const [viewingBook, setViewingBook] = useState<Book | null>(null);
   const { loading: addingBook, error: addBookError, run: createBook } = useApiCall(addBook);
   const { error: saveBookError, run: saveBook } = useApiCall(updateBook);
   const { error: deleteBookError, run: removeBook } = useApiCall(deleteBook);
@@ -173,7 +174,6 @@ export default function TorahSpacePage() {
   const [newRabbiName, setNewRabbiName] = useState("");
   const [newRabbiTitle, setNewRabbiTitle] = useState("");
   const [editingRabbi, setEditingRabbi] = useState<Rabbi | null>(null);
-  const [viewingRabbi, setViewingRabbi] = useState<Rabbi | null>(null);
   const { loading: addingRabbi, error: addRabbiError, run: createRabbi } = useApiCall(addRabbi);
   const { error: saveRabbiError, run: saveRabbi } = useApiCall(updateRabbi);
   const { error: deleteRabbiError, run: removeRabbi } = useApiCall(deleteRabbi);
@@ -193,6 +193,11 @@ export default function TorahSpacePage() {
   const reorderSummaryInSection = useAtlasStore((s) => s.reorderSummaryInSection);
   // null = the "all" tab.
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  // The book or rabbi whose hub is open. One state for both — the hub
+  // component is shared, so the page only needs to know which entity.
+  const [openEntity, setOpenEntity] = useState<{ type: "book" | "rabbi"; id: string } | null>(null);
+  const [sectionEditorTarget, setSectionEditorTarget] = useState<string | null>(null);
+  const addSummarySection = useAtlasStore((s) => s.addSummarySection);
   const { loading: addingSummary, error: addSummaryError, run: createSummary } = useApiCall(addSummary);
 
   // Filtered by the active tab, then ordered by the user's own arrangement.
@@ -288,9 +293,76 @@ export default function TorahSpacePage() {
       <h1 className="mb-1 text-2xl font-medium tracking-tight">מרחב תורה</h1>
       <p className="mb-8 text-sm text-muted">הספרייה האישית שלך — ספרים, רבנים, שיעורים וסיכומים, במקום אחד.</p>
 
-      <TorahTabs active={activeTab} onChange={setActiveTab} />
+      <TorahTabs
+        active={activeTab}
+        onChange={(tab) => {
+          setActiveTab(tab);
+          // Leaving a tab closes any open hub, so returning to Books does not
+          // land back inside the book the user was last reading.
+          setOpenEntity(null);
+          setSectionEditorTarget(null);
+        }}
+        sections={summarySections}
+        onAddSection={() => {
+          const name = window.prompt("שם המדור החדש");
+          if (name?.trim()) addSummarySection({ name: name.trim() }).catch(() => {});
+        }}
+      />
 
-      {activeTab === "books" && (
+      {/* The hub takes over the whole tab body when an entity is open — a
+          deep-dive is a destination, not a panel beside the list. */}
+      {openEntity && (
+        <GlassCard>
+          <EntityHub
+            entityType={openEntity.type}
+            entityId={openEntity.id}
+            name={
+              openEntity.type === "book"
+                ? (books.find((b) => b.id === openEntity.id)?.title ?? "")
+                : (rabbis.find((r) => r.id === openEntity.id)?.name ?? "")
+            }
+            subtitle={
+              openEntity.type === "book"
+                ? books.find((b) => b.id === openEntity.id)?.author
+                : rabbis.find((r) => r.id === openEntity.id)?.title
+            }
+            onBack={() => setOpenEntity(null)}
+          />
+        </GlassCard>
+      )}
+
+      {/* A custom section: mixed study items, ordered by the user. */}
+      {!openEntity && isCustomTab(activeTab) && (
+        <div className="flex flex-col gap-5">
+          {sectionEditorTarget !== null ? (
+            <GlassCard>
+              <SummaryWorkspace
+                existing={
+                  sectionEditorTarget === "new"
+                    ? undefined
+                    : summaries.find((s) => s.id === sectionEditorTarget)
+                }
+                onClose={() => setSectionEditorTarget(null)}
+              />
+            </GlassCard>
+          ) : (
+            <AddStudyItem
+              sectionId={activeTab.sectionId}
+              onWriteSummary={() => setSectionEditorTarget("new")}
+            />
+          )}
+
+          <StudyItemList
+            items={sectionItems(summaries, activeTab.sectionId)}
+            onDelete={handleDeleteSummary}
+            onEdit={(id) => setSectionEditorTarget(id)}
+            onMove={(id, delta) => reorderSummaryInSection(id, delta).catch(() => {})}
+            emptyLabel="המדור הזה עדיין ריק. הוסף סיכום, שיעור וידאו או מקור."
+          />
+        </div>
+      )}
+
+      {!openEntity && activeTab === "books" && (
         <div className="flex flex-col gap-6">
           <div className="flex max-w-xl flex-col gap-2 sm:flex-row">
             <input
@@ -330,7 +402,10 @@ export default function TorahSpacePage() {
                 book={book}
                 delay={Math.min(i * 0.06, 0.3)}
                 onEdit={setEditingBook}
-                onOpenProfile={setViewingBook}
+                // Clicking a book now lands in its hub — all its summaries,
+                // lessons and sources in one place — rather than a metadata
+                // modal. The modal remains reachable from the edit action.
+                onOpenProfile={(b) => setOpenEntity({ type: "book", id: b.id })}
               />
             ))}
           </div>
@@ -342,11 +417,10 @@ export default function TorahSpacePage() {
             onSave={handleSaveBook}
             onDelete={handleDeleteBook}
           />
-          <BookProfileModal book={viewingBook} onClose={() => setViewingBook(null)} />
         </div>
       )}
 
-      {activeTab === "rabbis" && (
+      {!openEntity && activeTab === "rabbis" && (
         <div className="flex flex-col gap-6">
           <div className="flex max-w-xl flex-col gap-2 sm:flex-row">
             <input
@@ -386,7 +460,7 @@ export default function TorahSpacePage() {
                 rabbi={rabbi}
                 delay={Math.min(i * 0.06, 0.3)}
                 onEdit={setEditingRabbi}
-                onOpenProfile={setViewingRabbi}
+                onOpenProfile={(r) => setOpenEntity({ type: "rabbi", id: r.id })}
               />
             ))}
           </div>
@@ -398,11 +472,10 @@ export default function TorahSpacePage() {
             onSave={handleSaveRabbi}
             onDelete={handleDeleteRabbi}
           />
-          <RabbiProfileModal rabbi={viewingRabbi} onClose={() => setViewingRabbi(null)} />
         </div>
       )}
 
-      {activeTab === "shiurim" && (
+      {!openEntity && activeTab === "shiurim" && (
         <div className="flex flex-col gap-6">
           <LearningInsightsHero
             insights={insights}
@@ -529,7 +602,7 @@ export default function TorahSpacePage() {
         </div>
       )}
 
-      {activeTab === "summaries" && (
+      {!openEntity && activeTab === "summaries" && (
         <div className="flex flex-col gap-6">
           <GlassCard delay={0} className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div>

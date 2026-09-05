@@ -13,6 +13,11 @@ export async function addSummaryAction(input: {
   entityType?: Summary["entityType"];
   entityId?: string;
   mentions?: Summary["mentions"];
+  sectionId?: string;
+  sortOrder?: number;
+  tags?: string[];
+  kind?: Summary["kind"];
+  url?: string;
 }) {
   const userId = await getCurrentUserId();
   const row = await summariesRepo.insert({
@@ -24,6 +29,11 @@ export async function addSummaryAction(input: {
     entity_type: input.entityType ?? null,
     entity_id: input.entityId ?? null,
     mentions: (input.mentions ?? []) as never,
+    section_id: input.sectionId ?? null,
+    sort_order: input.sortOrder ?? 0,
+    tags: (input.tags ?? []) as never,
+    kind: input.kind ?? "summary",
+    url: input.url ?? null,
   });
   return toSummary(row);
 }

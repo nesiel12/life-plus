@@ -307,6 +307,8 @@ export function toSummary(row: SummaryRow): Summary {
     sectionId: row.section_id ?? undefined,
     sortOrder: row.sort_order ?? 0,
     tags: (row.tags as string[]) ?? [],
+    kind: (row.kind as Summary["kind"]) ?? "summary",
+    url: row.url ?? undefined,
     date: row.summary_date,
   };
 }
@@ -323,6 +325,8 @@ export function toSummaryPatch(patch: Partial<Summary>): SummaryUpdate {
   if (patch.sectionId !== undefined) row.section_id = patch.sectionId || null;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
   if (patch.tags !== undefined) row.tags = patch.tags as Json;
+  if (patch.kind !== undefined) row.kind = patch.kind;
+  if (patch.url !== undefined) row.url = patch.url || null;
   if (patch.date !== undefined) row.summary_date = patch.date;
   return row;
 }
