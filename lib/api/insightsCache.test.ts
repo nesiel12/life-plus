@@ -82,6 +82,48 @@ describe("dedupedFetch", () => {
   });
 });
 
+// The interleaving the original tests missed. dedupedFetch registers a
+// placeholder entry to hold its in-flight promise, and readCache used to
+// report that placeholder as a hit — handing callers `undefined`, which
+// crashed any consumer reasonably guarding on `data === null`
+// (MonthView: "Cannot read properties of undefined (reading 'connected')").
+describe("readCache during an in-flight fetch", () => {
+  it("reports a MISS on a cold key while the first request is still running", () => {
+    let resolve!: (v: string) => void;
+    dedupedFetch("/cold", () => new Promise<string>((r) => (resolve = r)));
+
+    expect(readCache("/cold")).toBeUndefined();
+    resolve("v");
+  });
+
+  it("never hands back undefined as though it were a cached value", async () => {
+    let resolve!: (v: { connected: boolean }) => void;
+    const pending = dedupedFetch("/cold", () => new Promise<{ connected: boolean }>((r) => (resolve = r)));
+
+    const during = readCache<{ connected: boolean }>("/cold");
+    expect(during?.value).toBeUndefined();
+
+    resolve({ connected: true });
+    await pending;
+    expect(readCache<{ connected: boolean }>("/cold")!.value).toEqual({ connected: true });
+  });
+
+  it("keeps serving the previous value while a revalidation is in flight", () => {
+    writeCache("/warm", { connected: true });
+    let resolve!: (v: unknown) => void;
+    dedupedFetch("/warm", () => new Promise((r) => (resolve = r)));
+
+    // Stale-while-revalidate: the old value must stay readable throughout.
+    expect(readCache<{ connected: boolean }>("/warm")!.value).toEqual({ connected: true });
+    resolve({ connected: false });
+  });
+
+  it("still reports a miss after a failed cold fetch, rather than a phantom hit", async () => {
+    await expect(dedupedFetch("/cold", () => Promise.reject(new Error("down")))).rejects.toThrow();
+    expect(readCache("/cold")).toBeUndefined();
+  });
+});
+
 describe("subscribe", () => {
   it("notifies listeners when a key is written", () => {
     const listener = vi.fn();

@@ -19,6 +19,7 @@ export default function LearningSpacePage() {
   const learningTopics = useAtlasStore((s) => s.learningTopics);
   const learningResources = useAtlasStore((s) => s.learningResources);
   const addLearningTopic = useAtlasStore((s) => s.addLearningTopic);
+  const updateLearningResource = useAtlasStore((s) => s.updateLearningResource);
 
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("");
@@ -95,6 +96,18 @@ export default function LearningSpacePage() {
             videoUrl={
               learningResources.find((r) => r.topicId === studyingTopic.id && r.type === "youtube" && r.url)?.url
             }
+            onQuizComplete={() => {
+              // Auto-mark the topic's studied video complete on finishing the
+              // quiz, rather than making the user tick it separately. The
+              // store update is optimistic, so the checklist reflects it
+              // immediately.
+              const resource = learningResources.find(
+                (r) => r.topicId === studyingTopic.id && r.type === "youtube" && !r.isCompleted
+              );
+              if (resource) {
+                updateLearningResource(resource.id, { isCompleted: true }).catch(() => {});
+              }
+            }}
             onClose={() => setStudyingTopicId(null)}
           />
         </GlassCard>

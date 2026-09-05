@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, RotateCcw, X } from "lucide-react";
-import { isComplete, scoreQuiz, type QuizAnswers } from "@/lib/learning/quizScoring";
+import { isComplete, scoreQuiz, shuffleQuiz, type QuizAnswers } from "@/lib/learning/quizScoring";
 import { cn } from "@/lib/utils";
 import type { QuizQuestion } from "@/lib/ai/courseModule";
 
 interface CourseQuizProps {
   questions: QuizQuestion[];
+  /** Fired once the quiz is submitted, for auto-progression. */
+  onComplete?: (percent: number) => void;
 }
 
 // Chapter quiz with instant scoring.
@@ -20,12 +22,27 @@ interface CourseQuizProps {
 // Answers stay visible and locked after submitting rather than resetting:
 // the point of the quiz is learning what you got wrong, and clearing the
 // selections would take that away at exactly the moment it becomes useful.
-export function CourseQuiz({ questions }: CourseQuizProps) {
+export function CourseQuiz({ questions, onComplete }: CourseQuizProps) {
+  // A per-attempt seed. Randomising question and option order stops the quiz
+  // being learnable by position, and seeding it keeps the order stable across
+  // re-renders — reshuffling on every state change would move an option out
+  // from under the user's cursor mid-click. Bumping the seed is what makes
+  // "try again" a genuinely different attempt.
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1_000_000));
+  const shuffled = useMemo(() => shuffleQuiz(questions, seed), [questions, seed]);
+
   const [answers, setAnswers] = useState<QuizAnswers>(() => questions.map(() => null));
   const [submitted, setSubmitted] = useState(false);
 
-  const score = scoreQuiz(questions, answers);
-  const ready = isComplete(questions, answers);
+  const score = scoreQuiz(shuffled, answers);
+  const ready = isComplete(shuffled, answers);
+
+  function submit() {
+    setSubmitted(true);
+    // Auto-completion: the caller advances on this rather than making the
+    // user press a second "mark as done" button.
+    onComplete?.(scoreQuiz(shuffled, answers).percent);
+  }
 
   function choose(questionIndex: number, optionIndex: number) {
     if (submitted) return;
@@ -39,6 +56,9 @@ export function CourseQuiz({ questions }: CourseQuizProps) {
   function reset() {
     setAnswers(questions.map(() => null));
     setSubmitted(false);
+    // A fresh order for the retry, so a second attempt isn't just recall of
+    // where the right option sat last time.
+    setSeed(Math.floor(Math.random() * 1_000_000));
   }
 
   if (questions.length === 0) return null;
@@ -58,7 +78,7 @@ export function CourseQuiz({ questions }: CourseQuizProps) {
       </div>
 
       <ol className="flex list-none flex-col gap-5">
-        {questions.map((question, qi) => {
+        {shuffled.map((question, qi) => {
           const chosen = answers[qi];
           return (
             <li key={`${question.question}-${qi}`} className="flex flex-col gap-2">
@@ -112,7 +132,7 @@ export function CourseQuiz({ questions }: CourseQuizProps) {
       <div className="flex items-center gap-2">
         {!submitted ? (
           <button
-            onClick={() => setSubmitted(true)}
+            onClick={submit}
             disabled={!ready}
             className="focus-ring glass-control rounded-lg px-4 py-2 text-xs font-medium text-foreground disabled:opacity-40"
           >

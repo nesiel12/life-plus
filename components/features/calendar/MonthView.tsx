@@ -49,7 +49,7 @@ export function MonthView() {
   const chronotype = useAtlasStore((s) => s.personalDNA.chronotype);
   const [month] = useState(currentMonthKey);
 
-  const { data } = useInsights<MonthResponse>(`/api/calendar/month?month=${month}`, FALLBACK, [month]);
+  const { data, loading } = useInsights<MonthResponse>(`/api/calendar/month?month=${month}`, FALLBACK, [month]);
 
   const events = useMemo(() => data?.events ?? [], [data]);
   const analysis = useMemo(() => analyzeMonth(month, events, chronotype), [month, events, chronotype]);
@@ -82,7 +82,13 @@ export function MonthView() {
     ];
   }, [month, events]);
 
-  if (data === null) {
+  // `loading` rather than a null check, and optional chaining below: the
+  // hook can legitimately hand back a value before `connected` is known, and
+  // a guard that only tests for null walks straight into reading a property
+  // of undefined. Defaulting to the disconnected state is the honest
+  // degradation — it says "no data to show" instead of rendering an empty
+  // grid as though the month were genuinely free.
+  if (loading && !data) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted">
         <Loader2 size={14} className="animate-spin" aria-hidden />
@@ -91,7 +97,7 @@ export function MonthView() {
     );
   }
 
-  if (!data.connected) {
+  if (!data?.connected) {
     return <p className="text-sm text-muted">היומן לא מחובר, אז אין נתונים חודשיים להצגה.</p>;
   }
 

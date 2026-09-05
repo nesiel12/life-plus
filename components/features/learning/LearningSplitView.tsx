@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen, Loader2, Send, Sparkles } from "lucide-react";
+import { BookOpen, CheckCircle2, Loader2, Send, Sparkles } from "lucide-react";
 import { CourseQuiz } from "@/components/features/learning/CourseQuiz";
 import { InlineVideoPlayer } from "@/components/features/learning/InlineVideoPlayer";
 import { youtubeVideoId } from "@/lib/learning/youtube";
@@ -11,6 +11,8 @@ interface LearningSplitViewProps {
   topicTitle: string;
   /** Optional YouTube URL to study alongside the material. */
   videoUrl?: string;
+  /** Marks the studied resource complete — no manual "done" step. */
+  onQuizComplete?: (percent: number) => void;
   onClose: () => void;
 }
 
@@ -27,11 +29,12 @@ interface ChatTurn {
 // for the long-form reading this view exists to present. Splitting at the
 // breakpoint where each half is still a real column is what makes the split
 // worth having.
-export function LearningSplitView({ topicTitle, videoUrl, onClose }: LearningSplitViewProps) {
+export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClose }: LearningSplitViewProps) {
   const [module, setModule] = useState<CourseModule | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [completed, setCompleted] = useState(false);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
@@ -105,6 +108,14 @@ export function LearningSplitView({ topicTitle, videoUrl, onClose }: LearningSpl
         <p className="flex items-center gap-2 text-sm font-medium text-muted">
           <BookOpen size={16} className="text-accent-learning" aria-hidden />
           {topicTitle}
+          {/* Visual completion indicator — set automatically on quiz
+              submission, never by a separate "mark as done" click. */}
+          {completed && (
+            <span className="flex items-center gap-1 text-xs text-accent-health">
+              <CheckCircle2 size={13} aria-hidden />
+              הושלם
+            </span>
+          )}
         </p>
         <button
           onClick={onClose}
@@ -172,7 +183,13 @@ export function LearningSplitView({ topicTitle, videoUrl, onClose }: LearningSpl
                 </ul>
               </section>
 
-              <CourseQuiz questions={module.quiz} />
+              <CourseQuiz
+                questions={module.quiz}
+                onComplete={(percent) => {
+                  setCompleted(true);
+                  onQuizComplete?.(percent);
+                }}
+              />
             </article>
           )}
         </section>

@@ -19,6 +19,18 @@ type Listener = () => void;
 
 interface Entry {
   value: unknown;
+  /**
+   * Whether `value` was ever actually written.
+   *
+   * Not redundant with `value !== undefined`: dedupedFetch registers a
+   * placeholder entry to hold the in-flight promise *before* any value
+   * exists, and without this flag readCache reported that placeholder as a
+   * cache hit and handed callers `undefined`. Consumers that reasonably
+   * check `data === null` then sailed straight into `data.connected` and
+   * crashed. A value of undefined is also legitimately cacheable, so the
+   * presence of the key cannot be the test either.
+   */
+  hasValue: boolean;
   /** When this value was written, for the staleness check. */
   storedAt: number;
   /** Shared in-flight request, so N mounts don't fire N fetches. */
@@ -30,12 +42,13 @@ const listeners = new Map<string, Set<Listener>>();
 
 export function readCache<T>(key: string): { value: T; storedAt: number } | undefined {
   const entry = store.get(key);
-  return entry ? { value: entry.value as T, storedAt: entry.storedAt } : undefined;
+  if (!entry || !entry.hasValue) return undefined;
+  return { value: entry.value as T, storedAt: entry.storedAt };
 }
 
 export function writeCache(key: string, value: unknown): void {
   const existing = store.get(key);
-  store.set(key, { value, storedAt: Date.now(), inflight: existing?.inflight });
+  store.set(key, { value, hasValue: true, storedAt: Date.now(), inflight: existing?.inflight });
   listeners.get(key)?.forEach((notify) => notify());
 }
 
@@ -70,12 +83,15 @@ export function dedupedFetch<T>(key: string, fetcher: () => Promise<T>): Promise
       const entry = store.get(key);
       // Clear only our own marker: a later request may have replaced it.
       if (entry?.inflight === inflight) {
-        store.set(key, { value: entry.value, storedAt: entry.storedAt });
+        store.set(key, { value: entry.value, hasValue: entry.hasValue, storedAt: entry.storedAt });
       }
     });
 
   store.set(key, {
     value: existing?.value,
+    // Crucially false on a cold key: this entry exists only to hold the
+    // in-flight promise, and must not read as a cache hit.
+    hasValue: existing?.hasValue ?? false,
     storedAt: existing?.storedAt ?? 0,
     inflight: inflight as Promise<unknown>,
   });

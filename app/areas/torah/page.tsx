@@ -62,7 +62,11 @@ export default function TorahSpacePage() {
   } = useInsights<LearningInsights | null>("/api/torah/insights", null, [knowledgeEntries.length]);
 
   const entryInsightById = useMemo(() => {
-    const map = new Map(insights?.entries.map((e) => [e.entryId, e]) ?? []);
+    // Both levels optionally chained. `insights?.entries.map(...)` guards
+    // only `insights`; if the payload ever arrives without `entries` — a
+    // partial response, a shape change, a cached older version — this throws
+    // and takes the whole Torah page down behind the error boundary.
+    const map = new Map(insights?.entries?.map((e) => [e.entryId, e]) ?? []);
     return map;
   }, [insights]);
 
