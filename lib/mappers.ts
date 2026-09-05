@@ -296,6 +296,11 @@ export function toSummary(row: SummaryRow): Summary {
     id: row.id,
     title: row.title,
     content: row.content,
+    contentHtml: row.content_html ?? undefined,
+    isDraft: row.is_draft ?? false,
+    entityType: (row.entity_type as Summary["entityType"]) ?? undefined,
+    entityId: row.entity_id ?? undefined,
+    mentions: (row.mentions as Summary["mentions"]) ?? [],
     date: row.summary_date,
   };
 }
@@ -304,6 +309,11 @@ export function toSummaryPatch(patch: Partial<Summary>): SummaryUpdate {
   const row: SummaryUpdate = {};
   if (patch.title !== undefined) row.title = patch.title;
   if (patch.content !== undefined) row.content = patch.content;
+  if (patch.contentHtml !== undefined) row.content_html = patch.contentHtml || null;
+  if (patch.isDraft !== undefined) row.is_draft = patch.isDraft;
+  if (patch.entityType !== undefined) row.entity_type = patch.entityType || null;
+  if (patch.entityId !== undefined) row.entity_id = patch.entityId || null;
+  if (patch.mentions !== undefined) row.mentions = patch.mentions as Json;
   if (patch.date !== undefined) row.summary_date = patch.date;
   return row;
 }

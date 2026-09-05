@@ -76,7 +76,8 @@ function buildContent(draft: AiSummaryDraft): string {
 interface AiSummaryModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (summary: { title: string; content: string }) => Promise<void>;
+  /** Resolved value is ignored — see useApiCall for the same reasoning. */
+  onSave: (summary: { title: string; content: string }) => Promise<unknown>;
 }
 
 // The Summaries tab's "New AI Summary" flow (Torah Space AI Summarizer):

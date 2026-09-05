@@ -17,8 +17,12 @@ interface UseApiCallResult<Args extends unknown[]> {
 // `error` string to render inline if that's all they need, and a normal
 // try/catch around `run()` if they want bespoke handling (e.g. AICompanion
 // turning a failure into a chat bubble instead of an inline error).
+// The action's resolved value is deliberately unconstrained: this hook only
+// tracks loading/error and discards the result, so requiring Promise<void>
+// forced callers with a genuinely useful return (addSummary returns the
+// created row) to wrap it in a throwaway lambda.
 export function useApiCall<Args extends unknown[]>(
-  action: (...args: Args) => Promise<void>
+  action: (...args: Args) => Promise<unknown>
 ): UseApiCallResult<Args> {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

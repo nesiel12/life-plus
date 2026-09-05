@@ -499,6 +499,11 @@ export interface Database {
           user_id: string;
           title: string;
           content: string;
+          content_html: string | null;
+          is_draft: boolean;
+          entity_type: string | null;
+          entity_id: string | null;
+          mentions: Json;
           summary_date: string;
           created_at: string;
           updated_at: string;
@@ -508,6 +513,11 @@ export interface Database {
           user_id: string;
           title: string;
           content: string;
+          content_html?: string | null;
+          is_draft?: boolean;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          mentions?: Json;
           summary_date?: string;
         },
         {
@@ -515,6 +525,11 @@ export interface Database {
           user_id?: string;
           title?: string;
           content?: string;
+          content_html?: string | null;
+          is_draft?: boolean;
+          entity_type?: string | null;
+          entity_id?: string | null;
+          mentions?: Json;
           summary_date?: string;
         }
       >;

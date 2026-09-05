@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { UploadCloud, FileAudio, Sparkles, Plus, Link2, Search } from "lucide-react";
+import { FileText, UploadCloud, FileAudio, Sparkles, Plus, Link2, Search } from "lucide-react";
 import { AiSummaryModal } from "@/components/features/torah/AiSummaryModal";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -12,6 +12,7 @@ import { TorahTabs, type TorahTab } from "@/components/features/torah/TorahTabs"
 import { BookCard } from "@/components/features/torah/BookCard";
 import { RabbiCard } from "@/components/features/torah/RabbiCard";
 import { SummaryCard } from "@/components/features/torah/SummaryCard";
+import { SummaryWorkspace } from "@/components/features/summaries/SummaryWorkspace";
 import { EditBookModal } from "@/components/features/torah/EditBookModal";
 import { EditRabbiModal } from "@/components/features/torah/EditRabbiModal";
 import { RabbiProfileModal } from "@/components/features/torah/RabbiProfileModal";
@@ -181,6 +182,10 @@ export default function TorahSpacePage() {
   const [newSummaryTitle, setNewSummaryTitle] = useState("");
   const [newSummaryContent, setNewSummaryContent] = useState("");
   const [aiSummaryModalOpen, setAiSummaryModalOpen] = useState(false);
+  // null = closed; "new" = a fresh summary; any other string = resuming that
+  // summary's id. One state rather than an open flag plus an id, so the two
+  // cannot disagree about what the editor is showing.
+  const [editorTarget, setEditorTarget] = useState<string | null>(null);
   const { loading: addingSummary, error: addSummaryError, run: createSummary } = useApiCall(addSummary);
   const { error: deleteSummaryError, run: removeSummary } = useApiCall(deleteSummary);
 
@@ -553,9 +558,32 @@ export default function TorahSpacePage() {
             </div>
           </GlassCard>
 
+          {editorTarget !== null ? (
+            <GlassCard>
+              <SummaryWorkspace
+                existing={editorTarget === "new" ? undefined : summaries.find((s) => s.id === editorTarget)}
+                onClose={() => setEditorTarget(null)}
+              />
+            </GlassCard>
+          ) : (
+            <button
+              onClick={() => setEditorTarget("new")}
+              className="glass-control focus-ring flex w-fit items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-foreground"
+            >
+              <FileText size={14} className="text-accent-knowledge" aria-hidden />
+              כתוב סיכום מלא בעורך
+            </button>
+          )}
+
           <div className="flex flex-col gap-4">
             {summaries.map((s, i) => (
-              <SummaryCard key={s.id} summary={s} delay={Math.min(i * 0.05, 0.5)} onDelete={handleDeleteSummary} />
+              <SummaryCard
+                key={s.id}
+                summary={s}
+                delay={Math.min(i * 0.05, 0.5)}
+                onDelete={handleDeleteSummary}
+                onEdit={(id) => setEditorTarget(id)}
+              />
             ))}
             {summaries.length === 0 && <p className="text-sm text-muted">אין עדיין סיכומים. כתוב את הראשון למעלה.</p>}
           </div>

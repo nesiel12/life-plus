@@ -102,7 +102,17 @@ export interface Rabbi {
 export interface Summary {
   id: string;
   title: string;
+  /** Plain text. Kept as the searchable/AI-readable representation. */
   content: string;
+  /** The editor's rich representation. Absent on summaries predating it. */
+  contentHtml?: string;
+  /** Unfinished — powers pause-and-resume. */
+  isDraft?: boolean;
+  /** The entity this summary is about, if any. */
+  entityType?: "book" | "rabbi" | "person" | "topic";
+  entityId?: string;
+  /** Entities @mentioned in the body. */
+  mentions?: { type: "book" | "rabbi" | "person" | "topic"; id: string; label: string }[];
   date: string; // ISO date
 }
 

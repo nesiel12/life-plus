@@ -409,3 +409,121 @@ body::before {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Rich-text editor ──────────────────────────────────────────────────────
+   ProseMirror renders semantic HTML with no styling of its own, so the
+   document's typography lives here. Deliberately scoped under .prose-editor
+   and the read-only .summary-content, so nothing leaks into the rest of the
+   app's tightly-controlled Luxe surfaces. */
+.prose-editor,
+.summary-content {
+  color: var(--foreground);
+  line-height: 1.75;
+}
+
+.prose-editor h1,
+.summary-content h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+}
+.prose-editor h2,
+.summary-content h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1.1rem 0 0.45rem;
+}
+.prose-editor h3,
+.summary-content h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--gold-ink);
+  margin: 1rem 0 0.4rem;
+}
+.prose-editor p,
+.summary-content p {
+  margin: 0.5rem 0;
+}
+.prose-editor ul,
+.summary-content ul,
+.prose-editor ol,
+.summary-content ol {
+  /* padding-inline, not padding-left: the editor is RTL and a physical
+     property would indent lists on the wrong side. */
+  padding-inline-start: 1.5rem;
+  margin: 0.5rem 0;
+}
+.prose-editor ul,
+.summary-content ul {
+  list-style: disc;
+}
+.prose-editor ol,
+.summary-content ol {
+  list-style: decimal;
+}
+.prose-editor blockquote,
+.summary-content blockquote {
+  border-inline-start: 3px solid var(--gold-line);
+  padding-inline-start: 1rem;
+  margin: 0.75rem 0;
+  color: color-mix(in srgb, var(--foreground) 78%, transparent);
+}
+.prose-editor code,
+.summary-content code {
+  background: var(--fill-subtle);
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.9em;
+}
+
+.prose-editor table,
+.summary-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  table-layout: fixed;
+  overflow: hidden;
+}
+.prose-editor th,
+.summary-content th,
+.prose-editor td,
+.summary-content td {
+  border: 1px solid var(--hairline-card);
+  padding: 0.45rem 0.6rem;
+  vertical-align: top;
+}
+.prose-editor th,
+.summary-content th {
+  background: var(--fill-subtle);
+  font-weight: 600;
+  text-align: start;
+}
+/* The column-resize affordance TipTap's resizable tables add. */
+.prose-editor .column-resize-handle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: -2px;
+  width: 4px;
+  background: var(--gold);
+  pointer-events: none;
+}
+
+/* The placeholder, shown only while the document is genuinely empty. */
+.prose-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  float: inline-start;
+  height: 0;
+  pointer-events: none;
+}
+
+/* @mention chip. Reads as a link without being one — clicking navigates from
+   the rendered view, not from inside the editor. */
+.entity-mention {
+  background: var(--gold-soft);
+  color: var(--gold-ink);
+  border-radius: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  font-weight: 500;
+  white-space: nowrap;
+}

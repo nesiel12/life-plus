@@ -19,7 +19,7 @@ import { addInsightAction } from "@/app/actions/insights";
 import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/actions/knowledge";
 import { addBookAction, updateBookAction, deleteBookAction } from "@/app/actions/books";
 import { addRabbiAction, updateRabbiAction, deleteRabbiAction } from "@/app/actions/rabbis";
-import { addSummaryAction, deleteSummaryAction } from "@/app/actions/summaries";
+import { addSummaryAction, deleteSummaryAction, updateSummaryAction } from "@/app/actions/summaries";
 import { addTaskAction, updateTaskAction, deleteTaskAction } from "@/app/actions/tasks";
 import { addHabitAction, deleteHabitAction, toggleHabitCompletionAction } from "@/app/actions/habits";
 import {
@@ -160,7 +160,16 @@ interface AtlasState extends HydratedState {
   addRabbi: (rabbi: { name: string; title?: string; notes?: string }) => Promise<void>;
   updateRabbi: (rabbiId: string, patch: Partial<Rabbi>) => Promise<void>;
   deleteRabbi: (rabbiId: string) => Promise<void>;
-  addSummary: (summary: { title: string; content: string }) => Promise<void>;
+  addSummary: (summary: {
+    title: string;
+    content: string;
+    contentHtml?: string;
+    isDraft?: boolean;
+    entityType?: Summary["entityType"];
+    entityId?: string;
+    mentions?: Summary["mentions"];
+  }) => Promise<Summary>;
+  updateSummary: (summaryId: string, patch: Partial<Summary>) => Promise<void>;
   deleteSummary: (summaryId: string) => Promise<void>;
 
   addTask: (task: { title: string; description?: string; dueDate?: string }) => Promise<void>;
@@ -444,9 +453,30 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     set((state) => ({ rabbis: state.rabbis.filter((r) => r.id !== rabbiId) }));
   },
 
+  // Returns the created row so the editor can switch from "create" to
+  // "update" on its first autosave — without it, every debounce tick would
+  // insert another copy of the same draft.
   addSummary: async (summary) => {
     const created = await addSummaryAction(summary);
     set((state) => ({ summaries: [created, ...state.summaries] }));
+    return created;
+  },
+
+  // Optimistic with rollback, matching this store's established pattern —
+  // autosave fires while the person is still typing, so a round trip before
+  // the local state updates would make the editor feel laggy.
+  updateSummary: async (summaryId, patch) => {
+    const previous = get().summaries;
+    set((state) => ({
+      summaries: state.summaries.map((s) => (s.id === summaryId ? { ...s, ...patch } : s)),
+    }));
+    try {
+      const updated = await updateSummaryAction(summaryId, patch);
+      set((state) => ({ summaries: state.summaries.map((s) => (s.id === summaryId ? updated : s)) }));
+    } catch (err) {
+      set({ summaries: previous });
+      throw err;
+    }
   },
 
   deleteSummary: async (summaryId) => {
