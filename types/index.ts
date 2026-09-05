@@ -122,6 +122,10 @@ export interface SummarySection {
   /** A lucide icon name from the closed list the picker offers. */
   icon?: string;
   sortOrder: number;
+  /** Parent section, for one level of sub-sections. Absent = top level. */
+  parentId?: string;
+  /** When it was pinned. A timestamp, not a flag, so pins have an order. */
+  pinnedAt?: string;
 }
 
 /**
@@ -148,6 +152,8 @@ export interface Summary {
   sectionId?: string;
   /** Position within its section. */
   sortOrder?: number;
+  /** When it was pinned to the top of its section. */
+  pinnedAt?: string;
   /** Free-text labels the user typed. */
   tags?: string[];
   /** summary = written note, video = YouTube lesson, source = reference. */

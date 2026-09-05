@@ -186,7 +186,7 @@ interface AtlasState extends HydratedState {
   }) => Promise<Summary>;
   updateSummary: (summaryId: string, patch: Partial<Summary>) => Promise<void>;
   loadSummarySections: () => Promise<void>;
-  addSummarySection: (input: { name: string; icon?: string }) => Promise<void>;
+  addSummarySection: (input: { name: string; icon?: string; parentId?: string }) => Promise<void>;
   updateSummarySection: (sectionId: string, patch: Partial<SummarySection>) => Promise<void>;
   deleteSummarySection: (sectionId: string) => Promise<void>;
   reorderSummarySections: (sectionId: string, delta: number) => Promise<void>;
@@ -510,7 +510,12 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     const created = await addSummarySectionAction({
       name: input.name,
       icon: input.icon,
-      sortOrder: nextOrder(get().summarySections),
+      parentId: input.parentId,
+      // Ordered against its own siblings — a sub-section belongs at the end
+      // of its parent's children, not at the end of every section there is.
+      sortOrder: nextOrder(
+        get().summarySections.filter((s) => (s.parentId ?? null) === (input.parentId ?? null))
+      ),
     });
     set((state) => ({ summarySections: [...state.summarySections, created] }));
   },

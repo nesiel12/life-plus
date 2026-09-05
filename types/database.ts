@@ -500,6 +500,8 @@ export interface Database {
           name: string;
           icon: string | null;
           sort_order: number;
+          parent_id: string | null;
+          pinned_at: string | null;
           created_at: string;
           updated_at: string;
         },
@@ -509,11 +511,15 @@ export interface Database {
           name: string;
           icon?: string | null;
           sort_order?: number;
+          parent_id?: string | null;
+          pinned_at?: string | null;
         },
         {
           name?: string;
           icon?: string | null;
           sort_order?: number;
+          parent_id?: string | null;
+          pinned_at?: string | null;
         }
       >;
       summaries: TableDef<
@@ -529,6 +535,7 @@ export interface Database {
           mentions: Json;
           section_id: string | null;
           sort_order: number;
+          pinned_at: string | null;
           tags: Json;
           kind: string;
           url: string | null;
@@ -548,6 +555,7 @@ export interface Database {
           mentions?: Json;
           section_id?: string | null;
           sort_order?: number;
+          pinned_at?: string | null;
           tags?: Json;
           kind?: string;
           url?: string | null;
@@ -565,6 +573,7 @@ export interface Database {
           mentions?: Json;
           section_id?: string | null;
           sort_order?: number;
+          pinned_at?: string | null;
           tags?: Json;
           kind?: string;
           url?: string | null;

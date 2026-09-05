@@ -11,13 +11,19 @@ export async function listSummarySectionsAction() {
   return rows.map(toSummarySection);
 }
 
-export async function addSummarySectionAction(input: { name: string; icon?: string; sortOrder: number }) {
+export async function addSummarySectionAction(input: {
+  name: string;
+  icon?: string;
+  sortOrder: number;
+  parentId?: string;
+}) {
   const userId = await getCurrentUserId();
   const row = await summarySectionsRepo.insert({
     user_id: userId,
     name: input.name,
     icon: input.icon ?? null,
     sort_order: input.sortOrder,
+    parent_id: input.parentId ?? null,
   });
   return toSummarySection(row);
 }

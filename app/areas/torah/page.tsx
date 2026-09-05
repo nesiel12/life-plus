@@ -14,19 +14,20 @@ import { EntityHub } from "@/components/features/torah/EntityHub";
 import { AddStudyItem } from "@/components/features/torah/AddStudyItem";
 import { StudyItemList } from "@/components/features/torah/StudyItemList";
 import { buildSectionHub } from "@/lib/torah/studyHub";
+import { orderSummaries, sectionAndDescendants } from "@/lib/summaries/hierarchy";
 import type { EntityRef, EntitySources } from "@/lib/summaries/entityRef";
 import { BookCard } from "@/components/features/torah/BookCard";
 import { RabbiCard } from "@/components/features/torah/RabbiCard";
 import { SummaryCard } from "@/components/features/torah/SummaryCard";
 import { SummaryWorkspace } from "@/components/features/summaries/SummaryWorkspace";
 import { SectionManager } from "@/components/features/summaries/SectionManager";
-import { isFirst, isLast, sorted as sortedByOrder } from "@/lib/summaries/ordering";
+import { isFirst, isLast } from "@/lib/summaries/ordering";
 import { EditBookModal } from "@/components/features/torah/EditBookModal";
 import { EditRabbiModal } from "@/components/features/torah/EditRabbiModal";
 import { useApiCall } from "@/hooks/useApiCall";
 import { useInsights } from "@/hooks/useInsights";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
-import type { Book, KnowledgeEntry, Rabbi } from "@/types";
+import type { Book, KnowledgeEntry, Rabbi, Summary } from "@/types";
 import type { LearningInsights } from "@/lib/learning/types";
 
 interface ExtractedShiur {
@@ -253,12 +254,24 @@ export default function TorahSpacePage() {
   // need, so the move buttons disable on the real edges of *this* list rather
   // than of every summary.
   const visibleSummaries = useMemo(() => {
-    const scoped =
-      activeSectionId === null
-        ? summaries
-        : summaries.filter((s) => (s.sectionId ?? null) === activeSectionId);
-    return sortedByOrder(scoped.map((s) => ({ ...s, sortOrder: s.sortOrder ?? 0 })));
-  }, [summaries, activeSectionId]);
+    // A selected parent section shows its sub-sections' material too —
+    // otherwise a section whose content all lives one level down looks empty
+    // the moment you organise it.
+    const scopeIds = activeSectionId ? new Set(sectionAndDescendants(summarySections, activeSectionId)) : null;
+    const scoped = scopeIds
+      ? summaries.filter((s) => s.sectionId && scopeIds.has(s.sectionId))
+      : summaries;
+    return orderSummaries(scoped);
+  }, [summaries, summarySections, activeSectionId]);
+
+  const handleTogglePin = useCallback(
+    (summary: Summary) => {
+      updateSummary(summary.id, {
+        pinnedAt: summary.pinnedAt ? undefined : new Date().toISOString(),
+      }).catch(() => {});
+    },
+    [updateSummary]
+  );
 
   const orderableSiblings = useMemo(
     () => visibleSummaries.map((s) => ({ id: s.id, sortOrder: s.sortOrder ?? 0 })),
@@ -351,10 +364,7 @@ export default function TorahSpacePage() {
           setSectionEditorTarget(null);
         }}
         sections={summarySections}
-        onAddSection={() => {
-          const name = window.prompt("שם המדור החדש");
-          if (name?.trim()) addSummarySection({ name: name.trim() }).catch(() => {});
-        }}
+        onAddSection={(name) => addSummarySection({ name }).catch(() => {})}
       />
 
       {/* The hub takes over the whole tab body when an entity is open — a
@@ -734,6 +744,7 @@ export default function TorahSpacePage() {
                 delay={Math.min(i * 0.05, 0.5)}
                 onDelete={handleDeleteSummary}
                 onEdit={(id) => setEditorTarget(id)}
+                onTogglePin={handleTogglePin}
                 sections={summarySections}
                 onAssignSection={(id, sectionId) =>
                   updateSummary(id, { sectionId: sectionId ?? undefined }).catch(() => {})

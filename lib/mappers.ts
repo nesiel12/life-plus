@@ -306,6 +306,7 @@ export function toSummary(row: SummaryRow): Summary {
     mentions: (row.mentions as Summary["mentions"]) ?? [],
     sectionId: row.section_id ?? undefined,
     sortOrder: row.sort_order ?? 0,
+    pinnedAt: row.pinned_at ?? undefined,
     tags: (row.tags as string[]) ?? [],
     kind: (row.kind as Summary["kind"]) ?? "summary",
     url: row.url ?? undefined,
@@ -324,6 +325,8 @@ export function toSummaryPatch(patch: Partial<Summary>): SummaryUpdate {
   if (patch.mentions !== undefined) row.mentions = patch.mentions as Json;
   if (patch.sectionId !== undefined) row.section_id = patch.sectionId || null;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+  // `?? null`, not `|| null`: unpinning writes null on purpose.
+  if (patch.pinnedAt !== undefined) row.pinned_at = patch.pinnedAt ?? null;
   if (patch.tags !== undefined) row.tags = patch.tags as Json;
   if (patch.kind !== undefined) row.kind = patch.kind;
   if (patch.url !== undefined) row.url = patch.url || null;
@@ -532,6 +535,8 @@ export function toSummarySection(row: SummarySectionRow): SummarySection {
     name: row.name,
     icon: row.icon ?? undefined,
     sortOrder: row.sort_order,
+    parentId: row.parent_id ?? undefined,
+    pinnedAt: row.pinned_at ?? undefined,
   };
 }
 
@@ -540,5 +545,9 @@ export function toSummarySectionPatch(patch: Partial<SummarySection>): SummarySe
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.icon !== undefined) row.icon = patch.icon || null;
   if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+  // `?? null` rather than `|| null`: these are nullable by design, and
+  // unpinning or promoting to top level means writing null deliberately.
+  if (patch.parentId !== undefined) row.parent_id = patch.parentId ?? null;
+  if (patch.pinnedAt !== undefined) row.pinned_at = patch.pinnedAt ?? null;
   return row;
 }
