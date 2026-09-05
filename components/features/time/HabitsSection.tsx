@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, Plus, Repeat, Trash2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useApiCall } from "@/hooks/useApiCall";
@@ -31,8 +31,21 @@ export function HabitsSection({ selectedDate }: HabitsSectionProps) {
   const { error: toggleError, run: runToggle } = useApiCall(toggleHabitCompletion);
   const { error: deleteError, run: runDelete } = useApiCall(deleteHabit);
 
+  // One pass over the logs instead of one scan per habit. The list is
+  // re-derived on every render (a habit tick replaces habitLogs, and the day
+  // carousel changes selectedDate), and the previous .some() inside the row
+  // map made that O(habits × logs) — the checkbox that is meant to feel
+  // instant was the thing paying for it.
+  const completedToday = useMemo(() => {
+    const done = new Set<string>();
+    for (const log of habitLogs) {
+      if (log.completedDate === selectedDate) done.add(log.habitId);
+    }
+    return done;
+  }, [habitLogs, selectedDate]);
+
   function isCompletedOn(habitId: string): boolean {
-    return habitLogs.some((l) => l.habitId === habitId && l.completedDate === selectedDate);
+    return completedToday.has(habitId);
   }
 
   function handleToggle(habitId: string) {

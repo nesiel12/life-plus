@@ -1,19 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
-import { CalendarClock, CalendarDays, CalendarHeart, Clock } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarHeart, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ScheduleSuggestions } from "@/components/features/ScheduleSuggestions";
-import { VerticalTimeline } from "@/components/features/calendar/VerticalTimeline";
+import { DayView } from "@/components/features/calendar/DayView";
+import { WeekView } from "@/components/features/calendar/WeekView";
+import { YearView } from "@/components/features/calendar/YearView";
+import { RangeTabs } from "@/components/features/calendar/RangeTabs";
 import { CalendarAgentPanel } from "@/components/features/calendar/CalendarAgentPanel";
 import { MonthView } from "@/components/features/calendar/MonthView";
 import { ScheduleCopilotBar } from "@/components/features/calendar/ScheduleCopilotBar";
 import { useInsights } from "@/hooks/useInsights";
 import { groupUpcomingEvents } from "@/lib/calendar/groupUpcomingEvents";
-import { cn, daysUntil } from "@/lib/utils";
+import { isWithinRange, rangeLabel, stepAnchor, type CalendarRange } from "@/lib/calendar/ranges";
+import { daysUntil } from "@/lib/utils";
 import type { GoogleCalendarEvent } from "@/lib/googleCalendar/fetchEvents";
 
 interface UpcomingResponse {
@@ -41,21 +45,37 @@ export default function CalendarPage() {
   const chronotype = useAtlasStore((s) => s.personalDNA.chronotype);
   const { data, refresh } = useInsights<UpcomingResponse>("/api/calendar/upcoming", FALLBACK);
   // Day is the default: the hour-by-hour timeline is what this page is
-  // for day to day, and the month view is the step back you take
-  // occasionally. The month's events are only fetched once it is opened.
-  const [range, setRange] = useState<"day" | "month">("day");
+  // for day to day, and the wider ranges are the step back you take
+  // occasionally. Each view fetches only its own window, when opened.
+  const [range, setRange] = useState<CalendarRange>("day");
+  // What is being looked at, separate from how. Previously there was no such
+  // state at all — the day view hardcoded `new Date()` and the month view
+  // froze its own month at mount — which is why nothing on this page could
+  // be navigated. Keeping one anchor also means switching range holds your
+  // place instead of snapping back to today.
+  const [anchor, setAnchor] = useState(() => new Date());
+
+  // Drilling in from a wider view moves both the range and the anchor, so
+  // clicking the 14th of March lands on the 14th of March rather than on
+  // today in day view.
+  const openDay = useCallback((date: Date) => {
+    setAnchor(date);
+    setRange("day");
+  }, []);
+  const openMonth = useCallback((date: Date) => {
+    setAnchor(date);
+    setRange("month");
+  }, []);
+
+  // "Today" is only meaningful when you are not already looking at it — and
+  // at week, month and year that means the range *containing* today, not the
+  // date itself. Comparing dates directly would leave the button live while
+  // viewing the current week from its Tuesday.
+  const isToday = useMemo(() => isWithinRange(range, anchor, new Date()), [range, anchor]);
   const groups = data ? groupUpcomingEvents(data.events, new Date()) : [];
 
-  // The vertical timeline shows today only; groupUpcomingEvents already
-  // separates Today from later days, so reuse its notion of "today" rather
-  // than re-deriving a second, possibly-disagreeing one.
-  const now = new Date();
-  const startOfTomorrow = new Date(now);
-  startOfTomorrow.setHours(24, 0, 0, 0);
-  const todayEvents = (data?.events ?? []).filter((e) => {
-    const start = new Date(e.start).getTime();
-    return start >= new Date(now).setHours(0, 0, 0, 0) && start < startOfTomorrow.getTime();
-  });
+  // The copilot and agent panels still read the 14-day upcoming feed: they
+  // reason about free time coming up, not about whichever day is on screen.
   const busy = (data?.events ?? []).map((e) => ({ start: e.start, end: e.end, title: e.title }));
 
   return (
@@ -91,50 +111,51 @@ export default function CalendarPage() {
 
         {data?.connected && (
           <GlassCard delay={0.1}>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <p className="flex items-center gap-2 text-sm font-medium text-muted">
-                {range === "day" ? (
-                  <Clock size={16} className="text-accent-career" aria-hidden />
-                ) : (
-                  <CalendarDays size={16} className="text-accent-career" aria-hidden />
-                )}
-                {range === "day" ? "היום, שעה אחר שעה" : "החודש כולו"}
-              </p>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <p className="flex shrink-0 items-center gap-2 text-sm font-medium text-muted">
+                  {range === "day" ? (
+                    <Clock size={16} className="text-accent-career" aria-hidden />
+                  ) : (
+                    <CalendarDays size={16} className="text-accent-career" aria-hidden />
+                  )}
+                  <span className="truncate">{rangeLabel(range, anchor)}</span>
+                </p>
 
-              <div
-                role="tablist"
-                aria-label="טווח תצוגה"
-                className="glass-control flex items-center gap-1 rounded-lg p-0.5"
-              >
-                {(
-                  [
-                    { key: "day", label: "יום" },
-                    { key: "month", label: "חודש" },
-                  ] as const
-                ).map((option) => (
+                {/* ChevronRight steps back and ChevronLeft steps forward:
+                    the page is RTL, so "earlier" is to the right. */}
+                <div className="flex shrink-0 items-center gap-0.5">
                   <button
-                    key={option.key}
-                    role="tab"
-                    aria-selected={range === option.key}
-                    onClick={() => setRange(option.key)}
-                    className={cn(
-                      "focus-ring rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                      range === option.key
-                        ? "glass-control glass-control-active text-foreground"
-                        : "text-muted hover:text-foreground"
-                    )}
+                    onClick={() => setAnchor((current) => stepAnchor(range, current, -1))}
+                    aria-label="הקודם"
+                    className="glass-control-hover focus-ring grid size-7 place-items-center rounded-lg text-muted transition-colors hover:text-foreground"
                   >
-                    {option.label}
+                    <ChevronRight size={14} aria-hidden />
                   </button>
-                ))}
+                  <button
+                    onClick={() => setAnchor(new Date())}
+                    disabled={isToday}
+                    className="focus-ring rounded-lg px-2 py-1 text-xs text-muted transition-colors hover:text-foreground disabled:opacity-40"
+                  >
+                    היום
+                  </button>
+                  <button
+                    onClick={() => setAnchor((current) => stepAnchor(range, current, 1))}
+                    aria-label="הבא"
+                    className="glass-control-hover focus-ring grid size-7 place-items-center rounded-lg text-muted transition-colors hover:text-foreground"
+                  >
+                    <ChevronLeft size={14} aria-hidden />
+                  </button>
+                </div>
               </div>
+
+              <RangeTabs value={range} onChange={setRange} />
             </div>
 
-            {range === "day" ? (
-              <VerticalTimeline day={now} now={now} events={todayEvents} chronotype={chronotype} />
-            ) : (
-              <MonthView />
-            )}
+            {range === "day" && <DayView anchor={anchor} chronotype={chronotype} />}
+            {range === "week" && <WeekView anchor={anchor} />}
+            {range === "month" && <MonthView anchor={anchor} onSelectDay={openDay} />}
+            {range === "year" && <YearView anchor={anchor} onSelectMonth={openMonth} />}
           </GlassCard>
         )}
 

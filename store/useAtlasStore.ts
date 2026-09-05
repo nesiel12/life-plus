@@ -603,14 +603,44 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     set((state) => ({ tasks: [created, ...state.tasks] }));
   },
 
+  // Optimistic with rollback. This is the checklist tick: it has to flip the
+  // instant it is clicked, not after a server round trip. Awaiting first is
+  // exactly what made the task list feel sluggish next to the habit list,
+  // which has worked this way since it was written.
+  //
+  // Rollback restores the single row rather than the whole array — unlike
+  // toggleHabitCompletion below. Snapping `tasks` back wholesale would undo
+  // any task added or edited while this request was in flight, and the tick
+  // is the one action a user fires repeatedly and fast.
   updateTask: async (taskId, patch) => {
-    const updated = await updateTaskAction(taskId, patch);
-    set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? updated : t)) }));
+    const previous = get().tasks.find((t) => t.id === taskId);
+    set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, ...patch } : t)) }));
+    try {
+      // Reconciled with the server's row: the patch carries only what the
+      // caller changed, and fields the server derives would otherwise stay
+      // stale until the next full load.
+      const updated = await updateTaskAction(taskId, patch);
+      set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? updated : t)) }));
+    } catch (err) {
+      if (previous) {
+        set((state) => ({ tasks: state.tasks.map((t) => (t.id === taskId ? previous : t)) }));
+      }
+      throw err;
+    }
   },
 
+  // Optimistic too, but the whole array is kept for rollback: restoring a
+  // deleted row means restoring its position, and that is only recoverable
+  // from the list as it stood.
   deleteTask: async (taskId) => {
-    await deleteTaskAction(taskId);
+    const previous = get().tasks;
     set((state) => ({ tasks: state.tasks.filter((t) => t.id !== taskId) }));
+    try {
+      await deleteTaskAction(taskId);
+    } catch (err) {
+      set({ tasks: previous });
+      throw err;
+    }
   },
 
   addHabit: async (habit) => {

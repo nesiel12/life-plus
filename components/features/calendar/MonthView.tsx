@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { CalendarDays, Loader2, Sparkles, TrendingUp } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { useInsights } from "@/hooks/useInsights";
 import { analyzeMonth, type MonthEvent } from "@/lib/calendar/analyzeMonth";
+import { monthKey } from "@/lib/calendar/ranges";
 import { cn } from "@/lib/utils";
 
 interface MonthResponse {
@@ -16,13 +17,15 @@ interface MonthResponse {
 
 const FALLBACK: MonthResponse = { connected: false, month: "", events: [] };
 
+interface MonthViewProps {
+  /** Any date within the month to show. */
+  anchor: Date;
+  /** Drilling into a single day from the grid. */
+  onSelectDay?: (date: Date) => void;
+}
+
 // Sunday-first, matching the Hebrew week and Date.getDay().
 const WEEKDAY_INITIALS = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
-
-function currentMonthKey(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
 
 function monthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number);
@@ -45,13 +48,18 @@ function StatLine({ label, value }: { label: string; value: string }) {
 // tested: no AI call is involved in producing a number here. The month grid
 // and the analysis read the same fetched events, so the two can never
 // disagree about what's on the calendar.
-export function MonthView() {
+export function MonthView({ anchor, onSelectDay }: MonthViewProps) {
   const chronotype = useAtlasStore((s) => s.personalDNA.chronotype);
-  const [month] = useState(currentMonthKey);
+  // Driven by the page's anchor rather than frozen at mount. The month was
+  // previously held in a useState whose setter was never destructured, so
+  // the view could only ever show the month the app happened to load in.
+  const month = useMemo(() => monthKey(anchor), [anchor]);
 
   const { data, loading } = useInsights<MonthResponse>(`/api/calendar/month?month=${month}`, FALLBACK, [month]);
 
   const events = useMemo(() => data?.events ?? [], [data]);
+  const anchorYear = anchor.getFullYear();
+  const anchorMonthIndex = anchor.getMonth();
   const analysis = useMemo(() => analyzeMonth(month, events, chronotype), [month, events, chronotype]);
 
   // Day cells: a leading blank run for the first-of-month's weekday, then
@@ -125,10 +133,26 @@ export function MonthView() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.2, delay: Math.min(cell.day * 0.006, 0.2) }}
-                role="gridcell"
+                // A real button only when there is somewhere to go. Making
+                // every cell clickable when nothing handles the click is a
+                // promise the grid cannot keep.
+                {...(onSelectDay
+                  ? {
+                      onClick: () => onSelectDay(new Date(anchorYear, anchorMonthIndex, cell.day)),
+                      tabIndex: 0,
+                      role: "button" as const,
+                      onKeyDown: (e: React.KeyboardEvent) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSelectDay(new Date(anchorYear, anchorMonthIndex, cell.day));
+                        }
+                      },
+                    }
+                  : { role: "gridcell" as const })}
                 aria-label={`${cell.day} — ${cell.count} אירועים`}
                 className={cn(
                   "flex aspect-square flex-col items-center justify-center rounded-lg border text-xs transition-colors",
+                  onSelectDay && "focus-ring cursor-pointer hover:border-gold-line",
                   cell.isToday
                     ? "border-gold-line bg-gold-soft text-gold-ink"
                     : cell.count > 0
