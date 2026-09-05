@@ -26,6 +26,7 @@ import type {
   Person,
   Rabbi,
   Summary,
+  SummarySection,
   Task,
   Transaction,
   UpcomingEvent,
@@ -50,6 +51,8 @@ type BookUpdate = Database["public"]["Tables"]["books"]["Update"];
 type RabbiRow = Database["public"]["Tables"]["rabbis"]["Row"];
 type RabbiUpdate = Database["public"]["Tables"]["rabbis"]["Update"];
 type SummaryRow = Database["public"]["Tables"]["summaries"]["Row"];
+type SummarySectionRow = Database["public"]["Tables"]["summary_sections"]["Row"];
+type SummarySectionUpdate = Database["public"]["Tables"]["summary_sections"]["Update"];
 type SummaryUpdate = Database["public"]["Tables"]["summaries"]["Update"];
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 type TaskUpdate = Database["public"]["Tables"]["tasks"]["Update"];
@@ -301,6 +304,9 @@ export function toSummary(row: SummaryRow): Summary {
     entityType: (row.entity_type as Summary["entityType"]) ?? undefined,
     entityId: row.entity_id ?? undefined,
     mentions: (row.mentions as Summary["mentions"]) ?? [],
+    sectionId: row.section_id ?? undefined,
+    sortOrder: row.sort_order ?? 0,
+    tags: (row.tags as string[]) ?? [],
     date: row.summary_date,
   };
 }
@@ -314,6 +320,9 @@ export function toSummaryPatch(patch: Partial<Summary>): SummaryUpdate {
   if (patch.entityType !== undefined) row.entity_type = patch.entityType || null;
   if (patch.entityId !== undefined) row.entity_id = patch.entityId || null;
   if (patch.mentions !== undefined) row.mentions = patch.mentions as Json;
+  if (patch.sectionId !== undefined) row.section_id = patch.sectionId || null;
+  if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+  if (patch.tags !== undefined) row.tags = patch.tags as Json;
   if (patch.date !== undefined) row.summary_date = patch.date;
   return row;
 }
@@ -511,4 +520,21 @@ export function toGoal(row: GoalWithMilestones): Goal {
       dueDate: m.due_date ?? undefined,
     })),
   };
+}
+
+export function toSummarySection(row: SummarySectionRow): SummarySection {
+  return {
+    id: row.id,
+    name: row.name,
+    icon: row.icon ?? undefined,
+    sortOrder: row.sort_order,
+  };
+}
+
+export function toSummarySectionPatch(patch: Partial<SummarySection>): SummarySectionUpdate {
+  const row: SummarySectionUpdate = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.icon !== undefined) row.icon = patch.icon || null;
+  if (patch.sortOrder !== undefined) row.sort_order = patch.sortOrder;
+  return row;
 }

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { moveBy, nextOrder } from "@/lib/summaries/ordering";
 import { momentCategoryLabel } from "@/lib/lifeAreas";
 import { addMomentAction } from "@/app/actions/moments";
 import {
@@ -20,6 +21,13 @@ import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/acti
 import { addBookAction, updateBookAction, deleteBookAction } from "@/app/actions/books";
 import { addRabbiAction, updateRabbiAction, deleteRabbiAction } from "@/app/actions/rabbis";
 import { addSummaryAction, deleteSummaryAction, updateSummaryAction } from "@/app/actions/summaries";
+import {
+  addSummarySectionAction,
+  deleteSummarySectionAction,
+  listSummarySectionsAction,
+  reorderSummarySectionsAction,
+  updateSummarySectionAction,
+} from "@/app/actions/summarySections";
 import { addTaskAction, updateTaskAction, deleteTaskAction } from "@/app/actions/tasks";
 import { addHabitAction, deleteHabitAction, toggleHabitCompletionAction } from "@/app/actions/habits";
 import {
@@ -78,6 +86,7 @@ import type {
   Person,
   Rabbi,
   Summary,
+  SummarySection,
   SuggestedAction,
   Task,
   Transaction,
@@ -104,6 +113,7 @@ export interface HydratedState {
   books: Book[];
   rabbis: Rabbi[];
   summaries: Summary[];
+  summarySections: SummarySection[];
   tasks: Task[];
   habits: Habit[];
   habitLogs: HabitLog[];
@@ -170,6 +180,12 @@ interface AtlasState extends HydratedState {
     mentions?: Summary["mentions"];
   }) => Promise<Summary>;
   updateSummary: (summaryId: string, patch: Partial<Summary>) => Promise<void>;
+  loadSummarySections: () => Promise<void>;
+  addSummarySection: (input: { name: string; icon?: string }) => Promise<void>;
+  updateSummarySection: (sectionId: string, patch: Partial<SummarySection>) => Promise<void>;
+  deleteSummarySection: (sectionId: string) => Promise<void>;
+  reorderSummarySections: (sectionId: string, delta: number) => Promise<void>;
+  reorderSummaryInSection: (summaryId: string, delta: number) => Promise<void>;
   deleteSummary: (summaryId: string) => Promise<void>;
 
   addTask: (task: { title: string; description?: string; dueDate?: string }) => Promise<void>;
@@ -278,6 +294,7 @@ const EMPTY_STATE: HydratedState = {
   books: [],
   rabbis: [],
   summaries: [],
+  summarySections: [],
   tasks: [],
   habits: [],
   habitLogs: [],
@@ -473,6 +490,98 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     try {
       const updated = await updateSummaryAction(summaryId, patch);
       set((state) => ({ summaries: state.summaries.map((s) => (s.id === summaryId ? updated : s)) }));
+    } catch (err) {
+      set({ summaries: previous });
+      throw err;
+    }
+  },
+
+  loadSummarySections: async () => {
+    const sections = await listSummarySectionsAction();
+    set({ summarySections: sections });
+  },
+
+  addSummarySection: async (input) => {
+    const created = await addSummarySectionAction({
+      name: input.name,
+      icon: input.icon,
+      sortOrder: nextOrder(get().summarySections),
+    });
+    set((state) => ({ summarySections: [...state.summarySections, created] }));
+  },
+
+  updateSummarySection: async (sectionId, patch) => {
+    const previous = get().summarySections;
+    set((state) => ({
+      summarySections: state.summarySections.map((s) => (s.id === sectionId ? { ...s, ...patch } : s)),
+    }));
+    try {
+      const updated = await updateSummarySectionAction(sectionId, patch);
+      set((state) => ({
+        summarySections: state.summarySections.map((s) => (s.id === sectionId ? updated : s)),
+      }));
+    } catch (err) {
+      set({ summarySections: previous });
+      throw err;
+    }
+  },
+
+  deleteSummarySection: async (sectionId) => {
+    const previousSections = get().summarySections;
+    const previousSummaries = get().summaries;
+    // Mirror the DB's ON DELETE SET NULL locally, so summaries filed here
+    // reappear as unassigned rather than vanishing from the UI until reload.
+    set((state) => ({
+      summarySections: state.summarySections.filter((s) => s.id !== sectionId),
+      summaries: state.summaries.map((s) => (s.sectionId === sectionId ? { ...s, sectionId: undefined } : s)),
+    }));
+    try {
+      await deleteSummarySectionAction(sectionId);
+    } catch (err) {
+      set({ summarySections: previousSections, summaries: previousSummaries });
+      throw err;
+    }
+  },
+
+  reorderSummarySections: async (sectionId, delta) => {
+    const changes = moveBy(get().summarySections, sectionId, delta);
+    if (changes.length === 0) return;
+    const previous = get().summarySections;
+    const byId = new Map(changes.map((c) => [c.id, c.sortOrder]));
+    set((state) => ({
+      summarySections: state.summarySections.map((s) =>
+        byId.has(s.id) ? { ...s, sortOrder: byId.get(s.id)! } : s
+      ),
+    }));
+    try {
+      await reorderSummarySectionsAction(changes);
+    } catch (err) {
+      set({ summarySections: previous });
+      throw err;
+    }
+  },
+
+  reorderSummaryInSection: async (summaryId, delta) => {
+    const all = get().summaries;
+    const target = all.find((s) => s.id === summaryId);
+    if (!target) return;
+    // Reorder only within the summary's own section — a move must never
+    // silently reshuffle a different section's list.
+    const siblings = all
+      .filter((s) => (s.sectionId ?? null) === (target.sectionId ?? null))
+      .map((s) => ({ id: s.id, sortOrder: s.sortOrder ?? 0 }));
+    const changes = moveBy(siblings, summaryId, delta);
+    if (changes.length === 0) return;
+
+    const previous = all;
+    const byId = new Map(changes.map((c) => [c.id, c.sortOrder]));
+    set((state) => ({
+      summaries: state.summaries.map((s) => (byId.has(s.id) ? { ...s, sortOrder: byId.get(s.id)! } : s)),
+    }));
+    try {
+      for (const change of changes) {
+        await updateSummaryAction(change.id, { sortOrder: change.sortOrder });
+      }
     } catch (err) {
       set({ summaries: previous });
       throw err;

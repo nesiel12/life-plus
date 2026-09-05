@@ -5,6 +5,7 @@ import { Apple, Dumbbell, Plus, Trash2 } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { useApiCall } from "@/hooks/useApiCall";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { WellnessCopilot } from "@/components/features/health/WellnessCopilot";
 import { NewMealModal } from "@/components/features/health/NewMealModal";
 import { NewWorkoutModal } from "@/components/features/health/NewWorkoutModal";
 import { NutritionCoach } from "@/components/features/health/NutritionCoach";
@@ -95,6 +96,12 @@ export default function HealthSpacePage() {
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <h1 className="mb-1 text-2xl font-medium tracking-tight">בריאות</h1>
       <p className="mb-8 text-sm text-muted">ארוחות, אימונים, והדרכה תזונתית מבוססת AI — הכל במקום אחד.</p>
+
+      {/* The copilot leads: it is the proactive layer, and it renders from
+          store data with no fetch, so it paints before anything below it. */}
+      <GlassCard className="mb-6">
+        <WellnessCopilot />
+      </GlassCard>
 
       <div className="mb-6">
         <NutritionCoach

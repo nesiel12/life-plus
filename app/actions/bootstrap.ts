@@ -15,6 +15,7 @@ import { dailyIntentionsRepo } from "@/lib/db/dailyIntentions";
 import { booksRepo } from "@/lib/db/books";
 import { rabbisRepo } from "@/lib/db/rabbis";
 import { summariesRepo } from "@/lib/db/summaries";
+import { summarySectionsRepo } from "@/lib/db/summarySections";
 import { tasksRepo } from "@/lib/db/tasks";
 import { habitsRepo, habitLogsRepo } from "@/lib/db/habits";
 import { transactionsRepo } from "@/lib/db/transactions";
@@ -36,6 +37,7 @@ import {
   toBook,
   toRabbi,
   toSummary,
+  toSummarySection,
   toTask,
   toHabit,
   toHabitLog,
@@ -67,6 +69,7 @@ export async function getInitialState() {
     bookRows,
     rabbiRows,
     summaryRows,
+    summarySectionRows,
     taskRows,
     habitRows,
     habitLogRows,
@@ -90,6 +93,7 @@ export async function getInitialState() {
     booksRepo.list(userId),
     rabbisRepo.list(userId),
     summariesRepo.list(userId),
+    summarySectionsRepo.list(userId),
     tasksRepo.list(userId),
     habitsRepo.list(userId),
     habitLogsRepo.list(userId),
@@ -129,6 +133,7 @@ export async function getInitialState() {
     books: bookRows.map(toBook),
     rabbis: rabbiRows.map(toRabbi),
     summaries: summaryRows.map(toSummary),
+    summarySections: summarySectionRows.map(toSummarySection),
     tasks: taskRows.map(toTask),
     habits: habitRows.map(toHabit),
     habitLogs: habitLogRows.map(toHabitLog),

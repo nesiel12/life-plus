@@ -493,6 +493,29 @@ export interface Database {
           notes?: string | null;
         }
       >;
+      summary_sections: TableDef<
+        {
+          id: string;
+          user_id: string;
+          name: string;
+          icon: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          name: string;
+          icon?: string | null;
+          sort_order?: number;
+        },
+        {
+          name?: string;
+          icon?: string | null;
+          sort_order?: number;
+        }
+      >;
       summaries: TableDef<
         {
           id: string;
@@ -504,6 +527,9 @@ export interface Database {
           entity_type: string | null;
           entity_id: string | null;
           mentions: Json;
+          section_id: string | null;
+          sort_order: number;
+          tags: Json;
           summary_date: string;
           created_at: string;
           updated_at: string;
@@ -518,6 +544,9 @@ export interface Database {
           entity_type?: string | null;
           entity_id?: string | null;
           mentions?: Json;
+          section_id?: string | null;
+          sort_order?: number;
+          tags?: Json;
           summary_date?: string;
         },
         {
@@ -530,6 +559,9 @@ export interface Database {
           entity_type?: string | null;
           entity_id?: string | null;
           mentions?: Json;
+          section_id?: string | null;
+          sort_order?: number;
+          tags?: Json;
           summary_date?: string;
         }
       >;

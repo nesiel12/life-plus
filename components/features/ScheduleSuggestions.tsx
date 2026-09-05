@@ -60,6 +60,13 @@ export function ScheduleSuggestions() {
     };
   }, [setSuggestedActions]);
 
+  // Render nothing at all until the fetch resolves. `connected === null` is
+  // the in-flight state, and it previously fell through both guards below to
+  // the full banner with an empty list — which is the 2-3 second empty flash
+  // and the layout shift that followed it. A suggestions banner has nothing
+  // to say before its suggestions exist, so it should not occupy space.
+  if (connected === null) return null;
+
   if (connected === false) {
     return (
       <GlassCard delay={0.2}>
@@ -74,7 +81,9 @@ export function ScheduleSuggestions() {
     );
   }
 
-  if (connected === true && suggestions.length === 0) return null;
+  // Also covers stale suggestions left in the store by a previous mount:
+  // once this fetch reports connected, an empty list means genuinely empty.
+  if (suggestions.length === 0) return null;
 
   return (
     <GlassCard delay={0.2}>

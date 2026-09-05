@@ -13,6 +13,8 @@ import { BookCard } from "@/components/features/torah/BookCard";
 import { RabbiCard } from "@/components/features/torah/RabbiCard";
 import { SummaryCard } from "@/components/features/torah/SummaryCard";
 import { SummaryWorkspace } from "@/components/features/summaries/SummaryWorkspace";
+import { SectionManager } from "@/components/features/summaries/SectionManager";
+import { isFirst, isLast, sorted as sortedByOrder } from "@/lib/summaries/ordering";
 import { EditBookModal } from "@/components/features/torah/EditBookModal";
 import { EditRabbiModal } from "@/components/features/torah/EditRabbiModal";
 import { RabbiProfileModal } from "@/components/features/torah/RabbiProfileModal";
@@ -186,7 +188,29 @@ export default function TorahSpacePage() {
   // summary's id. One state rather than an open flag plus an id, so the two
   // cannot disagree about what the editor is showing.
   const [editorTarget, setEditorTarget] = useState<string | null>(null);
+  const summarySections = useAtlasStore((s) => s.summarySections);
+  const updateSummary = useAtlasStore((s) => s.updateSummary);
+  const reorderSummaryInSection = useAtlasStore((s) => s.reorderSummaryInSection);
+  // null = the "all" tab.
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const { loading: addingSummary, error: addSummaryError, run: createSummary } = useApiCall(addSummary);
+
+  // Filtered by the active tab, then ordered by the user's own arrangement.
+  // `orderableSiblings` is the same set reduced to what the ordering helpers
+  // need, so the move buttons disable on the real edges of *this* list rather
+  // than of every summary.
+  const visibleSummaries = useMemo(() => {
+    const scoped =
+      activeSectionId === null
+        ? summaries
+        : summaries.filter((s) => (s.sectionId ?? null) === activeSectionId);
+    return sortedByOrder(scoped.map((s) => ({ ...s, sortOrder: s.sortOrder ?? 0 })));
+  }, [summaries, activeSectionId]);
+
+  const orderableSiblings = useMemo(
+    () => visibleSummaries.map((s) => ({ id: s.id, sortOrder: s.sortOrder ?? 0 })),
+    [visibleSummaries]
+  );
   const { error: deleteSummaryError, run: removeSummary } = useApiCall(deleteSummary);
 
   function handleAddBook() {
@@ -575,17 +599,32 @@ export default function TorahSpacePage() {
             </button>
           )}
 
+          <SectionManager activeSectionId={activeSectionId} onSelect={setActiveSectionId} />
+
           <div className="flex flex-col gap-4">
-            {summaries.map((s, i) => (
+            {visibleSummaries.map((s, i) => (
               <SummaryCard
                 key={s.id}
                 summary={s}
                 delay={Math.min(i * 0.05, 0.5)}
                 onDelete={handleDeleteSummary}
                 onEdit={(id) => setEditorTarget(id)}
+                sections={summarySections}
+                onAssignSection={(id, sectionId) =>
+                  updateSummary(id, { sectionId: sectionId ?? undefined }).catch(() => {})
+                }
+                onMove={(id, delta) => reorderSummaryInSection(id, delta).catch(() => {})}
+                canMoveUp={!isFirst(orderableSiblings, s.id)}
+                canMoveDown={!isLast(orderableSiblings, s.id)}
               />
             ))}
-            {summaries.length === 0 && <p className="text-sm text-muted">אין עדיין סיכומים. כתוב את הראשון למעלה.</p>}
+            {visibleSummaries.length === 0 && (
+              <p className="text-sm text-muted">
+                {activeSectionId === null
+                  ? "אין עדיין סיכומים. כתוב את הראשון למעלה."
+                  : "אין סיכומים במדור הזה עדיין."}
+              </p>
+            )}
           </div>
         </div>
       )}

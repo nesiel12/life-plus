@@ -99,6 +99,15 @@ export interface Rabbi {
   notes?: string;
 }
 
+/** A user-defined top-level grouping for summaries (פרשת שבוע, דברי תורה, …). */
+export interface SummarySection {
+  id: string;
+  name: string;
+  /** A lucide icon name from the closed list the picker offers. */
+  icon?: string;
+  sortOrder: number;
+}
+
 export interface Summary {
   id: string;
   title: string;
@@ -113,6 +122,12 @@ export interface Summary {
   entityId?: string;
   /** Entities @mentioned in the body. */
   mentions?: { type: "book" | "rabbi" | "person" | "topic"; id: string; label: string }[];
+  /** The section this summary is filed under. Unassigned is valid. */
+  sectionId?: string;
+  /** Position within its section. */
+  sortOrder?: number;
+  /** Free-text labels the user typed. */
+  tags?: string[];
   date: string; // ISO date
 }
 

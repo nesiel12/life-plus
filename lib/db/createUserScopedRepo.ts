@@ -19,6 +19,7 @@ type UserScopedTableName =
   | "books"
   | "rabbis"
   | "summaries"
+  | "summary_sections"
   | "tasks"
   | "habits"
   | "habit_logs"
