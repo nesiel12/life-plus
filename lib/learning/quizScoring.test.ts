@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { isComplete, scoreLabel, scoreQuiz, seededRandom, shuffle, shuffleQuiz } from "@/lib/learning/quizScoring";
+import {
+  isComplete,
+  isSubmittable,
+  scoreLabel,
+  scoreQuiz,
+  seededRandom,
+  shuffle,
+  shuffleQuiz,
+} from "@/lib/learning/quizScoring";
 
 const q = (correctIndex: number) => ({ correctIndex });
 const THREE = [q(0), q(1), q(2)];
@@ -194,5 +202,92 @@ describe("shuffleQuiz", () => {
       expect(q.correctIndex).toBeGreaterThanOrEqual(0);
       expect(q.options[q.correctIndex]).toBe("same");
     }
+  });
+});
+
+// ── Flag / skip ───────────────────────────────────────────────────────────
+//
+// The flag exists so one unanswerable question cannot dead-end a course.
+
+describe("flagging", () => {
+  const questions = [{ correctIndex: 0 }, { correctIndex: 1 }, { correctIndex: 2 }];
+
+  describe("isSubmittable", () => {
+    it("is false when a question is neither answered nor flagged", () => {
+      expect(isSubmittable(questions, [0, null, null], [false, true, false])).toBe(false);
+    });
+
+    it("is true when every question is answered", () => {
+      expect(isSubmittable(questions, [0, 1, 2])).toBe(true);
+    });
+
+    it("is true when the gaps are all flagged", () => {
+      expect(isSubmittable(questions, [0, null, null], [false, true, true])).toBe(true);
+    });
+
+    it("is true when every question is flagged and none answered", () => {
+      expect(isSubmittable(questions, [null, null, null], [true, true, true])).toBe(true);
+    });
+
+    it("is false for an empty quiz", () => {
+      expect(isSubmittable([], [], [])).toBe(false);
+    });
+
+    it("treats a missing flags array as no flags", () => {
+      expect(isSubmittable(questions, [0, null, 2])).toBe(false);
+    });
+
+    // isComplete keeps its stricter meaning — it is not the submit gate.
+    it("is looser than isComplete", () => {
+      const answers = [0, null, 2];
+      const flags = [false, true, false];
+      expect(isComplete(questions, answers)).toBe(false);
+      expect(isSubmittable(questions, answers, flags)).toBe(true);
+    });
+  });
+
+  describe("scoreQuiz with flags", () => {
+    it("counts a flagged, unanswered question as skipped", () => {
+      const score = scoreQuiz(questions, [0, null, 2], [false, true, false]);
+      expect(score.skipped).toBe(1);
+      expect(score.answered).toBe(2);
+    });
+
+    // Flagging must not be a way to a perfect overall score.
+    it("still counts a skipped question against the overall percent", () => {
+      const score = scoreQuiz(questions, [0, null, 2], [false, true, false]);
+      expect(score.correct).toBe(2);
+      expect(score.percent).toBe(67);
+    });
+
+    it("reports a separate percentage over what was attempted", () => {
+      const score = scoreQuiz(questions, [0, null, 2], [false, true, false]);
+      expect(score.attemptedPercent).toBe(100);
+    });
+
+    it("grades an answered question even if it is also flagged", () => {
+      const score = scoreQuiz(questions, [0, 1, 2], [false, true, false]);
+      expect(score.answered).toBe(3);
+      expect(score.skipped).toBe(0);
+      expect(score.correct).toBe(3);
+    });
+
+    it("does not count an unanswered, unflagged question as skipped", () => {
+      const score = scoreQuiz(questions, [0, null, 2]);
+      expect(score.skipped).toBe(0);
+      expect(score.answered).toBe(2);
+    });
+
+    it("does not divide by zero when everything is flagged", () => {
+      const score = scoreQuiz(questions, [null, null, null], [true, true, true]);
+      expect(score.attemptedPercent).toBe(0);
+      expect(score.percent).toBe(0);
+      expect(score.skipped).toBe(3);
+    });
+
+    it("is unchanged when no flags are passed at all", () => {
+      const withOut = scoreQuiz(questions, [0, 1, 2]);
+      expect(withOut).toMatchObject({ correct: 3, percent: 100, skipped: 0, attemptedPercent: 100 });
+    });
   });
 });

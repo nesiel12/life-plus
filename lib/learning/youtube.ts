@@ -52,3 +52,17 @@ export function youtubeThumbnailUrl(videoId: string): string {
 export function youtubeWatchUrl(videoId: string): string {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
+
+/**
+ * A YouTube search for a suggested topic.
+ *
+ * The learning-path generator returns *search terms* for YouTube, not links
+ * — deliberately, because a model asked for real video URLs invents video
+ * ids that 404. Those rows therefore have no url and had no affordance at
+ * all: a suggestion the user could read and nothing else. Turning the term
+ * into a search is the honest way to make it actionable — it says "here is
+ * where to look", which is exactly what the model actually produced.
+ */
+export function youtubeSearchUrl(query: string): string {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+}

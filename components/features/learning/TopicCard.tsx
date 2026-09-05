@@ -10,6 +10,7 @@ import {
   Headphones,
   GraduationCap,
   Loader2,
+  Search,
   Sparkles,
   SquarePlay,
   Trash2,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { ResourceLauncher } from "@/components/features/learning/ResourceLauncher";
+import { youtubeSearchUrl } from "@/lib/learning/youtube";
 import { useApiCall } from "@/hooks/useApiCall";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { cn } from "@/lib/utils";
@@ -207,7 +209,25 @@ export function TopicCard({ topic, resources, expanded, onToggleExpanded, onStud
                     {resource.notes && (
                       <p className="mt-0.5 whitespace-pre-line text-xs text-muted">{resource.notes}</p>
                     )}
-                    {resource.url && <ResourceLauncher url={resource.url} title={resource.title} />}
+                    {resource.url ? (
+                      <ResourceLauncher url={resource.url} title={resource.title} />
+                    ) : (
+                      resource.type === "youtube" && (
+                        // A generated YouTube row is a search term, not a
+                        // link. Without this it was a dead line of text —
+                        // the one resource type the hub is built around,
+                        // and the only one you could not act on.
+                        <a
+                          href={youtubeSearchUrl(resource.title)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="focus-ring mt-1 inline-flex items-center gap-1.5 rounded-lg border border-hairline-card px-2 py-1 text-xs text-foreground transition-colors hover:bg-fill-subtle"
+                        >
+                          <Search size={11} className="text-accent-learning" aria-hidden />
+                          חפש ב-YouTube
+                        </a>
+                      )
+                    )}
                   </div>
                   <button
                     onClick={() => removeResource(resource.id).catch(() => {})}

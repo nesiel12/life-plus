@@ -10,37 +10,73 @@ export interface ScorableQuestion {
 /** answers[i] is the option index chosen for question i; null = unanswered. */
 export type QuizAnswers = (number | null)[];
 
+/**
+ * flagged[i] marks question i as deliberately set aside.
+ *
+ * A flag is not a wrong answer and not an unanswered one — it is "I do not
+ * know this yet, let me move on". The distinction matters because the whole
+ * point of the flag is to stop a single hard question from blocking the rest
+ * of the course, and folding it into "wrong" would quietly punish the
+ * learner for using it.
+ */
+export type QuizFlags = boolean[];
+
 export interface QuizScore {
   correct: number;
   total: number;
-  /** 0-100, rounded. */
+  /** 0-100 of the whole quiz, rounded. Flagged questions count against it. */
   percent: number;
   answered: number;
+  /** Questions set aside rather than answered. */
+  skipped: number;
   allAnswered: boolean;
+  /**
+   * 0-100 over the questions actually attempted.
+   *
+   * Reported alongside `percent` rather than instead of it: "8/8 of what you
+   * answered" is the honest encouragement, and "8/12 overall" is the honest
+   * assessment. Showing only the first would let someone flag their way to a
+   * perfect score.
+   */
+  attemptedPercent: number;
   /** Hebrew band label for the result. */
   label: string;
 }
 
-export function scoreQuiz(questions: ScorableQuestion[], answers: QuizAnswers): QuizScore {
+export function scoreQuiz(
+  questions: ScorableQuestion[],
+  answers: QuizAnswers,
+  flagged: QuizFlags = []
+): QuizScore {
   const total = questions.length;
   let correct = 0;
   let answered = 0;
+  let skipped = 0;
 
   for (let i = 0; i < total; i++) {
     const choice = answers[i];
-    if (choice === null || choice === undefined) continue;
+    if (choice === null || choice === undefined) {
+      // Only an *unanswered* question can be skipped. Someone who answered
+      // and then flagged has still attempted it, and their answer is graded.
+      if (flagged[i]) skipped++;
+      continue;
+    }
     answered++;
     if (choice === questions[i].correctIndex) correct++;
   }
 
-  // Guard the divide: a module with no quiz shouldn't produce NaN.
+  // Guard both divides: a module with no quiz, or one entirely flagged,
+  // must not produce NaN.
   const percent = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const attemptedPercent = answered > 0 ? Math.round((correct / answered) * 100) : 0;
 
   return {
     correct,
     total,
     percent,
     answered,
+    skipped,
+    attemptedPercent,
     allAnswered: total > 0 && answered === total,
     label: scoreLabel(percent),
   };
@@ -58,9 +94,27 @@ export function scoreLabel(percent: number): string {
   return "כדאי לחזור על החומר";
 }
 
-/** True once every question has a selection — gates the "submit" affordance. */
+/** True once every question has a selection. */
 export function isComplete(questions: ScorableQuestion[], answers: QuizAnswers): boolean {
   return questions.length > 0 && questions.every((_, i) => answers[i] !== null && answers[i] !== undefined);
+}
+
+/**
+ * True once every question is either answered or deliberately flagged.
+ *
+ * This, not isComplete, gates submission. Requiring every question to be
+ * answered is what made one unanswerable question a dead end for the whole
+ * course — the learner could neither finish the quiz nor get past it.
+ */
+export function isSubmittable(
+  questions: ScorableQuestion[],
+  answers: QuizAnswers,
+  flagged: QuizFlags = []
+): boolean {
+  return (
+    questions.length > 0 &&
+    questions.every((_, i) => (answers[i] !== null && answers[i] !== undefined) || Boolean(flagged[i]))
+  );
 }
 
 // ── Randomisation ─────────────────────────────────────────────────────────

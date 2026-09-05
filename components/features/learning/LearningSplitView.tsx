@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { BookOpen, CheckCircle2, Loader2, Send, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Send, Sparkles } from "lucide-react";
 import { CourseQuiz } from "@/components/features/learning/CourseQuiz";
-import { InlineVideoPlayer } from "@/components/features/learning/InlineVideoPlayer";
+import { TheaterVideo } from "@/components/features/learning/TheaterVideo";
 import { youtubeVideoId } from "@/lib/learning/youtube";
+import {
+  buildStages,
+  clampStage,
+  stageLabel,
+  stageProgress,
+} from "@/lib/learning/courseStages";
+import { cn } from "@/lib/utils";
 import type { CourseModule } from "@/lib/ai/courseModule";
 
 interface LearningSplitViewProps {
@@ -40,6 +47,17 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
   const [asking, setAsking] = useState(false);
 
   const videoId = videoUrl ? youtubeVideoId(videoUrl) : null;
+
+  // Where the learner is in the course. Progression used to be a set of
+  // checkboxes sitting beside the material; it is now the act of moving
+  // through it, which is what "next" and "back" are for.
+  const [stageIndex, setStageIndex] = useState(0);
+  const stages = useMemo(() => (module ? buildStages(module) : []), [module]);
+  const current = stages.length > 0 ? stages[clampStage(stageIndex, stages.length)] : null;
+  const isFirst = stageIndex <= 0;
+  const isLast = stageIndex >= stages.length - 1;
+
+  const goTo = (index: number) => setStageIndex(clampStage(index, stages.length));
 
   async function loadModule() {
     setLoading(true);
@@ -131,7 +149,7 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
           aria-label="חומר הלימוד"
           className="flex max-h-[70vh] min-w-0 flex-col gap-4 overflow-y-auto rounded-2xl border border-hairline-card bg-surface p-5"
         >
-          {videoId && <InlineVideoPlayer videoId={videoId} title={topicTitle} />}
+          {videoId && <TheaterVideo videoId={videoId} title={topicTitle} />}
 
           {!module && !loading && (
             <div className="flex flex-col items-start gap-3">
@@ -157,39 +175,108 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
 
           {error && <p className="text-xs text-accent-family">{error}</p>}
 
-          {module && (
-            <article className="flex flex-col gap-5">
-              <header className="flex flex-col gap-2">
-                <h2 className="text-lg font-medium text-foreground">{module.title}</h2>
-                <p className="text-sm leading-relaxed text-foreground/80">{module.intro}</p>
-              </header>
-
-              {module.sections.map((section, i) => (
-                <section key={`${section.heading}-${i}`} className="flex flex-col gap-2">
-                  <h3 className="text-sm font-medium text-gold-ink">{section.heading}</h3>
-                  {/* Preserves the paragraph breaks the model produced —
-                      rendering long-form text as one block would undo the
-                      structure that makes it readable. */}
-                  <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/80">{section.body}</p>
-                </section>
-              ))}
-
-              <section className="flex flex-col gap-2 rounded-xl border border-hairline-card bg-surface-sunken/60 p-4">
-                <h3 className="text-sm font-medium text-foreground">נקודות מפתח</h3>
-                <ul className="flex list-disc flex-col gap-1.5 pe-4 text-sm leading-relaxed text-foreground/80">
-                  {module.keyTakeaways.map((point, i) => (
-                    <li key={`${point}-${i}`}>{point}</li>
+          {module && current && (
+            <article className="flex min-h-0 flex-1 flex-col gap-4">
+              {/* Progress rail. Stage names rather than "3 / 5": the learner
+                  can see what is behind and ahead, and jump, instead of
+                  being told only how far along a number they are. */}
+              <nav aria-label="שלבי הקורס" className="flex flex-col gap-2">
+                <div className="h-0.5 w-full overflow-hidden rounded-full bg-fill-subtle">
+                  <div
+                    className="h-full rounded-full bg-[var(--gold)] transition-[width] duration-300"
+                    style={{ width: `${stageProgress(stageIndex, stages.length) * 100}%` }}
+                  />
+                </div>
+                <ol className="flex flex-wrap gap-1.5">
+                  {stages.map((stage, i) => (
+                    <li key={`${stage.kind}-${i}`}>
+                      <button
+                        onClick={() => goTo(i)}
+                        aria-current={i === stageIndex ? "step" : undefined}
+                        className={cn(
+                          "focus-ring max-w-[10rem] truncate rounded-full px-2.5 py-1 text-[0.7rem] transition-colors",
+                          i === stageIndex
+                            ? "bg-gold-soft font-medium text-gold-ink"
+                            : i < stageIndex
+                              ? "text-muted hover:text-foreground"
+                              : "text-muted/70 hover:text-foreground"
+                        )}
+                      >
+                        {stageLabel(stage)}
+                      </button>
+                    </li>
                   ))}
-                </ul>
-              </section>
+                </ol>
+              </nav>
 
-              <CourseQuiz
-                questions={module.quiz}
-                onComplete={(percent) => {
-                  setCompleted(true);
-                  onQuizComplete?.(percent);
-                }}
-              />
+              <div className="min-h-0 flex-1">
+                {current.kind === "intro" && (
+                  <section className="flex flex-col gap-3">
+                    <h2 className="text-lg font-medium text-foreground">{current.title}</h2>
+                    <p className="course-prose">{current.body}</p>
+                  </section>
+                )}
+
+                {current.kind === "section" && (
+                  <section className="flex flex-col gap-3">
+                    <h3 className="text-base font-medium text-gold-ink">{current.heading}</h3>
+                    {/* Preserves the paragraph breaks the model produced —
+                        rendering long-form text as one block would undo the
+                        structure that makes it readable. */}
+                    <p className="course-prose">{current.body}</p>
+                  </section>
+                )}
+
+                {current.kind === "takeaways" && (
+                  <section className="flex flex-col gap-3 rounded-xl border border-hairline-card bg-surface-sunken/60 p-4">
+                    <h3 className="text-base font-medium text-foreground">נקודות מפתח</h3>
+                    <ul className="flex list-disc flex-col gap-2 pe-4 text-[0.95rem] leading-[1.85] text-foreground/85">
+                      {current.items.map((point, i) => (
+                        <li key={`${point}-${i}`}>{point}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {current.kind === "quiz" && (
+                  <CourseQuiz
+                    questions={current.questions}
+                    onComplete={(percent) => {
+                      setCompleted(true);
+                      onQuizComplete?.(percent);
+                    }}
+                    // The quiz is the last stage, so "past it" is the end of
+                    // the course rather than another screen.
+                    onSkip={() => setCompleted(true)}
+                  />
+                )}
+              </div>
+
+              {/* ChevronRight is "back" and ChevronLeft is "forward": the app
+                  is RTL, so forward runs leftward. */}
+              <div className="flex items-center justify-between gap-3 border-t border-hairline-card pt-3">
+                <button
+                  onClick={() => goTo(stageIndex - 1)}
+                  disabled={isFirst}
+                  className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground disabled:opacity-40"
+                >
+                  <ChevronRight size={14} aria-hidden />
+                  חזור
+                </button>
+
+                <span className="ltr text-[0.7rem] tabular-nums text-muted">
+                  {stageIndex + 1} / {stages.length}
+                </span>
+
+                <button
+                  onClick={() => goTo(stageIndex + 1)}
+                  disabled={isLast}
+                  className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground disabled:opacity-40"
+                >
+                  הבא
+                  <ChevronLeft size={14} aria-hidden />
+                </button>
+              </div>
             </article>
           )}
         </section>

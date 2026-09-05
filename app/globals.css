@@ -191,6 +191,22 @@ body::before {
     background: var(--surface);
   }
 }
+/* Long-form course text.
+   The model is prompted for flowing prose with real paragraphs and no bullet
+   lists, so the only structure in the string is the blank line — which makes
+   line height, measure and paragraph rhythm the whole of the typography.
+   A measure cap matters more here than anywhere else in the app: the study
+   view is a half-width column on a wide screen, and 120-character lines of
+   Hebrew are genuinely hard to track back from. */
+.course-prose {
+  white-space: pre-line;
+  max-inline-size: 68ch;
+  font-size: 0.95rem;
+  line-height: 1.9;
+  color: color-mix(in srgb, var(--foreground) 88%, transparent);
+  text-wrap: pretty;
+}
+
 /* ── cir-tabs: the calendar's Day / Week / Month / Year range selector ──
    A radio group wearing a segmented control. The radios stay in the DOM and
    stay focusable — only visually replaced — so keyboard arrow-key navigation
