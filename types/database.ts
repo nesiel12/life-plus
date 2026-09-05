@@ -493,6 +493,31 @@ export interface Database {
           notes?: string | null;
         }
       >;
+      check_ins: TableDef<
+        {
+          id: string;
+          user_id: string;
+          occurred_at: string;
+          activity: string;
+          energy: number;
+          note: string | null;
+          created_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          occurred_at?: string;
+          activity: string;
+          energy: number;
+          note?: string | null;
+        },
+        {
+          occurred_at?: string;
+          activity?: string;
+          energy?: number;
+          note?: string | null;
+        }
+      >;
       summary_sections: TableDef<
         {
           id: string;

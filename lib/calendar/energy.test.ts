@@ -83,3 +83,59 @@ describe("energyForHour", () => {
     expect(energyForHour(9, {})).toBe("neutral");
   });
 });
+
+// ── Observed energy ───────────────────────────────────────────────────────
+//
+// What the check-ins actually show, versus what the user predicted about
+// themselves during onboarding.
+
+describe("observed energy overrides the declared chronotype", () => {
+  const chronotype = {
+    wakeTime: "06:00",
+    sleepTime: "23:00",
+    peakFocusHours: ["morning" as const],
+    lowEnergyHours: ["afternoon" as const],
+  };
+
+  it("marks an observed peak hour as peak", () => {
+    expect(energyForHour(15, chronotype, { peakHours: [15], lowHours: [] })).toBe("peak");
+  });
+
+  it("marks an observed low hour as low", () => {
+    expect(energyForHour(9, chronotype, { peakHours: [], lowHours: [9] })).toBe("low");
+  });
+
+  // The chronotype says afternoons (12-16) are low; the check-ins say 15:00
+  // is a peak. The observation is the one that actually happened — and the
+  // rest of the afternoon still follows the declaration.
+  it("beats a contradicting chronotype day part, hour by hour", () => {
+    const observed = { peakHours: [15], lowHours: [] };
+    expect(energyForHour(15, chronotype, observed)).toBe("peak");
+    expect(energyForHour(14, chronotype, observed)).toBe("low");
+  });
+
+  // Hour-precise, where the chronotype is a five-bucket day part.
+  it("can single out one hour inside a declared day part", () => {
+    const observed = { peakHours: [], lowHours: [10] };
+    expect(energyForHour(10, chronotype, observed)).toBe("low");
+    expect(energyForHour(9, chronotype, observed)).toBe("peak");
+  });
+
+  // A peak logged at 02:00 by someone who had a late night is not a slot.
+  it("never overrides sleep", () => {
+    expect(energyForHour(2, chronotype, { peakHours: [2], lowHours: [] })).toBe("asleep");
+  });
+
+  it("falls back to the chronotype when the hour was not observed", () => {
+    expect(energyForHour(9, chronotype, { peakHours: [15], lowHours: [] })).toBe("peak");
+  });
+
+  it("behaves exactly as before when nothing was observed", () => {
+    expect(energyForHour(15, chronotype, { peakHours: [], lowHours: [] })).toBe("low");
+    expect(energyForHour(15, chronotype)).toBe("low");
+  });
+
+  it("prefers peak when an hour is somehow in both lists", () => {
+    expect(energyForHour(12, chronotype, { peakHours: [12], lowHours: [12] })).toBe("peak");
+  });
+});

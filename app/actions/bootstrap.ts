@@ -16,6 +16,7 @@ import { booksRepo } from "@/lib/db/books";
 import { rabbisRepo } from "@/lib/db/rabbis";
 import { summariesRepo } from "@/lib/db/summaries";
 import { summarySectionsRepo } from "@/lib/db/summarySections";
+import { checkInsRepo } from "@/lib/db/checkIns";
 import { tasksRepo } from "@/lib/db/tasks";
 import { habitsRepo, habitLogsRepo } from "@/lib/db/habits";
 import { transactionsRepo } from "@/lib/db/transactions";
@@ -47,6 +48,7 @@ import {
   toLearningResource,
   toMeal,
   toWorkout,
+  toCheckIn,
 } from "@/lib/mappers";
 
 // The one Server Action every page hydrates from on load — replaces the
@@ -79,6 +81,7 @@ export async function getInitialState() {
     learningResourceRows,
     mealRows,
     workoutRows,
+    checkInRows,
   ] = await Promise.all([
     lifeAreaScoresRepo.list(userId),
     peopleRepo.list(userId),
@@ -103,6 +106,7 @@ export async function getInitialState() {
     learningResourcesRepo.list(userId),
     mealsRepo.list(userId),
     workoutsRepo.list(userId),
+    checkInsRepo.list(userId),
   ]);
 
   // Self-learning loop trigger, v1 (docs/ATLAS_ARCHITECTURE_VISION.md §3):
@@ -143,5 +147,9 @@ export async function getInitialState() {
     learningResources: learningResourceRows.map(toLearningResource),
     meals: mealRows.map(toMeal),
     workouts: workoutRows.map(toWorkout),
+    // Bounded here rather than in the repo: the profile learns the
+    // *current* routine, and a year of history would drag every
+    // average toward a life the user no longer lives.
+    checkIns: checkInRows.slice(0, 200).map(toCheckIn),
   };
 }

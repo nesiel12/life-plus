@@ -21,6 +21,7 @@ import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/acti
 import { addBookAction, updateBookAction, deleteBookAction } from "@/app/actions/books";
 import { addRabbiAction, updateRabbiAction, deleteRabbiAction } from "@/app/actions/rabbis";
 import { addSummaryAction, deleteSummaryAction, updateSummaryAction } from "@/app/actions/summaries";
+import { addCheckInAction, listCheckInsAction } from "@/app/actions/checkIns";
 import {
   addSummarySectionAction,
   deleteSummarySectionAction,
@@ -87,6 +88,7 @@ import type {
   Rabbi,
   Summary,
   SummarySection,
+  CheckIn,
   SuggestedAction,
   Task,
   Transaction,
@@ -114,6 +116,7 @@ export interface HydratedState {
   rabbis: Rabbi[];
   summaries: Summary[];
   summarySections: SummarySection[];
+  checkIns: CheckIn[];
   tasks: Task[];
   habits: Habit[];
   habitLogs: HabitLog[];
@@ -187,6 +190,8 @@ interface AtlasState extends HydratedState {
   updateSummary: (summaryId: string, patch: Partial<Summary>) => Promise<void>;
   loadSummarySections: () => Promise<void>;
   addSummarySection: (input: { name: string; icon?: string; parentId?: string }) => Promise<void>;
+  loadCheckIns: () => Promise<void>;
+  addCheckIn: (input: { activity: CheckIn["activity"]; energy: number; note?: string }) => Promise<void>;
   updateSummarySection: (sectionId: string, patch: Partial<SummarySection>) => Promise<void>;
   deleteSummarySection: (sectionId: string) => Promise<void>;
   reorderSummarySections: (sectionId: string, delta: number) => Promise<void>;
@@ -300,6 +305,7 @@ const EMPTY_STATE: HydratedState = {
   rabbis: [],
   summaries: [],
   summarySections: [],
+  checkIns: [],
   tasks: [],
   habits: [],
   habitLogs: [],
@@ -497,6 +503,35 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
       set((state) => ({ summaries: state.summaries.map((s) => (s.id === summaryId ? updated : s)) }));
     } catch (err) {
       set({ summaries: previous });
+      throw err;
+    }
+  },
+
+  loadCheckIns: async () => {
+    set({ checkIns: await listCheckInsAction() });
+  },
+
+  // Optimistic, like every other tick-sized write here: the check-in widget
+  // is answered in two taps and then dismissed, and waiting on a round trip
+  // to acknowledge that is the whole feeling this directive set out to
+  // remove. The temporary id is replaced by the server's row on success.
+  addCheckIn: async (input) => {
+    const previous = get().checkIns;
+    const optimistic: CheckIn = {
+      id: `optimistic-${input.activity}-${Date.now()}`,
+      occurredAt: new Date().toISOString(),
+      activity: input.activity,
+      energy: input.energy,
+      note: input.note,
+    };
+    set((state) => ({ checkIns: [optimistic, ...state.checkIns] }));
+    try {
+      const created = await addCheckInAction(input);
+      set((state) => ({
+        checkIns: state.checkIns.map((c) => (c.id === optimistic.id ? created : c)),
+      }));
+    } catch (err) {
+      set({ checkIns: previous });
       throw err;
     }
   },

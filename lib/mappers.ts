@@ -32,6 +32,7 @@ import type {
   UpcomingEvent,
   UserContext,
   Workout,
+  CheckIn,
 } from "@/types";
 import type { GoalWithMilestones } from "@/lib/db/goals";
 
@@ -52,6 +53,7 @@ type RabbiRow = Database["public"]["Tables"]["rabbis"]["Row"];
 type RabbiUpdate = Database["public"]["Tables"]["rabbis"]["Update"];
 type SummaryRow = Database["public"]["Tables"]["summaries"]["Row"];
 type SummarySectionRow = Database["public"]["Tables"]["summary_sections"]["Row"];
+type CheckInRow = Database["public"]["Tables"]["check_ins"]["Row"];
 type SummarySectionUpdate = Database["public"]["Tables"]["summary_sections"]["Update"];
 type SummaryUpdate = Database["public"]["Tables"]["summaries"]["Update"];
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
@@ -550,4 +552,16 @@ export function toSummarySectionPatch(patch: Partial<SummarySection>): SummarySe
   if (patch.parentId !== undefined) row.parent_id = patch.parentId ?? null;
   if (patch.pinnedAt !== undefined) row.pinned_at = patch.pinnedAt ?? null;
   return row;
+}
+
+export function toCheckIn(row: CheckInRow): CheckIn {
+  return {
+    id: row.id,
+    occurredAt: row.occurred_at,
+    // The column is CHECK-constrained to this union, but the row type is
+    // `string` — the cast is the one place those two facts meet.
+    activity: row.activity as CheckIn["activity"],
+    energy: row.energy,
+    note: row.note ?? undefined,
+  };
 }

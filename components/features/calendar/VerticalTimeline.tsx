@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Moon, Sparkles, TrendingDown } from "lucide-react";
-import { energyForHour, type HourEnergy } from "@/lib/calendar/energy";
+import { energyForHour, type HourEnergy, type ObservedEnergy } from "@/lib/calendar/energy";
 import { cn } from "@/lib/utils";
 import type { ChronotypeSettings } from "@/types";
 
@@ -19,6 +19,9 @@ interface VerticalTimelineProps {
   day: Date;
   events: TimelineEvent[];
   chronotype: ChronotypeSettings;
+  /** What the user's check-ins actually show. Overrides the declared
+   *  chronotype for hours it has enough evidence about. */
+  observedEnergy?: ObservedEnergy;
   /** Draws the "now" marker. Omit for days other than today. */
   now?: Date;
   /** Hours to render, inclusive start, exclusive end. */
@@ -57,6 +60,7 @@ export function VerticalTimeline({
   day,
   events,
   chronotype,
+  observedEnergy,
   now,
   fromHour = 6,
   toHour = 24,
@@ -112,9 +116,10 @@ export function VerticalTimeline({
       <div className="relative" style={{ height: `${hours.length * ROW_HEIGHT_REM}rem` }}>
         {/* Hour rows: the energy banding lives here, behind the events. */}
         {hours.map((hour, i) => {
-          const energy = energyForHour(hour, chronotype);
+          const energy = energyForHour(hour, chronotype, observedEnergy);
           const style = ENERGY_STYLE[energy];
-          const isBandStart = i === 0 || energyForHour(hours[i - 1], chronotype) !== energy;
+          const isBandStart =
+            i === 0 || energyForHour(hours[i - 1], chronotype, observedEnergy) !== energy;
           return (
             <div
               key={hour}

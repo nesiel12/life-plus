@@ -116,6 +116,55 @@ export type EntityType = "book" | "rabbi" | "person" | "topic" | "section";
 /** The subset the `entity_type` column accepts. */
 export type FiledEntityType = Exclude<EntityType, "section">;
 
+/**
+ * A periodic check-in: what the user was doing, and how they felt.
+ *
+ * A closed activity list rather than free text — the value of a check-in is
+ * entirely in the aggregate, and "gym"/"workout"/"training" is one activity
+ * to a person and three to a tally.
+ */
+export type CheckInActivity =
+  | "work"
+  | "study"
+  | "training"
+  | "family"
+  | "friends"
+  | "rest"
+  | "errands"
+  | "other";
+
+export interface CheckIn {
+  id: string;
+  /** When the activity happened, not when it was reported. */
+  occurredAt: string;
+  activity: CheckInActivity;
+  /** 1-5. */
+  energy: number;
+  note?: string;
+}
+
+export const CHECK_IN_ACTIVITIES: CheckInActivity[] = [
+  "work",
+  "study",
+  "training",
+  "family",
+  "friends",
+  "rest",
+  "errands",
+  "other",
+];
+
+export const CHECK_IN_ACTIVITY_LABELS: Record<CheckInActivity, string> = {
+  work: "עבודה",
+  study: "לימודים",
+  training: "אימון",
+  family: "משפחה",
+  friends: "חברים",
+  rest: "מנוחה",
+  errands: "סידורים",
+  other: "אחר",
+};
+
 export interface SummarySection {
   id: string;
   name: string;

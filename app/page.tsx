@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
-import { CalendarHeart, ArrowLeft } from "lucide-react";
+import { CalendarHeart, ArrowLeft, Check, LayoutGrid, RotateCcw } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { AIBriefing } from "@/components/features/AIBriefing";
 import { EnergyLevelBadge } from "@/components/features/EnergyLevelBadge";
@@ -18,6 +18,8 @@ import { IntentionComposer } from "@/components/features/dashboard/IntentionComp
 import { TodayTimelineCard } from "@/components/features/dashboard/TodayTimelineCard";
 import { FinanceAlertCard } from "@/components/features/dashboard/FinanceAlertCard";
 import { NextCourseCard } from "@/components/features/dashboard/NextCourseCard";
+import { DailyCheckIn } from "@/components/features/dashboard/DailyCheckIn";
+import { WidgetFrame } from "@/components/features/dashboard/WidgetFrame";
 import { BentoGrid, BentoCard } from "@/components/magicui/bento-grid";
 import { RetroGrid } from "@/components/magicui/retro-grid";
 import { LightRays } from "@/components/magicui/light-rays";
@@ -26,6 +28,9 @@ import { KineticText } from "@/components/magicui/kinetic-text";
 import { Logo } from "@/components/ui/Logo";
 import { daysUntil } from "@/lib/utils";
 import { greetingForHour } from "@/lib/greeting";
+import { useDashboardLayout } from "@/hooks/useDashboardLayout";
+import { hiddenWidgets, isCustomised, spanOf, visibleWidgets } from "@/lib/dashboard/layout";
+import type { ReactNode } from "react";
 
 const MAX_UPCOMING_ON_DASHBOARD = 3;
 
@@ -36,6 +41,9 @@ export default function Home() {
   const user = useAtlasStore((s) => s.user);
   const goals = useAtlasStore((s) => s.goals);
   const upcomingEvents = useAtlasStore((s) => s.upcomingEvents);
+
+  const { layout, move, moveTo, hide, restore, resize, reset } = useDashboardLayout();
+  const [editing, setEditing] = useState(false);
 
   // Real time-of-day, computed after mount from the user's own browser clock.
   const [greeting, setGreeting] = useState<string | null>(null);
@@ -181,83 +189,140 @@ export default function Home() {
 
       {/* ─── Bento dashboard ──────────────────────────────────────────────── */}
       <div className="mx-auto max-w-6xl px-6 pb-16 sm:px-10 lg:px-16">
-        <BentoGrid>
-          {/* The Decision Stream leads the grid on purpose (LifeOS Pillar 3):
-              if the dashboard is meant to have zero cognitive overload, the
-              at-most-three things actually needing a decision have to be the
-              first thing read, above the briefing and the timeline. */}
-          <BentoCard>
-            <DecisionStream />
-          </BentoCard>
+        {/* Widget bodies, keyed by registry id. The grid below renders
+            whichever of these the user's layout asks for, in their order —
+            the arrangement lives in data, not in this JSX. */}
+        {(() => {
+          const CONTENT: Record<string, { node: ReactNode; tilt?: boolean; href?: string; cta?: string }> = {
+            // The Decision Stream leads the default order on purpose (LifeOS
+            // Pillar 3): if the dashboard is meant to have zero cognitive
+            // overload, the at-most-three things actually needing a decision
+            // have to be the first thing read.
+            "decision-stream": { node: <DecisionStream /> },
+            "daily-checkin": { node: <DailyCheckIn />, tilt: false },
+            "ai-briefing": { node: <AIBriefing bare /> },
+            "today-timeline": { node: <TodayTimelineCard /> },
+            intention: { node: <IntentionComposer />, tilt: false },
+            "upcoming-moments": {
+              href: "/calendar",
+              cta: "ליומן החכם",
+              node: (
+                <>
+                  <p className="mb-5 flex items-center gap-2 text-sm font-medium text-muted">
+                    <CalendarHeart size={16} className="text-accent-family" aria-hidden />
+                    רגעים משמעותיים בקרוב
+                  </p>
+                  {upcomingEvents.length === 0 ? (
+                    <p className="text-xs text-muted">אין כרגע רגעים מתוזמנים.</p>
+                  ) : (
+                    <ul className="flex flex-col gap-3">
+                      {upcomingEvents.slice(0, MAX_UPCOMING_ON_DASHBOARD).map((event) => {
+                        const diff = daysUntil(event.date);
+                        const label =
+                          diff === 0 ? "היום" : diff === 1 ? "מחר" : diff > 1 ? `בעוד ${diff} ימים` : "עבר";
+                        return (
+                          <li
+                            key={event.id}
+                            className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-hairline-card bg-surface-sunken/60 px-3.5 py-2.5 text-sm"
+                          >
+                            <span className="flex min-w-0 items-center gap-2 text-foreground/90">
+                              <CalendarHeart size={15} className="shrink-0 text-accent-family" aria-hidden />
+                              <span className="truncate">{event.title}</span>
+                              <span className="shrink-0 text-xs text-muted">
+                                · {categoryLabel(event.category)}
+                              </span>
+                            </span>
+                            <span className="ltr shrink-0 whitespace-nowrap text-xs text-muted">{label}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </>
+              ),
+            },
+            "recent-activity": { node: <RecentActivityCard /> },
+            "finance-alert": { node: <FinanceAlertCard /> },
+            // Dense form panels — tilt is off so embedded players and inputs
+            // stay crisp.
+            "next-course": { node: <NextCourseCard />, tilt: false },
+            memories: { node: <MemoryCards />, tilt: false },
+            goals: { node: <GoalsPanel bare />, tilt: false },
+          };
 
-          <BentoCard className="sm:col-span-2">
-            <AIBriefing bare />
-          </BentoCard>
+          const visible = visibleWidgets(layout);
+          const hiddenList = hiddenWidgets(layout);
 
-          <BentoCard>
-            <TodayTimelineCard />
-          </BentoCard>
+          return (
+            <>
+              <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+                {editing && isCustomised(layout) && (
+                  <button
+                    onClick={reset}
+                    className="focus-ring flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground"
+                  >
+                    <RotateCcw size={12} aria-hidden />
+                    אפס סידור
+                  </button>
+                )}
+                <button
+                  onClick={() => setEditing((v) => !v)}
+                  aria-pressed={editing}
+                  className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-foreground"
+                >
+                  {editing ? <Check size={13} aria-hidden /> : <LayoutGrid size={13} aria-hidden />}
+                  {editing ? "סיום עריכה" : "ערוך מסך"}
+                </button>
+              </div>
 
-          <BentoCard tilt={false}>
-            <IntentionComposer />
-          </BentoCard>
-
-          <BentoCard className="sm:col-span-2" href="/calendar" cta="ליומן החכם">
-            <p className="mb-5 flex items-center gap-2 text-sm font-medium text-muted">
-              <CalendarHeart size={16} className="text-accent-family" aria-hidden />
-              רגעים משמעותיים בקרוב
-            </p>
-            {upcomingEvents.length === 0 ? (
-              <p className="text-xs text-muted">אין כרגע רגעים מתוזמנים.</p>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {upcomingEvents.slice(0, MAX_UPCOMING_ON_DASHBOARD).map((event) => {
-                  const diff = daysUntil(event.date);
-                  const label =
-                    diff === 0 ? "היום" : diff === 1 ? "מחר" : diff > 1 ? `בעוד ${diff} ימים` : "עבר";
+              <BentoGrid>
+                {visible.map((widget, index) => {
+                  const entry = CONTENT[widget.id];
+                  // A registry entry with no body would render an empty card.
+                  // Skipping is the honest response to a mismatch this file
+                  // and lib/dashboard/layout.ts are supposed to keep in step.
+                  if (!entry) return null;
                   return (
-                    <li
-                      key={event.id}
-                      className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-hairline-card bg-surface-sunken/60 px-3.5 py-2.5 text-sm"
+                    <WidgetFrame
+                      key={widget.id}
+                      widget={widget}
+                      span={spanOf(layout, widget.id)}
+                      editing={editing}
+                      isFirst={index === 0}
+                      isLast={index === visible.length - 1}
+                      onMove={(delta) => move(widget.id, delta)}
+                      onDropOn={(draggedId) => moveTo(draggedId, widget.id)}
+                      onHide={() => hide(widget.id)}
+                      onResize={() => resize(widget.id)}
                     >
-                      <span className="flex min-w-0 items-center gap-2 text-foreground/90">
-                        <CalendarHeart size={15} className="shrink-0 text-accent-family" aria-hidden />
-                        <span className="truncate">{event.title}</span>
-                        <span className="shrink-0 text-xs text-muted">
-                          · {categoryLabel(event.category)}
-                        </span>
-                      </span>
-                      <span className="ltr shrink-0 whitespace-nowrap text-xs text-muted">{label}</span>
-                    </li>
+                      <BentoCard tilt={entry.tilt} href={entry.href} cta={entry.cta}>
+                        {entry.node}
+                      </BentoCard>
+                    </WidgetFrame>
                   );
                 })}
-              </ul>
-            )}
-          </BentoCard>
+              </BentoGrid>
 
-          <BentoCard>
-            <RecentActivityCard />
-          </BentoCard>
-
-          <BentoCard>
-            <FinanceAlertCard />
-          </BentoCard>
-
-          {/* A dense form panel (video controls) — tilt is off so the
-              embedded player stays crisp. */}
-          <BentoCard tilt={false}>
-            <NextCourseCard />
-          </BentoCard>
-
-          {/* A dense form panel — tilt is off here so inputs stay crisp. */}
-          <BentoCard className="sm:col-span-2 lg:col-span-3" tilt={false}>
-            <MemoryCards />
-          </BentoCard>
-
-          <BentoCard className="sm:col-span-2 lg:col-span-3" tilt={false}>
-            <GoalsPanel bare />
-          </BentoCard>
-        </BentoGrid>
+              {/* Hidden widgets stay reachable. "Delete" on a dashboard the
+                  app itself ships has to mean "put away", not "destroy" —
+                  there would be nothing to restore from. */}
+              {editing && hiddenList.length > 0 && (
+                <div className="mt-5 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-hairline-card p-3">
+                  <span className="text-xs text-muted">מוסתרים:</span>
+                  {hiddenList.map((widget) => (
+                    <button
+                      key={widget.id}
+                      onClick={() => restore(widget.id)}
+                      className="glass-control-hover focus-ring rounded-lg px-2.5 py-1 text-xs text-muted transition-colors hover:text-foreground"
+                    >
+                      + {widget.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         <motion.p
           initial={{ opacity: 0 }}

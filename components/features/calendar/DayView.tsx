@@ -3,7 +3,9 @@
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { VerticalTimeline, type TimelineEvent } from "@/components/features/calendar/VerticalTimeline";
+import { useAtlasStore } from "@/store/useAtlasStore";
 import { useInsights } from "@/hooks/useInsights";
+import { buildCheckInProfile } from "@/lib/checkins/analyze";
 import { isSameDay, rangeBounds } from "@/lib/calendar/ranges";
 import type { WindowEvent } from "@/lib/googleCalendar/fetchWindow";
 import type { ChronotypeSettings } from "@/types";
@@ -30,6 +32,19 @@ const FALLBACK: RangeResponse = { connected: false, events: [] };
 // be honest about days outside that window.
 export function DayView({ anchor, chronotype }: DayViewProps) {
   const { from, to } = useMemo(() => rangeBounds("day", anchor), [anchor]);
+
+  // The declared chronotype says what the user predicted about themselves
+  // during onboarding; the check-ins say what has since happened. The
+  // timeline paints the second over the first wherever there is enough
+  // evidence — otherwise the check-in loop collects data and changes nothing,
+  // which is a survey, not a system that learns.
+  const checkIns = useAtlasStore((s) => s.checkIns);
+  const observedEnergy = useMemo(() => {
+    const profile = buildCheckInProfile(checkIns);
+    return profile.hasEnoughData
+      ? { peakHours: profile.peakHours, lowHours: profile.lowHours }
+      : undefined;
+  }, [checkIns]);
 
   const query = `/api/calendar/range?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(
     to.toISOString()
@@ -83,6 +98,7 @@ export function DayView({ anchor, chronotype }: DayViewProps) {
         now={isSameDay(anchor, new Date()) ? new Date() : undefined}
         events={timed}
         chronotype={chronotype}
+        observedEnergy={observedEnergy}
       />
     </div>
   );

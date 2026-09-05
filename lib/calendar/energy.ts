@@ -35,13 +35,42 @@ export function isAsleepAt(minutes: number, chronotype: ChronotypeSettings): boo
 }
 
 /**
+ * What the user's own check-ins have established about specific hours.
+ *
+ * Hour-precise, unlike the chronotype, which is expressed in coarse day
+ * parts. Only hours with enough samples appear here — the thresholds live in
+ * lib/checkins/analyze.ts.
+ */
+export interface ObservedEnergy {
+  peakHours: number[];
+  lowHours: number[];
+}
+
+/**
  * Energy for a given hour. Sleep wins over everything — a peak-focus day part
  * the user is asleep through is not a schedulable peak. Peak beats low when a
  * day part was somehow marked as both, since the optimistic read is the one
  * that puts work on the calendar and the user can always decline it.
+ *
+ * Observation beats declaration. `observed` carries what the user's check-ins
+ * actually show, and it is consulted before the chronotype, because the
+ * chronotype is what they predicted about themselves once during onboarding
+ * and this is what has since happened. It is also hour-precise where the
+ * chronotype is a five-bucket day part, so "16:00 is a trough" survives
+ * instead of being flattened into "afternoons are good".
+ *
+ * Sleep still wins over both: a peak observed at 02:00 by someone who logged
+ * a late night is not a slot to schedule work into.
  */
-export function energyForHour(hour: number, chronotype: ChronotypeSettings): HourEnergy {
+export function energyForHour(
+  hour: number,
+  chronotype: ChronotypeSettings,
+  observed?: ObservedEnergy
+): HourEnergy {
   if (isAsleepAt(hour * 60, chronotype)) return "asleep";
+
+  if (observed?.peakHours.includes(hour)) return "peak";
+  if (observed?.lowHours.includes(hour)) return "low";
 
   const part = dayPartForHour(hour);
   if (!part) return "neutral";
