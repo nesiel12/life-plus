@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { authOptions } from "@/lib/auth";
+import { appBaseUrl } from "@/lib/appUrl";
 import { getCurrentUserId } from "@/lib/currentUser";
 import { exchangeCodeForTokens } from "@/lib/photos/auth";
 
@@ -11,8 +12,7 @@ export const runtime = "nodejs";
 const STATE_COOKIE = "lifeplus.photos.oauth_state";
 
 function back(path: string): string {
-  const base = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}${path}`;
+  return `${appBaseUrl()}${path}`;
 }
 
 export async function GET(request: NextRequest) {

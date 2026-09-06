@@ -1,4 +1,5 @@
 import "server-only";
+import { appBaseUrl } from "@/lib/appUrl";
 import { googlePhotosCredentialsRepo } from "@/lib/db/googlePhotos";
 import { PICKER_SCOPE } from "@/lib/photos/pickerClient";
 
@@ -15,8 +16,7 @@ const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const EXPIRY_SKEW_MS = 60_000;
 
 export function photosRedirectUri(): string {
-  const base = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}/api/photos/callback`;
+  return `${appBaseUrl()}/api/photos/callback`;
 }
 
 export function buildConsentUrl(state: string): string {
