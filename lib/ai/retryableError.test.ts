@@ -45,6 +45,19 @@ describe("isRetryableAiError", () => {
     it("retries overload wording regardless of case", () => {
       expect(isRetryableAiError(new Error("Model OVERLOADED, please Try Again"))).toBe(true);
     });
+
+    // Both providers actually surface quota exhaustion as HTTP 429, already
+    // covered above — these three assert the explicit text fallback still
+    // catches it if a wrapper ever loses the numeric status.
+    it("retries OpenAI's insufficient_quota wording with no status attached", () => {
+      const err = new Error("You exceeded your current quota, please check your plan and billing details.");
+      expect(isRetryableAiError(err)).toBe(true);
+      expect(isRetryableAiError(new Error("insufficient_quota"))).toBe(true);
+    });
+
+    it("retries Gemini's RESOURCE_EXHAUSTED wording with no status attached", () => {
+      expect(isRetryableAiError(new Error("RESOURCE_EXHAUSTED: quota exceeded for this project"))).toBe(true);
+    });
   });
 
   describe("correctness failures — the same on every model", () => {

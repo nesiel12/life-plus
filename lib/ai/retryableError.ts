@@ -28,6 +28,14 @@ const RETRYABLE_TEXT = [
   "rate limit",
   "rate_limit",
   "too many requests",
+  // Quota/billing exhaustion. Both providers actually surface this as HTTP
+  // 429 (already retryable via RETRYABLE_STATUS above) — OpenAI's JSON body
+  // carries error.code "insufficient_quota", Gemini's gRPC status name is
+  // RESOURCE_EXHAUSTED. Listed explicitly anyway, as a safety net for an SDK
+  // wrapper that loses the numeric status and leaves only the message text.
+  "quota",
+  "insufficient_quota",
+  "resource_exhausted",
   "timeout",
   "timed out",
   "aborted",

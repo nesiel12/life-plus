@@ -7,7 +7,11 @@
 export type ChatProvider = "openai" | "gemini" | null;
 
 export function resolveChatProvider(env: { openaiKey?: string; geminiKey?: string }): ChatProvider {
-  if (env.openaiKey) return "openai";
+  // Gemini is primary: it's the cheaper, faster model this workload
+  // actually needs, and OpenAI is deliberately kept configured as the
+  // fallback for when Gemini itself is unavailable — see
+  // getChatModelChain() in lib/ai/provider.ts for the ordering this feeds.
   if (env.geminiKey) return "gemini";
+  if (env.openaiKey) return "openai";
   return null;
 }

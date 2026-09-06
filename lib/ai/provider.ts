@@ -9,14 +9,19 @@ import { resolveChatProvider, type ChatProvider } from "@/lib/ai/resolveChatProv
 // the new SDK's call shape genuinely differs, service.ts), never any of
 // the AI-backed routes.
 //
-// Two chat providers are supported — OpenAI and Google Gemini — selected by
+// Two chat providers are supported — Google Gemini and OpenAI — selected by
 // which API key is actually configured, resolved once here rather than
 // duplicated per route. This explicitly overrides this file's own earlier
 // "OpenAI only" note: that was correct when there was exactly one working
 // provider to validate a plugin contract against; there are two now, chosen
-// deliberately, not speculative. OpenAI wins when both keys are present —
-// it was the incumbent, and nothing about a route already relying on it
-// should change just because a Gemini key gets added later.
+// deliberately, not speculative.
+//
+// Gemini wins when both keys are present. It is the cheaper, faster choice
+// for this app's workload (short generations — insights, goal breakdowns,
+// structured extraction), and OpenAI stays configured specifically to be
+// the fallback: getChatModelChain() below tries Gemini first and only
+// reaches OpenAI on a genuine capacity failure (see isRetryableAiError in
+// lib/ai/retryableError.ts for exactly what counts as one).
 const OPENAI_CHAT_MODEL_ID = "gpt-4o-mini";
 // A Google-maintained alias ("whatever flash model is currently
 // recommended"), not a pinned dated model — deliberately, after a pinned
