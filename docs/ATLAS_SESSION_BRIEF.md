@@ -146,7 +146,7 @@ Supabase Postgres · Vercel AI SDK v7 (`ai` + `@ai-sdk/openai` + `@ai-sdk/google
 **Foundation — done:**
 - **Security:** every API route session‑checked; zod body validation (`lib/api/parseJsonBody.ts`);
   in‑memory rate limiting (`lib/api/rateLimit.ts`); Google token handled server‑side only via
-  `getToken` (never on the client session); fail‑closed `ALLOWED_SIGNIN_EMAILS` allow‑list; refresh
+  `getToken` (never on the client session); open sign‑up — any Google account; refresh
   handling in `lib/auth.ts`.
 - **Persistence (code complete):** 21 migrations `supabase/migrations/20260720000000_init.sql →
   20260727000000_chat_messages_pin.sql`. 27 tables: `users, personal_dna, personal_patterns,
@@ -235,7 +235,6 @@ back):
 | `NEXTAUTH_SECRET` | `openssl rand -base64 32` — generate fresh (the old one leaked in past sessions). |
 | `NEXTAUTH_URL` | `http://localhost:3000` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google Cloud Console → Credentials. **Rotate the secret.** OAuth consent scopes must include `calendar.events`. |
-| `ALLOWED_SIGNIN_EMAILS` | `nesiel12388@gmail.com` |
 | `OPENAI_API_KEY` and/or `GEMINI_API_KEY` | Either enables AI features. `OPENAI_API_KEY` is additionally required for Torah/Learning **audio transcription** (Whisper) regardless of chat provider. |
 
 Then, autonomously:

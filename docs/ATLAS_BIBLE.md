@@ -172,7 +172,7 @@ not source of truth) · NextAuth v4 (Google OAuth, JWT sessions) · Supabase Pos
 | API routes | `app/api/*` — all session‑checked, zod‑validated (`lib/api/parseJsonBody.ts`), rate‑limited (`lib/api/rateLimit.ts`) |
 | Server actions | `app/actions/*` — one module per domain; all go through `lib/currentUser.ts` |
 | DB repositories | `lib/db/*` — user‑scoped via `lib/db/createUserScopedRepo.ts`; never trust a client‑passed id |
-| Auth | `lib/auth.ts` (Google OAuth, `calendar.events` scope, fail‑closed `ALLOWED_SIGNIN_EMAILS`, `events.signIn` provisions the user row + `personal_dna`) |
+| Auth | `lib/auth.ts` (Google OAuth, `calendar.events` scope, open sign‑up — any Google account, `events.signIn` provisions the user row + `personal_dna`) |
 | Intelligence Engine | `lib/intelligence/core/*` — deterministic normalize → rank → detect conflicts → format |
 | Personal DNA | `lib/intelligence/personalDNA/*` — analyzers (focus, goals, learning, routine) + confidence + timezone |
 | Recommendations | `lib/intelligence/recommendations/*` — dedupe, feedback weighting, tracking (`recommendation_events`) |

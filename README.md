@@ -29,7 +29,6 @@ Life Plus is a personal, Hebrew-language (RTL) "Proactive AI Life Operating Syst
    | `NEXTAUTH_SECRET` | Generate with `openssl rand -base64 32`. |
    | `NEXTAUTH_URL` | `http://localhost:3000` for local development. |
    | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials from the [Google Cloud Console](https://console.cloud.google.com/apis/credentials). Needs the `calendar.events` scope for calendar suggestions/commands to work. |
-   | `ALLOWED_SIGNIN_EMAILS` | Comma-separated allow-list. Empty/unset means nobody can sign in (fail-closed) — Atlas is currently single-tenant by design. |
    | `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase project. The service-role key is server-only, never exposed to the client. |
    | `SUPABASE_DB_URL` | Direct Postgres connection string, used only by `npm run db:migrate`. |
 

@@ -21,17 +21,6 @@ const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
 ].join(" ");
 
-// Fail closed: until real multi-tenancy exists (see docs/ROADMAP_V2.md Phase 1/6),
-// only explicitly allow-listed emails may authenticate. An unset or empty
-// ALLOWED_SIGNIN_EMAILS locks sign-in out entirely rather than opening it to anyone
-// with a Google account.
-const ALLOWED_SIGNIN_EMAILS = new Set(
-  (process.env.ALLOWED_SIGNIN_EMAILS ?? "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean)
-);
-
 interface GoogleRefreshResponse {
   access_token: string;
   expires_in: number;
@@ -91,9 +80,18 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
+    // Open sign-up: any Google account may authenticate. The former
+    // ALLOWED_SIGNIN_EMAILS allow-list is gone, along with its fail-closed
+    // behaviour on an empty value.
+    //
+    // An email is still required, and that is not a residue of the
+    // allow-list — it is the tenancy key. getCurrentUser() resolves the
+    // users row from session.user.email, and getOrCreateUserByEmail keys on
+    // it too, so a session without one cannot be scoped to any data and
+    // would fail on the first Server Action it reached. Rejecting here turns
+    // that into a clean "cannot sign in" instead of a broken session.
     async signIn({ user }) {
-      if (!user.email) return false;
-      return ALLOWED_SIGNIN_EMAILS.has(user.email.toLowerCase());
+      return Boolean(user.email);
     },
     async jwt({ token, account }) {
       // Initial sign-in: Google just issued fresh tokens. Explicitly

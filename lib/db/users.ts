@@ -24,7 +24,8 @@ export async function getUserByEmail(email: string): Promise<UserRow | null> {
 }
 
 // Called from the NextAuth signIn/jwt callback so a users row always exists
-// for anyone who passes the ALLOWED_SIGNIN_EMAILS check (see lib/auth.ts).
+// for anyone who signs in. Sign-up is open (see lib/auth.ts), so this is the
+// provisioning path for every new account, not just a pre-approved few.
 export async function getOrCreateUserByEmail(
   email: string,
   defaults: { name: string; image?: string | null }
