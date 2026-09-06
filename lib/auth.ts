@@ -5,6 +5,7 @@ import { getOrCreateUserByEmail } from "@/lib/db/users";
 import { lifeAreaScoresRepo } from "@/lib/db/lifeAreaScores";
 import { personalDnaRepo } from "@/lib/db/personalDna";
 import { notificationPreferencesRepo } from "@/lib/db/notificationPreferences";
+import { sessionCookieConfig } from "@/lib/sessionCookie";
 
 // calendar.events (not calendar.readonly) — accepting a schedule suggestion
 // now creates a real event via the Calendar API (see app/api/calendar/events),
@@ -78,6 +79,9 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/login",
   },
+  // Pinned by NODE_ENV, not derived from NEXTAUTH_URL — see
+  // lib/sessionCookie.ts for why the two disagree and what that breaks.
+  cookies: sessionCookieConfig,
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
     // Open sign-up: any Google account may authenticate. The former
