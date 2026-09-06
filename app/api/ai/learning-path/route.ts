@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { isProviderConfigured } from "@/lib/ai";
 import { generateLearningPath } from "@/lib/ai/learningPath";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // AI Track Builder engine for the Learning & Knowledge Space (Phase 7) —
 // takes a bare topic title and returns a structured starter curriculum
@@ -33,6 +35,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`learning-path:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   let body: unknown;
   try {
     body = await request.json();
@@ -53,9 +58,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const path = await generateLearningPath(parsed.data.topic);
+    const path = await generateLearningPath(parsed.data.topic, actor);
     return NextResponse.json(path);
   } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     console.error("Learning path generation failed:", err);
     return NextResponse.json({ error: "בניית מסלול הלימוד נכשלה. נסה שוב." }, { status: 500 });
   }

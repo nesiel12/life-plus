@@ -20,6 +20,8 @@ import {
   mergePersonalDnaPatch,
 } from "@/lib/onboarding/deepOnboarding";
 import type { Person, PersonalDNA } from "@/types";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 export const runtime = "nodejs";
 
@@ -63,6 +65,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`onboarding:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   const parsed = await parseJsonBody(request, onboardingRequestSchema);
   if (parsed.error) return parsed.error;
   const { history, skippedTopics } = parsed.data;
@@ -94,6 +99,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await generateStructuredData({
+      actor,
       schema: OnboardingExtractionSchema,
       system: buildOnboardingSystemPrompt({
         displayName: user.name,
@@ -133,7 +139,9 @@ export async function POST(request: Request) {
       personalDNA: updatedPersonalDNA,
       newPeople,
     });
-  } catch {
+  } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     return jsonResult({
       reply: FRIENDLY_ERROR,
       complete: false,

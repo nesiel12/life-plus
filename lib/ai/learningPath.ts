@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { generateStructuredData } from "@/lib/ai";
+import type { AiActor } from "@/lib/ai/quota";
 
 // Learning & Knowledge Space (Phase 7) AI Track Builder — shared by
 // app/api/ai/learning-path (the standalone endpoint) and
@@ -38,8 +39,9 @@ export const learningPathSchema = z.object({
 
 export type LearningPath = z.infer<typeof learningPathSchema>;
 
-export async function generateLearningPath(topic: string): Promise<LearningPath> {
+export async function generateLearningPath(topic: string, actor: AiActor): Promise<LearningPath> {
   return generateStructuredData({
+    actor: actor,
     schema: learningPathSchema,
     system:
       "אתה מורה פרטי מומחה שבונה מסלול למידה ראשוני לנושא שהמשתמש רוצה ללמוד — יכול להיות נושא טכני " +

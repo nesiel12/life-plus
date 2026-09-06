@@ -13,6 +13,8 @@ import { resolvePersonByName } from "@/lib/commands/resolvePerson";
 import { buildCommandTimeWindow } from "@/lib/commands/timeWindow";
 import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
 import { fetchGoogleCalendarEvents } from "@/lib/googleCalendar/fetchEvents";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 export const runtime = "nodejs";
 // Above lib/ai/service.ts's internal timeouts, so the app's own graceful
@@ -54,6 +56,9 @@ export async function POST(request: NextRequest) {
   const limited = rateLimitResponse(`commands:${token.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   const parsed = await parseJsonBody(request, commandRequestSchema);
   if (parsed.error) return parsed.error;
   const { message } = parsed.data;
@@ -69,6 +74,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await generateStructuredData({
+      actor,
       schema: CommandIntentSchema,
       system: buildCommandSystemPrompt(),
       prompt: message,
@@ -150,7 +156,9 @@ export async function POST(request: NextRequest) {
           start: event.start,
           end: event.end,
         }));
-      } catch {
+      } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
         return NextResponse.json({ reply: FRIENDLY_ERROR, proposal: null });
       }
 
@@ -169,7 +177,9 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ reply: result.reply, proposal: null });
-  } catch {
+  } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     return NextResponse.json({ reply: FRIENDLY_ERROR, proposal: null });
   }
 }

@@ -4,6 +4,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // AI Nutrition Coach for the Health & Fitness Space (Phase 8): given the
 // day's real workouts and previously logged meals, asks the AI to act as a
@@ -67,6 +69,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`nutrition:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   let body: unknown;
   try {
     body = await request.json();
@@ -88,6 +93,7 @@ export async function POST(request: Request) {
 
   try {
     const recommendation = await generateStructuredData({
+      actor,
       schema: nutritionSchema,
       system:
         "אתה תזונאי ספורט מומחה שמעניק המלצות תזונה מותאמות אישית. קיבלת את רשימת האימונים והארוחות שהמשתמש " +
@@ -100,6 +106,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(recommendation);
   } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     console.error("Nutrition recommendation failed:", err);
     return NextResponse.json({ error: "יצירת ההמלצה נכשלה. נסה שוב." }, { status: 500 });
   }

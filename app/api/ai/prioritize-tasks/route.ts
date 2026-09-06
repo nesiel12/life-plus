@@ -4,6 +4,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // AI Auto-Prioritization for the Time & Tasks Space (Phase 5): given the
 // user's currently-open tasks and a Personal DNA-shaped context object,
@@ -50,6 +52,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`prioritize-tasks:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   let body: unknown;
   try {
     body = await request.json();
@@ -81,6 +86,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await generateStructuredData({
+      actor,
       schema: prioritizationSchema,
       system:
         "אתה עוזר אישי שמחליט אילו משימות מתוך רשימת המשימות הפתוחות של המשתמש דורשות תשומת לב מיידית היום. " +
@@ -96,6 +102,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ prioritized_task_ids: prioritizedTaskIds });
   } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     console.error("Task prioritization failed:", err);
     return NextResponse.json({ error: "התעדוף נכשל. נסה שוב." }, { status: 500 });
   }

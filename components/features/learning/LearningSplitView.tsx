@@ -13,6 +13,7 @@ import {
 } from "@/lib/learning/courseStages";
 import { cn } from "@/lib/utils";
 import type { CourseModule } from "@/lib/ai/courseModule";
+import { readAiError } from "@/lib/api/aiClient";
 
 interface LearningSplitViewProps {
   topicTitle: string;
@@ -97,7 +98,11 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: `בהקשר של לימוד הנושא "${topicTitle}": ${text}` }),
       });
-      if (!res.ok || !res.body) throw new Error("chat failed");
+      if (!res.ok) {
+        const info = await readAiError(res, "chat failed");
+        throw new Error(info.message);
+      }
+      if (!res.body) throw new Error("chat failed");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

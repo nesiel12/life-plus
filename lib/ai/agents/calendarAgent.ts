@@ -4,6 +4,7 @@ import { generateStructuredData } from "@/lib/ai";
 import { findFocusSlots, hasConflict, type Interval } from "@/lib/calendar/findFocusSlots";
 import { sanitizeEventTitle } from "@/lib/calendar/sanitizeEventTitle";
 import type { ChronotypeSettings } from "@/types";
+import type { AiActor } from "@/lib/ai/quota";
 
 // The CalendarAgent's own prompt and contract, kept out of the route so the
 // persona is versioned as a unit and can be reused (the Sprint 6 agent router
@@ -138,8 +139,10 @@ export async function resolveCalendarIntent(params: {
   timeZone: string;
   busy: BusyEvent[];
   chronotype: ChronotypeSettings;
+  actor: AiActor;
 }): Promise<ResolveCalendarIntentResult> {
   const intent = await generateStructuredData({
+    actor: params.actor,
     schema: calendarIntentSchema,
     system: CALENDAR_AGENT_SYSTEM,
     prompt: buildCalendarAgentPrompt({

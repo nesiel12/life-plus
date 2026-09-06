@@ -13,6 +13,8 @@ import {
 } from "@/lib/ai/agents/financeAgent";
 import { buildSnapshot, formatSnapshotForPrompt } from "@/lib/finances/analyze";
 import { EXPENSE_KEYS, INCOME_KEYS, isCategoryKey } from "@/lib/finances/categories";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -59,6 +61,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`finance-agent:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   const parsed = await parseJsonBody(request, requestSchema);
   if (parsed.error) return parsed.error;
 
@@ -82,6 +87,7 @@ export async function POST(request: Request) {
         .join("\n");
 
       const result = await generateStructuredData({
+      actor,
         schema: categorizationSchema,
         system: CATEGORIZATION_SYSTEM,
         prompt: `סווג את התנועות הבאות:\n${listing}`,
@@ -111,13 +117,16 @@ export async function POST(request: Request) {
     }
 
     const analysis = await generateStructuredData({
+      actor,
       schema: cfoAnalysisSchema,
       system: CFO_SYSTEM,
       prompt: formatSnapshotForPrompt(snapshot).join("\n"),
     });
 
     return NextResponse.json({ mode: "analyze" as const, snapshot, analysis });
-  } catch {
+  } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     return NextResponse.json({ error: "הניתוח הפיננסי נכשל. נסה שוב." }, { status: 502 });
   }
 }

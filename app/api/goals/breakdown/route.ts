@@ -12,6 +12,8 @@ import type { SignalCategory } from "@/lib/intelligence/core";
 import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
 import { categoryLabel } from "@/store/useAtlasStore";
 import { generateChatText, isProviderConfigured } from "@/lib/ai";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // Goal breakdown only needs to know about goal-behavior-relevant
 // intelligence — scoping the categories it considers is a task-boundary
@@ -55,6 +57,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`goals:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   const parsed = await parseJsonBody(request, breakdownRequestSchema);
   if (parsed.error) return parsed.error;
   const { title, category } = parsed.data;
@@ -96,6 +101,7 @@ export async function POST(request: Request) {
       : "";
 
     const text = await generateChatText({
+      actor,
       system: joinContextSections([baseSystem, contextBlock]),
       prompt: `היעד: "${title}" (תחום: ${categoryLabel(category)}). פרק אותו לרשימת אבני דרך.`,
     });
@@ -104,7 +110,9 @@ export async function POST(request: Request) {
     const milestones = parsedMilestones.length > 0 ? parsedMilestones : genericMilestones(title);
     await trackBreakdown(milestones, parsedMilestones.length > 0);
     return NextResponse.json({ milestones });
-  } catch {
+  } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     const milestones = genericMilestones(title);
     await trackBreakdown(milestones, false);
     return NextResponse.json({ milestones });

@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { generateStructuredData } from "@/lib/ai";
+import type { AiActor } from "@/lib/ai/quota";
 
 // Deep course modules for the Learning Hub.
 //
@@ -75,9 +76,15 @@ const SYSTEM = [
   "- שאלות הבוחן צריכות לבדוק הבנה, לא זיכרון. כל ארבע האפשרויות צריכות להיראות סבירות למי שלא הבין את החומר.",
 ].join("\n");
 
-export async function generateCourseModule(topic: string, focus?: string): Promise<CourseModule> {
+export async function generateCourseModule(
+  topic: string,
+  actor: AiActor,
+  focus?: string
+): Promise<CourseModule> {
   const prompt = focus?.trim()
     ? `הנושא: ${topic}\nהתמקד במיוחד ב: ${focus.trim()}`
     : `הנושא: ${topic}`;
-  return generateStructuredData({ schema: courseModuleSchema, system: SYSTEM, prompt });
+  return generateStructuredData({
+    actor: actor,
+    operation: "course_module", schema: courseModuleSchema, system: SYSTEM, prompt });
 }

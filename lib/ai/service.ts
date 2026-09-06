@@ -4,6 +4,18 @@ import type { z } from "zod";
 import type { ChatModelCandidate } from "@/lib/ai/provider";
 import { getChatModel, getChatModelChain, getTranscriptionModel } from "@/lib/ai/provider";
 import { isRetryableAiError } from "@/lib/ai/retryableError";
+import {
+  actualAudioMinutes,
+  budgetsFor,
+  dayWindow,
+  estimatedAudioMinutes,
+  quotaLimits,
+  quotaMessage,
+  resetAt,
+  type AiActor,
+  type AiOperation,
+} from "@/lib/ai/quota";
+import { adjustAiUnits, consumeAiUnits } from "@/lib/db/aiUsage";
 
 // The one shared AI service (Unified AI Provider Layer) — every AI-backed
 // route calls through here instead of importing the `ai` SDK or
@@ -15,6 +27,55 @@ import { isRetryableAiError } from "@/lib/ai/retryableError";
 // call shape, same return shape the four AI-backed routes already
 // depended on — with only the model selection now living in
 // lib/ai/provider.ts instead of scattered across every route.
+
+/**
+ * Thrown when a user has spent their free allowance.
+ *
+ * A named class rather than a plain Error so routes can map it to a 429 with
+ * the real reason, instead of the generic 500 every other AI failure becomes.
+ * A user who has hit a limit has done nothing wrong and needs to be told
+ * what happened and when it clears, not shown "something went wrong".
+ */
+export class AiQuotaExceededError extends Error {
+  readonly scope: string;
+  readonly resetAt: Date;
+
+  constructor(scope: string, message: string, resetAt: Date) {
+    super(message);
+    this.name = "AiQuotaExceededError";
+    this.scope = scope;
+    this.resetAt = resetAt;
+  }
+}
+
+/**
+ * Charges the actor's quota, or refuses.
+ *
+ * System actors are exempt: the Proactive Engine's per-user jobs are the
+ * owner's own scheduled work, not something the user asked for, and charging
+ * them would let a nightly cron quietly eat the allowance someone was about
+ * to use.
+ *
+ * The quota is charged *before* the model call, not after. Charging on
+ * success would let a user fire unlimited requests that fail — and every one
+ * of those still costs money at the provider.
+ */
+async function chargeQuota(
+  actor: AiActor,
+  operation: AiOperation,
+  audioMinutes = 0
+): Promise<void> {
+  if (actor.kind === "system") return;
+
+  const now = new Date();
+  const budgets = budgetsFor(operation, now, quotaLimits(), audioMinutes);
+  const result = await consumeAiUnits(actor.userId, budgets);
+
+  if (!result.allowed) {
+    const scope = result.rejectedScope ?? "day";
+    throw new AiQuotaExceededError(scope, quotaMessage(scope, now), resetAt(scope, now));
+  }
+}
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -87,7 +148,13 @@ async function withModelFallback<T>(
   throw lastError;
 }
 
-export function streamChatReply(params: { system: string; messages: ChatMessage[] }) {
+export async function streamChatReply(params: {
+  system: string;
+  messages: ChatMessage[];
+  actor: AiActor;
+}) {
+  await chargeQuota(params.actor, "chat");
+
   // The abortSignal every other call in this module already had, and this one
   // was missing. Without it a provider that accepts the connection and then
   // stalls mid-stream produces a response that never completes and never
@@ -107,7 +174,14 @@ export function streamChatReply(params: { system: string; messages: ChatMessage[
   });
 }
 
-export async function generateChatText(params: { system: string; prompt: string }): Promise<string> {
+export async function generateChatText(params: {
+  system: string;
+  prompt: string;
+  actor: AiActor;
+  /** Defaults to a plain chat-weight call. */
+  operation?: AiOperation;
+}): Promise<string> {
+  await chargeQuota(params.actor, params.operation ?? "chat");
   return withModelFallback("generateChatText", async (model) => {
     const { text } = await generateText({
       model,
@@ -120,7 +194,15 @@ export async function generateChatText(params: { system: string; prompt: string 
   });
 }
 
-export async function generateStructuredData<T extends z.ZodTypeAny>(params: { schema: T; system: string; prompt: string }) {
+export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
+  schema: T;
+  system: string;
+  prompt: string;
+  actor: AiActor;
+  /** Defaults to a plain structured call; pass "course_module" for the heavy one. */
+  operation?: AiOperation;
+}) {
+  await chargeQuota(params.actor, params.operation ?? "structured");
   return withModelFallback("generateStructuredData", async (model) => {
     const { object } = await generateObject({
       model,
@@ -147,7 +229,26 @@ export interface TranscriptionResult {
   durationInSeconds?: number;
 }
 
-export async function transcribeAudio(audio: Uint8Array): Promise<TranscriptionResult> {
+export async function transcribeAudio(
+  audio: Uint8Array,
+  actor: AiActor
+): Promise<TranscriptionResult> {
+  // Reserved from the file size, because Whisper only reports the true
+  // duration once it has already processed the audio — by which point the
+  // money is spent. The estimate is settled below.
+  const estimated = estimatedAudioMinutes(audio.byteLength);
+  await chargeQuota(actor, "transcription", estimated);
+
   const result = await transcribe({ model: getTranscriptionModel(), audio });
+
+  if (actor.kind === "user") {
+    const actual = actualAudioMinutes(result.durationInSeconds);
+    if (actual !== null && actual !== estimated) {
+      // Best-effort: the call already succeeded, so a settle failure must not
+      // become an error the user sees.
+      await adjustAiUnits(actor.userId, "transcribe_day", dayWindow(new Date()), actual - estimated);
+    }
+  }
+
   return { text: result.text, durationInSeconds: result.durationInSeconds };
 }

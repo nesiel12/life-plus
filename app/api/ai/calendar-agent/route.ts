@@ -11,6 +11,8 @@ import { sanitizeEventTitle } from "@/lib/calendar/sanitizeEventTitle";
 import { hasConflict, type Interval } from "@/lib/calendar/findFocusSlots";
 import { isDayPart } from "@/lib/onboarding/chronotype";
 import type { ChronotypeSettings, DayPart } from "@/types";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // CalendarAgent (Sprint 1): natural language in, a *proposed* event out.
 //
@@ -78,6 +80,9 @@ export async function POST(request: Request) {
   );
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   const parsed = await parseJsonBody(request, requestSchema);
   if (parsed.error) return parsed.error;
 
@@ -92,9 +97,12 @@ export async function POST(request: Request) {
   const chronotype = toChronotype(parsed.data.chronotype);
 
   try {
-    const result = await resolveCalendarIntent({ message, nowLocal, timeZone, busy, chronotype });
+    const result = await resolveCalendarIntent({
+      actor, message, nowLocal, timeZone, busy, chronotype });
     return NextResponse.json(result);
   } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     // Every model in the failover chain is down. Rather than tell the user
     // the calendar is unavailable, try the deterministic local parser: an AI
     // outage should not stop someone putting "מחר פגישה ב-13:00" in their

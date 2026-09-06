@@ -5,6 +5,7 @@ import { learningResourcesRepo, learningTopicsRepo } from "@/lib/db/learning";
 import { toLearningResource, toLearningResourcePatch, toLearningTopic, toLearningTopicPatch } from "@/lib/mappers";
 import { generateLearningPath } from "@/lib/ai/learningPath";
 import { isProviderConfigured } from "@/lib/ai";
+import { currentUserActor } from "@/lib/ai/actor";
 import type { LearningResource, LearningResourceType, LearningTopic } from "@/types";
 
 export async function addLearningTopicAction(input: { title: string; category?: string }) {
@@ -78,7 +79,9 @@ export async function generateLearningPathAction(topicId: string, topicTitle: st
     throw new Error("בניית מסלול AI דורשת מפתח OpenAI או Gemini מחובר. פנה למנהל המערכת.");
   }
 
-  const path = await generateLearningPath(topicTitle);
+  // Server Actions bypass the HTTP rate limiter entirely, so the quota
+  // charged inside the AI service is the only thing metering this path.
+  const path = await generateLearningPath(topicTitle, await currentUserActor());
 
   const quizText = path.quiz.map((q, i) => `${i + 1}. ${q.question}\nתשובה: ${q.answer}`).join("\n\n");
 

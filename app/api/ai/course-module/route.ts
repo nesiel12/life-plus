@@ -6,6 +6,8 @@ import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { isProviderConfigured } from "@/lib/ai";
 import { generateCourseModule } from "@/lib/ai/courseModule";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // Deep course material for the Learning Hub's split view. Distinct from
 // app/api/ai/learning-path, which builds the *starter curriculum* (what to
@@ -33,6 +35,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`course-module:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   const parsed = await parseJsonBody(request, requestSchema);
   if (parsed.error) return parsed.error;
 
@@ -44,9 +49,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const courseModule = await generateCourseModule(parsed.data.topic, parsed.data.focus);
+    const courseModule = await generateCourseModule(parsed.data.topic, actor, parsed.data.focus);
     return NextResponse.json({ module: courseModule });
   } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     // The model failover chain (lib/ai/service.ts) has already been
     // exhausted by the time this is reached.
     console.error("[course-module] generation failed:", err);

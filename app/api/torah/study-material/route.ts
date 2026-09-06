@@ -8,6 +8,8 @@ import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { knowledgeEntriesRepo } from "@/lib/db/knowledgeEntries";
 import { toKnowledgeEntry } from "@/lib/mappers";
 import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 export const runtime = "nodejs";
 
@@ -43,6 +45,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`torah-study:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   const parsed = await parseJsonBody(request, requestSchema);
   if (parsed.error) return parsed.error;
   const { entryId } = parsed.data;
@@ -71,6 +76,7 @@ export async function POST(request: Request) {
 
   try {
     const object = await generateStructuredData({
+      actor,
       schema: studyMaterialSchema,
       system:
         "You create study material (flashcards and review questions) from a Torah shiur's topic, source, and summary. Respond only based on the content given, no invented facts, everything in Hebrew.",
@@ -85,7 +91,9 @@ export async function POST(request: Request) {
     );
     const entry = toKnowledgeEntry(updated);
     return NextResponse.json({ flashcards: entry.flashcards, reviewQuestions: entry.reviewQuestions });
-  } catch {
+  } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     return NextResponse.json(
       { flashcards: [], reviewQuestions: [], error: "יצירת חומר הלמידה נכשלה. נסה שוב." },
       { status: 200 }

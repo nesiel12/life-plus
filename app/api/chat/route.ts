@@ -24,6 +24,8 @@ import { formatCalendarReply, resolveCalendarIntent, type BusyEvent } from "@/li
 import { buildSnapshot, type AnalyzableTransaction } from "@/lib/finances/analyze";
 import { getLocalWallClock } from "@/lib/intelligence/personalDNA/timezone";
 import { fetchGoogleCalendarEvents, type GoogleCalendarEvent } from "@/lib/googleCalendar/fetchEvents";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 export const runtime = "nodejs";
 // Above lib/ai/service.ts's internal timeouts, so the app's own graceful
@@ -97,6 +99,9 @@ export async function POST(request: NextRequest) {
   const limited = rateLimitResponse(`chat:${token.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   const parsed = await parseJsonBody(request, chatRequestSchema);
   if (parsed.error) return parsed.error;
   const { message, history = [] } = parsed.data;
@@ -116,7 +121,7 @@ export async function POST(request: NextRequest) {
     // reply this route always gave — see lib/ai/agentRouter.ts's header for
     // why "calendar" only sometimes shortcuts and "memories" isn't routed
     // here at all.
-    const [user, routerDomain] = await Promise.all([getUserByEmail(token.email), classifyRouterDomain(message)]);
+    const [user, routerDomain] = await Promise.all([getUserByEmail(token.email), classifyRouterDomain(message, actor)]);
 
     // AI Context Injection (Smart Calendar & Google Calendar Integration,
     // CRITICAL per the founder's own framing): the real schedule, next 14
@@ -164,6 +169,7 @@ export async function POST(request: NextRequest) {
       const nowIso = new Date().toISOString();
       try {
         const resolved = await resolveCalendarIntent({
+      actor,
           message,
           nowLocal: getLocalWallClock(nowIso, DEFAULT_TIME_ZONE),
           timeZone: DEFAULT_TIME_ZONE,
@@ -194,7 +200,7 @@ export async function POST(request: NextRequest) {
         grounding = groundFinance(buildSnapshot(transactions));
       } else if (routerDomain === "tasks") {
         const rows = await tasksRepo.list(user.id);
-        grounding = await groundTaskDomain(rows.map(toTask), message, new Date());
+        grounding = await groundTaskDomain(rows.map(toTask), message, new Date(), actor);
       } else {
         const [topicRows, resourceRows] = await Promise.all([
           learningTopicsRepo.list(user.id),
@@ -211,7 +217,8 @@ export async function POST(request: NextRequest) {
     // replace basedOn rather than append to it.
     const basedOn = grounding ? grounding.basedOn : topSignals.slice(0, MAX_BASED_ON).map((signal) => signal.summary);
 
-    const result = streamChatReply({
+    const result = await streamChatReply({
+      actor,
       system: basePrompt,
       messages: [...history, { role: "user", content: message }],
     });
@@ -220,6 +227,8 @@ export async function POST(request: NextRequest) {
       headers: { "x-atlas-based-on": encodeBasedOnHeader(basedOn) },
     });
   } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     // Previously a bare `catch {}` — any real failure here (a Google API
     // error, a DB error from buildAtlasContext, anything) silently showed
     // the exact same "no key connected" text as a genuinely missing key,

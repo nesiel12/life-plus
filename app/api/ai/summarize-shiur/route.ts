@@ -4,6 +4,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // AI summarization engine for the Torah Space — takes a raw shiur
 // transcript/notes and returns a structured summary (title/tldr/key
@@ -52,6 +54,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`summarize-shiur:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   let body: unknown;
   try {
     body = await request.json();
@@ -73,6 +78,7 @@ export async function POST(request: Request) {
 
   try {
     const summary = await generateStructuredData({
+      actor,
       schema: shiurSummarySchema,
       system:
         "אתה עוזר שמנתח תמלול או הערות של שיעור תורני ומפיק ממנו סיכום מובנה. " +
@@ -84,6 +90,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(summary);
   } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     console.error("Shiur summarization failed:", err);
     return NextResponse.json({ error: "יצירת הסיכום נכשלה. נסה שוב." }, { status: 500 });
   }

@@ -13,6 +13,7 @@ import { CommandPanel } from "@/components/features/CommandPanel";
 import { decodeBasedOnHeader } from "@/lib/api/basedOnHeader";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types";
+import { readAiError } from "@/lib/api/aiClient";
 
 interface Briefing {
   signals: BriefingSignal[];
@@ -135,7 +136,14 @@ export function AICompanion() {
         body: JSON.stringify({ message, history }),
         signal: controller.signal,
       });
-      if (!res.ok || !res.body) throw new Error("Chat request failed");
+      if (!res.ok) {
+        // Read the body rather than throwing a generic failure: this is the
+        // route a user is most likely to exhaust their quota on, and the
+        // server's explanation was being discarded here.
+        const info = await readAiError(res, "Chat request failed");
+        throw new Error(info.message);
+      }
+      if (!res.body) throw new Error("Chat request failed");
 
       const basedOn = decodeBasedOnHeader(res.headers.get("x-atlas-based-on"));
 

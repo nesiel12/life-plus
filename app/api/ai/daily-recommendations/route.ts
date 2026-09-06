@@ -4,6 +4,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // Daily AI Recommendations for the Time & Tasks unified timeline: given a
 // day's real events + open tasks, asks the AI for 1-2 concrete, actionable
@@ -74,6 +76,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`daily-recommendations:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   let body: unknown;
   try {
     body = await request.json();
@@ -104,6 +109,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await generateStructuredData({
+      actor,
       schema: responseSchema,
       system:
         "אתה עוזר Life OS פרואקטיבי שמנתח את העומס של המשתמש ליום מסוים — האירועים והמשימות הפתוחות שלו, " +
@@ -122,6 +128,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     console.error("Daily recommendations generation failed:", err);
     return NextResponse.json({ error: "הניתוח נכשל. נסה שוב." }, { status: 500 });
   }

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { transcribeAudio, isTranscriptionConfigured } from "@/lib/ai";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // Audio-transcription leg of the Torah Space AI Summarizer's "input
 // triangle" (text / YouTube / audio file). Goes through the same shared
@@ -27,6 +29,9 @@ export async function POST(request: Request) {
 
   const limited = rateLimitResponse(`transcribe-audio:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
+
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
 
   if (!isTranscriptionConfigured()) {
     return NextResponse.json(
@@ -55,12 +60,14 @@ export async function POST(request: Request) {
 
   try {
     const buffer = new Uint8Array(await file.arrayBuffer());
-    const { text } = await transcribeAudio(buffer);
+    const { text } = await transcribeAudio(buffer, actor);
     if (!text.trim()) {
       return NextResponse.json({ error: "לא הצלחנו לחלץ תמלול מקובץ השמע." }, { status: 422 });
     }
     return NextResponse.json({ text: text.trim() });
   } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     console.error("Audio transcription failed:", err);
     return NextResponse.json({ error: "תמלול קובץ השמע נכשל. נסה שוב." }, { status: 500 });
   }

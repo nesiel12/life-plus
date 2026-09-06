@@ -4,6 +4,7 @@ import { generateStructuredData } from "@/lib/ai";
 import { resolveTaskAssist, type TaskAssist } from "@/lib/ai/agents/taskAgent";
 import { formatSnapshotForPrompt, type FinancialSnapshot } from "@/lib/finances/analyze";
 import type { LearningResource, LearningTopic, Task } from "@/types";
+import type { AiActor } from "@/lib/ai/quota";
 
 // The Section AI Router (Sprint 6): "if the user types in the main search
 // bar, the correct agent answers." The main search bar is AICompanion's
@@ -61,9 +62,10 @@ export function buildRouterPrompt(message: string): string {
  * is about, not carry a second, competing notion of conversational context
  * alongside buildAtlasContext's.
  */
-export async function classifyRouterDomain(message: string): Promise<RouterDomain> {
+export async function classifyRouterDomain(message: string, actor: AiActor): Promise<RouterDomain> {
   try {
     const result = await generateStructuredData({
+    actor: actor,
       schema: routerIntentSchema,
       system: ROUTER_SYSTEM,
       prompt: buildRouterPrompt(message),
@@ -201,12 +203,21 @@ export function formatTaskAssistGrounding(taskTitle: string, assist: TaskAssist)
  * deterministic task-list summary (groundTasks above) — real facts either
  * way, never a guess at what the user's tasks are.
  */
-export async function groundTaskDomain(tasks: Task[], message: string, now: Date): Promise<DomainGrounding> {
+export async function groundTaskDomain(
+  tasks: Task[],
+  message: string,
+  now: Date,
+  actor: AiActor
+): Promise<DomainGrounding> {
   const matched = matchTaskByTitle(tasks, message);
   if (!matched) return groundTasks(tasks, now);
 
   try {
-    const assist = await resolveTaskAssist({ title: matched.title, description: matched.description });
+    const assist = await resolveTaskAssist({
+      title: matched.title,
+      description: matched.description,
+      actor,
+    });
     return formatTaskAssistGrounding(matched.title, assist);
   } catch {
     // TaskAgent itself failed — fall back to the deterministic summary

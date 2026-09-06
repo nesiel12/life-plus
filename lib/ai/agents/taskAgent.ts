@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { generateStructuredData } from "@/lib/ai";
+import type { AiActor } from "@/lib/ai/quota";
 
 // TaskAgent (Sprint 5): the "beyond lists" layer. A task title alone rarely
 // says what kind of help it needs, so this is one classifying call rather
@@ -79,8 +80,13 @@ export function buildTaskAgentPrompt(params: { title: string; description?: stri
  * than clicked from TaskCard) — gets help through the exact same tested
  * pipeline instead of a parallel copy of the schema/system/prompt wiring.
  */
-export async function resolveTaskAssist(params: { title: string; description?: string }): Promise<TaskAssist> {
+export async function resolveTaskAssist(params: {
+  title: string;
+  description?: string;
+  actor: AiActor;
+}): Promise<TaskAssist> {
   return generateStructuredData({
+    actor: params.actor,
     schema: taskAssistSchema,
     system: TASK_AGENT_SYSTEM,
     prompt: buildTaskAgentPrompt(params),

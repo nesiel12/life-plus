@@ -6,6 +6,8 @@ import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { isProviderConfigured } from "@/lib/ai";
 import { resolveTaskAssist } from "@/lib/ai/agents/taskAgent";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // TaskAgent endpoint (Sprint 5): "help me with this task" for one task, one
 // call. See lib/ai/agents/taskAgent.ts for the mode split and the honesty
@@ -30,6 +32,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`task-agent:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   const parsed = await parseJsonBody(request, requestSchema);
   if (parsed.error) return parsed.error;
 
@@ -41,9 +46,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const assist = await resolveTaskAssist(parsed.data);
+    const assist = await resolveTaskAssist({ ...parsed.data, actor });
     return NextResponse.json({ assist });
-  } catch {
+  } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     return NextResponse.json({ error: "עוזר הביצוע לא זמין כרגע. נסה שוב." }, { status: 502 });
   }
 }

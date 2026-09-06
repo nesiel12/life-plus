@@ -31,6 +31,9 @@ Life Plus is a personal, Hebrew-language (RTL) "Proactive AI Life Operating Syst
    | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials from the [Google Cloud Console](https://console.cloud.google.com/apis/credentials). Needs the `calendar.events` scope for calendar suggestions/commands to work. |
    | `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase project. The service-role key is server-only, never exposed to the client. |
    | `SUPABASE_DB_URL` | Direct Postgres connection string, used only by `npm run db:migrate`. |
+   | `FREE_AI_REQUESTS_PER_DAY` | Free AI allowance per user per day, in cost units (default `40`). A chat or structured call is 1 unit; a course module is 3, since it emits several times the output. |
+   | `FREE_AI_TRANSCRIPTION_MINUTES_PER_DAY` | Separate daily allowance for audio transcription, in minutes (default `10`). Whisper is priced per minute, so one transcription can cost far more than a day of chat. |
+   | `FREE_AI_REQUESTS_PER_MINUTE` | Burst guard (default `6`), so a whole day's allowance cannot be drained in one second. |
 
 3. **Database migrations**
 

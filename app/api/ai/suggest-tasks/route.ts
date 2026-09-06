@@ -4,6 +4,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 // AI Task Suggestions for the Time & Tasks Space: given the day's real
 // events, work shift, and habit-completion state, asks the AI to act as a
@@ -68,6 +70,9 @@ export async function POST(request: Request) {
   const limited = rateLimitResponse(`suggest-tasks:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   let body: unknown;
   try {
     body = await request.json();
@@ -97,6 +102,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await generateStructuredData({
+      actor,
       schema: responseSchema,
       system:
         "אתה עוזר אישי פרואקטיבי שמציע 3-5 משימות קטנות וקונקרטיות שכדאי למשתמש לעשות היום, בהתבסס על היום " +
@@ -111,6 +117,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     console.error("Task suggestion generation failed:", err);
     return NextResponse.json({ error: "יצירת ההצעות נכשלה. נסה שוב." }, { status: 500 });
   }

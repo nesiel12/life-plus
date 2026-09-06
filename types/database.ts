@@ -493,6 +493,24 @@ export interface Database {
           notes?: string | null;
         }
       >;
+      ai_usage: TableDef<
+        {
+          id: string;
+          user_id: string;
+          scope: string;
+          window_start: string;
+          units: number;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          scope: string;
+          window_start: string;
+          units?: number;
+        },
+        { units?: number }
+      >;
       check_ins: TableDef<
         {
           id: string;
@@ -1122,6 +1140,27 @@ export interface Database {
       >;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      // The atomic quota check-and-charge. Both live in
+      // supabase/migrations/20260906020000_ai_usage_quota.sql — declared here
+      // so .rpc() is typed rather than `any`, since these two calls are the
+      // whole enforcement mechanism.
+      consume_ai_units: {
+        Args: {
+          p_user_id: string;
+          p_budgets: { scope: string; window: string; cost: number; limit: number }[];
+        };
+        Returns: {
+          allowed: boolean;
+          rejected_scope: string | null;
+          used: number | null;
+          cap: number | null;
+        }[];
+      };
+      adjust_ai_units: {
+        Args: { p_user_id: string; p_scope: string; p_window: string; p_delta: number };
+        Returns: number;
+      };
+    };
   };
 }

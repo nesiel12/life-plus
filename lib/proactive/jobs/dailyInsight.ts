@@ -7,6 +7,7 @@ import {
 } from "@/lib/intelligence/core";
 import { insightsRepo } from "@/lib/db/insights";
 import { generateChatText, isProviderConfigured } from "@/lib/ai";
+import { systemActor } from "@/lib/ai/actor";
 import { notify } from "@/lib/notify";
 import { buildDedupeKey } from "@/lib/proactive/dedupe";
 import type { Job } from "@/lib/proactive/types";
@@ -44,6 +45,10 @@ export const dailyInsightJob: Job = {
         // generateChatText carries its own 30s abort-timeout (lib/ai/service.ts).
         body = (
           await generateChatText({
+            // Scheduled work the owner runs, not something this user asked
+            // for — charging their free quota would let a nightly job eat
+            // the allowance they were about to use themselves.
+            actor: systemActor("daily_insight"),
             system: SYSTEM_PROMPT,
             prompt: `הנתונים הרלוונטיים כרגע:\n${formatted}\n\nכתוב/י את התובנה היומית.`,
           })

@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 import {
   STUDY_AGENT_SYSTEM,
   studyGradeSchema,
@@ -54,6 +56,9 @@ export async function POST(request: Request) {
   );
   if (limited) return limited;
 
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
+
   const parsed = await parseJsonBody(request, requestSchema);
   if (parsed.error) return parsed.error;
 
@@ -70,6 +75,7 @@ export async function POST(request: Request) {
   try {
     if (body.mode === "summary") {
       const summary = await generateStructuredData({
+      actor,
         schema: studySummarySchema,
         system: STUDY_AGENT_SYSTEM.summary,
         prompt: `תמלול הסרטון:\n${transcript}`,
@@ -82,6 +88,7 @@ export async function POST(request: Request) {
         ? `\n\nשאלות שכבר נשאלו (אל תחזור עליהן):\n${body.askedQuestions.map((q) => `- ${q}`).join("\n")}`
         : "";
       const quiz = await generateStructuredData({
+      actor,
         schema: studyQuizSchema,
         system: STUDY_AGENT_SYSTEM.quiz,
         prompt: `רמת השליטה הנוכחית של המשתמש: ${body.mastery}/100.\n\nתמלול הסרטון:\n${transcript}${asked}`,
@@ -90,6 +97,7 @@ export async function POST(request: Request) {
     }
 
     const grade = await generateStructuredData({
+      actor,
       schema: studyGradeSchema,
       system: STUDY_AGENT_SYSTEM.discuss,
       prompt: [
@@ -100,7 +108,9 @@ export async function POST(request: Request) {
       ].join("\n"),
     });
     return NextResponse.json({ mode: "discuss" as const, grade });
-  } catch {
+  } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     return NextResponse.json({ error: "עוזר הלימוד לא זמין כרגע. נסה שוב." }, { status: 502 });
   }
 }

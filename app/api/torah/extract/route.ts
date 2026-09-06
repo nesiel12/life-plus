@@ -10,6 +10,10 @@ import { joinContextSections } from "@/lib/context/formatContext";
 import type { AtlasContext } from "@/lib/context/types";
 import { buildIntelligenceSignals, filterSignalsByCategory, rankSignals, formatSignalsForPrompt } from "@/lib/intelligence/core";
 import type { SignalCategory } from "@/lib/intelligence/core";
+import { currentUserActor } from "@/lib/ai/actor";
+import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
+import { AiQuotaExceededError } from "@/lib/ai/service";
+import type { AiActor } from "@/lib/ai/quota";
 import {
   generateStructuredData,
   transcribeAudio as transcribeWithProvider,
@@ -53,9 +57,12 @@ async function extractPdfText(file: File): Promise<string> {
   return text.trim();
 }
 
-async function transcribeAudio(file: File): Promise<{ text: string; durationMinutes?: number }> {
+async function transcribeAudio(
+  file: File,
+  actor: AiActor
+): Promise<{ text: string; durationMinutes?: number }> {
   const buffer = new Uint8Array(await file.arrayBuffer());
-  const result = await transcribeWithProvider(buffer);
+  const result = await transcribeWithProvider(buffer, actor);
   return {
     text: result.text.trim(),
     durationMinutes: result.durationInSeconds ? Math.round(result.durationInSeconds / 60) : undefined,
@@ -76,7 +83,8 @@ function honestFallback(fileName: string, rawText: string): ExtractionResult {
 async function summarize(
   rawText: string,
   fileName: string,
-  context: AtlasContext | undefined
+  context: AtlasContext | undefined,
+  actor: AiActor
 ): Promise<ExtractionResult> {
   if (!rawText) {
     return {
@@ -98,6 +106,7 @@ async function summarize(
 
   try {
     const object = await generateStructuredData({
+      actor,
       schema: extractedShiurSchema,
       system: joinContextSections([
         "אתה עוזר שמנתח תמלול או טקסט של שיעור תורני ומחלץ ממנו נושא, מקור וסיכום תמציתי. " +
@@ -107,7 +116,12 @@ async function summarize(
       prompt: rawText.slice(0, MAX_TEXT_CHARS_FOR_LLM),
     });
     return object;
-  } catch {
+  } catch (err) {
+    // A quota rejection is not an extraction failure and must not be
+    // absorbed into the fallback — the caller turns it into a 429 with a
+    // real explanation, whereas honestFallback would hand back a plausible
+    // stub and hide the fact that nothing was generated.
+    if (err instanceof AiQuotaExceededError) throw err;
     return honestFallback(fileName, rawText);
   }
 }
@@ -120,6 +134,9 @@ export async function POST(request: Request) {
 
   const limited = rateLimitResponse(`torah-extract:${session.user.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
+
+  // Resolved from the session, never from the request body.
+  const actor = await currentUserActor();
 
   const formData = await request.formData();
   const file = formData.get("file");
@@ -137,7 +154,7 @@ export async function POST(request: Request) {
     if (file.type === "application/pdf") {
       const rawText = await extractPdfText(file);
       const context = user ? await buildAtlasContext(user.id, { query: rawText.slice(0, 2000) }) : undefined;
-      const result = await summarize(rawText, file.name, context);
+      const result = await summarize(rawText, file.name, context, actor);
       return NextResponse.json(result);
     }
 
@@ -151,14 +168,16 @@ export async function POST(request: Request) {
           { status: 503 }
         );
       }
-      const { text: rawText, durationMinutes } = await transcribeAudio(file);
+      const { text: rawText, durationMinutes } = await transcribeAudio(file, actor);
       const context = user ? await buildAtlasContext(user.id, { query: rawText.slice(0, 2000) }) : undefined;
-      const result = await summarize(rawText, file.name, context);
+      const result = await summarize(rawText, file.name, context, actor);
       return NextResponse.json({ ...result, durationMinutes });
     }
 
     return NextResponse.json({ error: "סוג קובץ לא נתמך. יש להעלות PDF או קובץ אודיו." }, { status: 400 });
-  } catch {
+  } catch (err) {
+    const quota = aiQuotaResponse(err);
+    if (quota) return quota;
     return NextResponse.json({ error: "עיבוד הקובץ נכשל. נסה שוב." }, { status: 500 });
   }
 }
