@@ -24,8 +24,9 @@ Life Plus is a personal, Hebrew-language (RTL) "Proactive AI Life Operating Syst
 
    | Variable | Purpose |
    |---|---|
-   | `OPENAI_API_KEY` | Enables every AI-backed route (chat, goal breakdown, Torah extraction, Deep Onboarding, the AI Command Panel) via OpenAI, and is required for audio transcription (Torah Space uploads) regardless of which provider handles chat. |
-   | `GEMINI_API_KEY` | Alternative chat provider — get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). If both `OPENAI_API_KEY` and `GEMINI_API_KEY` are set, OpenAI is used. Every AI-backed route degrades to an honest fallback (never a fabricated response) when neither is set. |
+   | `GEMINI_API_KEY` | Primary chat provider — get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Used whenever present; enables every AI-backed route (chat, goal breakdown, Torah extraction, Deep Onboarding, the AI Command Panel). |
+   | `OPENAI_API_KEY` | Final fallback provider, and required for audio transcription (Torah Space uploads) regardless of which provider handles chat. Every AI-backed route degrades to an honest fallback (never a fabricated response) when no chat provider is configured at all. |
+   | `BYTEZ_API_KEY` | Optional middle fallback tier between Gemini and OpenAI — get a key at [bytez.com](https://bytez.com). See `lib/ai/provider.ts`'s `getChatModelChain` for the exact ordering. |
    | `NEXTAUTH_SECRET` | Generate with `openssl rand -base64 32`. |
    | `NEXTAUTH_URL` | `http://localhost:3000` for local development. |
    | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials from the [Google Cloud Console](https://console.cloud.google.com/apis/credentials). Needs the `calendar.events` scope for calendar suggestions/commands to work. |

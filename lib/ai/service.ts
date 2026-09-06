@@ -4,6 +4,7 @@ import type { z } from "zod";
 import type { ChatModelCandidate } from "@/lib/ai/provider";
 import { getChatModel, getChatModelChain, getTranscriptionModel } from "@/lib/ai/provider";
 import { isRetryableAiError } from "@/lib/ai/retryableError";
+import { bytezGenerateObject, bytezGenerateText } from "@/lib/ai/bytez";
 import {
   actualAudioMinutes,
   budgetsFor,
@@ -121,7 +122,7 @@ const STRUCTURED_TIMEOUT_MS = 45_000; // generateObject re-prompts on schema mis
  */
 async function withModelFallback<T>(
   operation: string,
-  attempt: (model: ChatModelCandidate["model"]) => Promise<T>
+  attempt: (candidate: ChatModelCandidate) => Promise<T>
 ): Promise<T> {
   const chain = getChatModelChain();
   let lastError: unknown;
@@ -129,7 +130,7 @@ async function withModelFallback<T>(
   for (let i = 0; i < chain.length; i++) {
     const candidate = chain[i];
     try {
-      const result = await attempt(candidate.model);
+      const result = await attempt(candidate);
       if (i > 0) {
         console.warn(`[ai] ${operation} recovered on fallback model ${candidate.label} (attempt ${i + 1})`);
       }
@@ -182,9 +183,12 @@ export async function generateChatText(params: {
   operation?: AiOperation;
 }): Promise<string> {
   await chargeQuota(params.actor, params.operation ?? "chat");
-  return withModelFallback("generateChatText", async (model) => {
+  return withModelFallback("generateChatText", async (candidate) => {
+    if (candidate.kind === "bytez") {
+      return bytezGenerateText({ modelId: candidate.modelId, system: params.system, prompt: params.prompt });
+    }
     const { text } = await generateText({
-      model,
+      model: candidate.model,
       system: params.system,
       prompt: params.prompt,
       maxRetries: 1,
@@ -203,9 +207,22 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
   operation?: AiOperation;
 }) {
   await chargeQuota(params.actor, params.operation ?? "structured");
-  return withModelFallback("generateStructuredData", async (model) => {
+  return withModelFallback("generateStructuredData", async (candidate) => {
+    if (candidate.kind === "bytez") {
+      // See lib/ai/bytez.ts: prompted JSON, not native schema enforcement.
+      // No abortSignal/maxRetries plumbing to match here — callBytez
+      // carries its own timeout, and a schema-validation failure is
+      // deliberately not retried within this one call the way
+      // generateObject retries a single model's near-miss.
+      return bytezGenerateObject({
+        modelId: candidate.modelId,
+        schema: params.schema,
+        system: params.system,
+        prompt: params.prompt,
+      });
+    }
     const { object } = await generateObject({
-      model,
+      model: candidate.model,
       schema: params.schema,
       system: params.system,
       prompt: params.prompt,

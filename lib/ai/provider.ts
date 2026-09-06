@@ -1,6 +1,7 @@
 import "server-only";
 import { openai } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import type { LanguageModel } from "ai";
 import { resolveChatProvider, type ChatProvider } from "@/lib/ai/resolveChatProvider";
 
 // The one place that knows which AI provider Atlas actually uses (Unified
@@ -41,6 +42,20 @@ const GEMINI_CHAT_MODEL_ID = "gemini-flash-lite-latest";
 const GEMINI_FALLBACK_MODEL_ID = "gemini-flash-latest";
 const OPENAI_FALLBACK_MODEL_ID = "gpt-4o-mini";
 const TRANSCRIPTION_MODEL_ID = "whisper-1";
+// Second fallback, between Gemini and OpenAI — see lib/ai/bytez.ts for why
+// this is a direct REST call rather than an SDK-native model.
+//
+// Bytez has no distinct "free models" tier: it bills all open-model
+// inference by the second (docs.bytez.com/model-api/docs/billing), with a
+// small rolling credit allowance ($1 / 4 weeks on the free plan) that any
+// model draws down, scaled by parameter count — a 7B-class model runs
+// roughly $0.26/hour, a 120B one roughly five times that. Gemma 3 4B is
+// below even the 7B tier, is genuinely capable as an assistant model for
+// its size, and is confirmed as an actual, currently-integrated Bytez
+// model (docs.litellm.ai/docs/providers/bytez uses this exact id as their
+// own worked example) — cheap enough that this fallback tier does not
+// meaningfully eat into a free-tier account's rolling allowance.
+const BYTEZ_CHAT_MODEL_ID = "google/gemma-3-4b-it";
 
 function currentChatProvider(): ChatProvider {
   return resolveChatProvider({
@@ -56,19 +71,27 @@ function getGoogleProvider() {
   return createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
 }
 
-export function getChatModel() {
+export function getChatModel(): LanguageModel {
   // currentChatProvider() being null here means a caller invoked this
   // without first checking isProviderConfigured() — falling back to OpenAI
   // (which will itself fail loudly on a missing key) is more honest than
   // silently picking a provider nothing asked for.
+  //
+  // Bytez deliberately never appears here. This is the single-model picker
+  // streamChatReply uses (see its own comment for why streaming has no
+  // mid-request failover), and Bytez is meant strictly as a fallback tier
+  // inside getChatModelChain() below, never a top-level primary choice.
   return currentChatProvider() === "gemini" ? getGoogleProvider()(GEMINI_CHAT_MODEL_ID) : openai(OPENAI_CHAT_MODEL_ID);
 }
 
-export interface ChatModelCandidate {
-  /** For logging — which model actually served the request. */
-  label: string;
-  model: ReturnType<typeof openai>;
-}
+// A "sdk" candidate is called through generateText/generateObject exactly
+// as before; a "bytez" candidate has no LanguageModel to hand those
+// functions, so it carries only the model id and is called through
+// lib/ai/bytez.ts instead — see the branch in each of
+// lib/ai/service.ts's withModelFallback call sites.
+export type ChatModelCandidate =
+  | { kind: "sdk"; label: string; model: LanguageModel }
+  | { kind: "bytez"; label: string; modelId: string };
 
 /**
  * The ordered failover chain (system-wide AI resiliency).
@@ -86,30 +109,43 @@ export function getChatModelChain(): ChatModelCandidate[] {
   const provider = currentChatProvider();
   const hasOpenAi = Boolean(process.env.OPENAI_API_KEY);
   const hasGemini = Boolean(process.env.GEMINI_API_KEY);
+  const hasBytez = Boolean(process.env.BYTEZ_API_KEY);
 
   const openaiPrimary: ChatModelCandidate[] = hasOpenAi
-    ? [{ label: `openai:${OPENAI_CHAT_MODEL_ID}`, model: openai(OPENAI_CHAT_MODEL_ID) }]
+    ? [{ kind: "sdk", label: `openai:${OPENAI_CHAT_MODEL_ID}`, model: openai(OPENAI_CHAT_MODEL_ID) }]
     : [];
   const geminiPrimary: ChatModelCandidate[] = hasGemini
-    ? [{ label: `gemini:${GEMINI_CHAT_MODEL_ID}`, model: getGoogleProvider()(GEMINI_CHAT_MODEL_ID) }]
+    ? [{ kind: "sdk", label: `gemini:${GEMINI_CHAT_MODEL_ID}`, model: getGoogleProvider()(GEMINI_CHAT_MODEL_ID) }]
     : [];
   const geminiAlternate: ChatModelCandidate[] = hasGemini
-    ? [{ label: `gemini:${GEMINI_FALLBACK_MODEL_ID}`, model: getGoogleProvider()(GEMINI_FALLBACK_MODEL_ID) }]
+    ? [{ kind: "sdk", label: `gemini:${GEMINI_FALLBACK_MODEL_ID}`, model: getGoogleProvider()(GEMINI_FALLBACK_MODEL_ID) }]
     : [];
   const openaiAlternate: ChatModelCandidate[] =
     hasOpenAi && OPENAI_FALLBACK_MODEL_ID !== OPENAI_CHAT_MODEL_ID
-      ? [{ label: `openai:${OPENAI_FALLBACK_MODEL_ID}`, model: openai(OPENAI_FALLBACK_MODEL_ID) }]
+      ? [{ kind: "sdk", label: `openai:${OPENAI_FALLBACK_MODEL_ID}`, model: openai(OPENAI_FALLBACK_MODEL_ID) }]
       : [];
+  // The middle tier: "Gemini primary, Bytez second, OpenAI final" per the
+  // requested ordering. Included in the openai-primary branch too (only
+  // reached when Gemini's own key is absent) so a Gemini outage does not
+  // also remove Atlas's only other cross-provider fallback — it slots in
+  // right after whichever provider is actually primary, before that
+  // branch's within-provider alternates, matching the existing "cross
+  // providers before falling back within one" ordering below.
+  const bytez: ChatModelCandidate[] = hasBytez
+    ? [{ kind: "bytez", label: `bytez:${BYTEZ_CHAT_MODEL_ID}`, modelId: BYTEZ_CHAT_MODEL_ID }]
+    : [];
 
   const chain =
     provider === "gemini"
-      ? [...geminiPrimary, ...openaiPrimary, ...geminiAlternate]
-      : [...openaiPrimary, ...geminiPrimary, ...openaiAlternate, ...geminiAlternate];
+      ? [...geminiPrimary, ...bytez, ...openaiPrimary, ...geminiAlternate]
+      : [...openaiPrimary, ...bytez, ...geminiPrimary, ...openaiAlternate, ...geminiAlternate];
 
   // Never hand back an empty chain: callers gate on isProviderConfigured(),
   // and an empty array would look like "succeeded with no result" rather
   // than failing loudly on a missing key.
-  return chain.length > 0 ? chain : [{ label: `openai:${OPENAI_CHAT_MODEL_ID}`, model: openai(OPENAI_CHAT_MODEL_ID) }];
+  return chain.length > 0
+    ? chain
+    : [{ kind: "sdk", label: `openai:${OPENAI_CHAT_MODEL_ID}`, model: openai(OPENAI_CHAT_MODEL_ID) }];
 }
 
 export function getTranscriptionModel() {
