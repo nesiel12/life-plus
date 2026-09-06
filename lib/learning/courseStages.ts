@@ -17,16 +17,6 @@ export type CourseStage =
   | { kind: "takeaways"; items: string[] }
   | { kind: "quiz"; questions: QuizQuestion[] };
 
-export interface StageMeta {
-  stage: CourseStage;
-  /** 0-based position. */
-  index: number;
-  /** How many stages the course has in total. */
-  total: number;
-  isFirst: boolean;
-  isLast: boolean;
-}
-
 /**
  * The stages of a course, in reading order.
  *
@@ -56,18 +46,6 @@ export function clampStage(index: number, total: number): number {
   if (total <= 0) return 0;
   if (!Number.isFinite(index)) return 0;
   return Math.min(Math.max(Math.trunc(index), 0), total - 1);
-}
-
-export function stageMeta(stages: CourseStage[], index: number): StageMeta | null {
-  if (stages.length === 0) return null;
-  const clamped = clampStage(index, stages.length);
-  return {
-    stage: stages[clamped],
-    index: clamped,
-    total: stages.length,
-    isFirst: clamped === 0,
-    isLast: clamped === stages.length - 1,
-  };
 }
 
 /** What the progress rail calls each stage. */

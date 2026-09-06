@@ -1,10 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, CornerDownLeft, Pencil, Pin, PinOff, Plus, Trash2, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { isFirst, isLast } from "@/lib/summaries/ordering";
-import { buildSectionTree, sectionAndDescendants } from "@/lib/summaries/hierarchy";
+import {
+  buildSectionTree,
+  eligibleParents,
+  sectionAndDescendants,
+  wouldExceedDepth,
+} from "@/lib/summaries/hierarchy";
 import { cn } from "@/lib/utils";
 import type { SummarySection } from "@/types";
 
@@ -77,13 +82,24 @@ export function SectionManager({ activeSectionId, onSelect }: SectionManagerProp
     setRenameValue("");
   }
 
+  // Moving an existing section under another, or back out to top level.
+  // Creating a sub-section was already possible; without this the hierarchy
+  // was one-way — you could build the wrong shape but never correct it.
+  function reparent(sectionId: string, parentId: string | null) {
+    // Guarded even though the picker only offers legal targets: the list is
+    // built from a snapshot, and a section that gained a child in another tab
+    // between render and click would otherwise be moved to depth two.
+    if (wouldExceedDepth(sections, sectionId, parentId)) return;
+    updateSection(sectionId, { parentId: parentId ?? undefined }).catch(() => {});
+  }
+
   function togglePin(section: SummarySection) {
     updateSection(section.id, {
       pinnedAt: section.pinnedAt ? undefined : new Date().toISOString(),
     }).catch(() => {});
   }
 
-  function Tab({ section, depth }: { section: SummarySection; depth: number }) {
+  function renderTab(section: SummarySection, depth: number) {
     const isActive = activeSectionId === section.id;
     const siblings = depth === 0 ? tree.map((n) => n.section) : (activeRoot?.children ?? []);
 
@@ -166,6 +182,25 @@ export function SectionManager({ activeSectionId, onSelect }: SectionManagerProp
             >
               {section.pinnedAt ? <PinOff size={11} aria-hidden /> : <Pin size={11} aria-hidden />}
             </button>
+            {/* Re-parenting. Offered only where it is legal: a section with
+                children of its own has nowhere to go without dragging them
+                to depth two, and eligibleParents returns nothing for it. */}
+            {(depth === 1 || eligibleParents(sections, section.id).length > 0) && (
+              <select
+                value={section.parentId ?? ""}
+                onChange={(e) => reparent(section.id, e.target.value || null)}
+                aria-label={`העבר את ${section.name} למדור אחר`}
+                className="focus-ring max-w-[7rem] rounded border border-hairline-card bg-surface px-1 py-0.5 text-[0.65rem] text-muted"
+              >
+                <option value="">רמה עליונה</option>
+                {eligibleParents(sections, section.id).map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
             {/* Only a top-level section can take children — the depth cap. */}
             {depth === 0 && (
               <button
@@ -222,7 +257,7 @@ export function SectionManager({ activeSectionId, onSelect }: SectionManagerProp
         </button>
 
         {tree.map((node) => (
-          <Tab key={node.section.id} section={node.section} depth={0} />
+          <Fragment key={node.section.id}>{renderTab(node.section, 0)}</Fragment>
         ))}
 
         {adding && !adding.parentId ? (
@@ -278,7 +313,7 @@ export function SectionManager({ activeSectionId, onSelect }: SectionManagerProp
       {activeRoot && activeRoot.children.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 ps-4" role="tablist" aria-label={`תתי-מדורים ב${activeRoot.section.name}`}>
           {activeRoot.children.map((child) => (
-            <Tab key={child.id} section={child} depth={1} />
+            <Fragment key={child.id}>{renderTab(child, 1)}</Fragment>
           ))}
         </div>
       )}

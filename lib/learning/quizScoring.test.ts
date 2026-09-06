@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  isComplete,
   isSubmittable,
   scoreLabel,
   scoreQuiz,
@@ -78,22 +77,6 @@ describe("scoreLabel", () => {
 
   it("does not call a failing score encouraging", () => {
     expect(scoreLabel(40)).toBe("כדאי לחזור על החומר");
-  });
-});
-
-describe("isComplete", () => {
-  it("is true only when every question has a selection", () => {
-    expect(isComplete(THREE, [0, 1, 2])).toBe(true);
-    expect(isComplete(THREE, [0, 1, null])).toBe(false);
-    expect(isComplete(THREE, [0])).toBe(false);
-  });
-
-  it("counts a zero selection as answered", () => {
-    expect(isComplete([q(1)], [0])).toBe(true);
-  });
-
-  it("is false for an empty quiz — there is nothing to submit", () => {
-    expect(isComplete([], [])).toBe(false);
   });
 });
 
@@ -237,12 +220,12 @@ describe("flagging", () => {
       expect(isSubmittable(questions, [0, null, 2])).toBe(false);
     });
 
-    // isComplete keeps its stricter meaning — it is not the submit gate.
-    it("is looser than isComplete", () => {
+    // The whole point: a gap that would have blocked submission no longer
+    // does, once the learner has explicitly set it aside.
+    it("lets a flagged gap through where an unflagged one blocks", () => {
       const answers = [0, null, 2];
-      const flags = [false, true, false];
-      expect(isComplete(questions, answers)).toBe(false);
-      expect(isSubmittable(questions, answers, flags)).toBe(true);
+      expect(isSubmittable(questions, answers, [false, false, false])).toBe(false);
+      expect(isSubmittable(questions, answers, [false, true, false])).toBe(true);
     });
   });
 

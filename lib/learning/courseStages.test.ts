@@ -3,7 +3,6 @@ import {
   buildStages,
   clampStage,
   stageLabel,
-  stageMeta,
   stageProgress,
 } from "@/lib/learning/courseStages";
 import type { CourseModule } from "@/lib/ai/courseModule";
@@ -110,34 +109,6 @@ describe("clampStage", () => {
     expect(clampStage(NaN, 5)).toBe(0);
     expect(clampStage(Infinity, 5)).toBe(0);
     expect(clampStage(2.7, 5)).toBe(2);
-  });
-});
-
-describe("stageMeta", () => {
-  const stages = buildStages(courseModule());
-
-  it("is null when there are no stages", () => {
-    expect(stageMeta([], 0)).toBeNull();
-  });
-
-  it("marks the first and last stage", () => {
-    expect(stageMeta(stages, 0)).toMatchObject({ isFirst: true, isLast: false, total: 5 });
-    expect(stageMeta(stages, 4)).toMatchObject({ isFirst: false, isLast: true });
-  });
-
-  it("clamps an out-of-range index instead of returning undefined", () => {
-    expect(stageMeta(stages, 99)?.index).toBe(4);
-    expect(stageMeta(stages, -1)?.index).toBe(0);
-  });
-
-  it("returns the stage at the index", () => {
-    expect(stageMeta(stages, 3)?.stage.kind).toBe("takeaways");
-  });
-
-  // One stage is both the first and the last — a course with only an intro.
-  it("marks a single stage as both first and last", () => {
-    const only = buildStages(courseModule({ sections: [], keyTakeaways: [], quiz: [] }));
-    expect(stageMeta(only, 0)).toMatchObject({ isFirst: true, isLast: true, total: 1 });
   });
 });
 

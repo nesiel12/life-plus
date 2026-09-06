@@ -94,17 +94,13 @@ export function scoreLabel(percent: number): string {
   return "כדאי לחזור על החומר";
 }
 
-/** True once every question has a selection. */
-export function isComplete(questions: ScorableQuestion[], answers: QuizAnswers): boolean {
-  return questions.length > 0 && questions.every((_, i) => answers[i] !== null && answers[i] !== undefined);
-}
-
 /**
  * True once every question is either answered or deliberately flagged.
  *
- * This, not isComplete, gates submission. Requiring every question to be
- * answered is what made one unanswerable question a dead end for the whole
- * course — the learner could neither finish the quiz nor get past it.
+ * Gates submission. The stricter "every question answered" predicate this
+ * replaced is what made one unanswerable question a dead end for the whole
+ * course — the learner could neither finish the quiz nor get past it — and it
+ * was deleted rather than kept, since nothing needs that meaning any more.
  */
 export function isSubmittable(
   questions: ScorableQuestion[],

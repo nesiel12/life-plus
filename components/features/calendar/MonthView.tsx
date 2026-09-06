@@ -133,14 +133,19 @@ export function MonthView({ anchor, onSelectDay }: MonthViewProps) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.2, delay: Math.min(cell.day * 0.006, 0.2) }}
-                // A real button only when there is somewhere to go. Making
+                // Interactive only when there is somewhere to go — making
                 // every cell clickable when nothing handles the click is a
                 // promise the grid cannot keep.
+                //
+                // The role stays gridcell either way. Swapping it to "button"
+                // would put a button directly inside role="grid", which
+                // expects rows and gridcells; a focusable, activatable
+                // gridcell is the shape a date grid is supposed to have.
+                role="gridcell"
                 {...(onSelectDay
                   ? {
                       onClick: () => onSelectDay(new Date(anchorYear, anchorMonthIndex, cell.day)),
                       tabIndex: 0,
-                      role: "button" as const,
                       onKeyDown: (e: React.KeyboardEvent) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
@@ -148,7 +153,7 @@ export function MonthView({ anchor, onSelectDay }: MonthViewProps) {
                         }
                       },
                     }
-                  : { role: "gridcell" as const })}
+                  : {})}
                 aria-label={`${cell.day} — ${cell.count} אירועים`}
                 className={cn(
                   "flex aspect-square flex-col items-center justify-center rounded-lg border text-xs transition-colors",
