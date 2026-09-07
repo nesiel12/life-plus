@@ -15,6 +15,11 @@ import { createRecommendationEvent } from "@/lib/intelligence/recommendations";
 import { fetchGoogleCalendarEvents } from "@/lib/googleCalendar/fetchEvents";
 import { currentUserActor } from "@/lib/ai/actor";
 import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
+import { personalDnaRepo } from "@/lib/db/personalDna";
+import { localDayIn, resolveUserTimezone } from "@/lib/proactive/timezone";
+import { getLocalWallClock } from "@/lib/intelligence/personalDNA/timezone";
+import { parseMinute, WEEKDAY_LABELS } from "@/lib/schedule/routine";
+import { wallClockToInstant } from "@/lib/commands/wallClock";
 
 export const runtime = "nodejs";
 // Above lib/ai/service.ts's internal timeouts, so the app's own graceful
@@ -73,10 +78,23 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // The model cannot resolve "מחר בשמונה" without knowing when now is,
+    // and the server's clock is not the user's. Reading their stored zone is
+    // what makes every relative time in a spoken command land correctly.
+    const dna = await personalDnaRepo.get(user.id).catch(() => null);
+    const timeZone = resolveUserTimezone(dna?.timezone);
+    const now = new Date();
+
     const result = await generateStructuredData({
       actor,
       schema: CommandIntentSchema,
-      system: buildCommandSystemPrompt(),
+      system: buildCommandSystemPrompt({
+        nowLocal: getLocalWallClock(now.toISOString(), timeZone),
+        // Noon of the user's local date, read back in UTC: the only way to
+        // get their weekday without the host's own timezone shifting it.
+        todayLabel:
+          WEEKDAY_LABELS[new Date(`${localDayIn(now, timeZone)}T12:00:00Z`).getUTCDay()],
+      }),
       prompt: message,
     });
 
@@ -101,6 +119,81 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         reply: result.reply,
         proposal: { type: "add_goal", recommendationEventId, addGoal: result.addGoal },
+      });
+    }
+
+    if (result.intent === "add_task" && result.addTask) {
+      const recommendationEventId = await createRecommendationEvent(user.id, {
+        type: "command_add_task",
+        source: "commands_interpret_route",
+        payload: result.addTask,
+      });
+      return NextResponse.json({
+        reply: result.reply,
+        proposal: { type: "add_task", recommendationEventId, addTask: result.addTask },
+      });
+    }
+
+    if (result.intent === "add_calendar_event" && result.addCalendarEvent) {
+      // The model speaks wall-clock; Google needs an instant. Converting here
+      // rather than client-side keeps the user's stored timezone as the single
+      // authority on what "10:00" meant.
+      const start = wallClockToInstant(result.addCalendarEvent.start, timeZone);
+      const end = wallClockToInstant(result.addCalendarEvent.end, timeZone);
+      if (!start || !end || end <= start) {
+        return NextResponse.json({
+          reply: "לא הצלחתי להבין את השעות. אפשר לנסח שוב עם שעת התחלה וסיום?",
+          proposal: null,
+        });
+      }
+      const payload = { title: result.addCalendarEvent.title, start, end };
+      const recommendationEventId = await createRecommendationEvent(user.id, {
+        type: "command_add_calendar_event",
+        source: "commands_interpret_route",
+        payload,
+      });
+      return NextResponse.json({
+        reply: result.reply,
+        proposal: { type: "add_calendar_event", recommendationEventId, addCalendarEvent: payload },
+      });
+    }
+
+    if (result.intent === "add_routine_block" && result.addRoutineBlock) {
+      const startMinute = parseMinute(result.addRoutineBlock.startTime);
+      const endMinute = parseMinute(result.addRoutineBlock.endTime);
+      if (startMinute === null || endMinute === null || endMinute <= startMinute) {
+        return NextResponse.json({
+          reply: "לא הצלחתי להבין את השעות של הבלוק. אפשר לנסח שוב?",
+          proposal: null,
+        });
+      }
+      const payload = {
+        title: result.addRoutineBlock.title,
+        kind: result.addRoutineBlock.kind,
+        weekdays: [...new Set(result.addRoutineBlock.weekdays)].sort((a, b) => a - b),
+        startMinute,
+        endMinute,
+      };
+      const recommendationEventId = await createRecommendationEvent(user.id, {
+        type: "command_add_routine_block",
+        source: "commands_interpret_route",
+        payload,
+      });
+      return NextResponse.json({
+        reply: result.reply,
+        proposal: { type: "add_routine_block", recommendationEventId, addRoutineBlock: payload },
+      });
+    }
+
+    if (result.intent === "log_check_in" && result.logCheckIn) {
+      const recommendationEventId = await createRecommendationEvent(user.id, {
+        type: "command_log_check_in",
+        source: "commands_interpret_route",
+        payload: result.logCheckIn,
+      });
+      return NextResponse.json({
+        reply: result.reply,
+        proposal: { type: "log_check_in", recommendationEventId, logCheckIn: result.logCheckIn },
       });
     }
 

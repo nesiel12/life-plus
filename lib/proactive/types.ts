@@ -8,7 +8,8 @@ export type JobName =
   | "busy_week_scan"
   | "notification_dispatch"
   | "schedule_transition"
-  | "recovery_support";
+  | "recovery_support"
+  | "relationship_nudge";
 
 export type NotificationKind =
   | "daily_insight"

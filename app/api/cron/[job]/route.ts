@@ -14,6 +14,7 @@ const VALID_JOBS: JobName[] = [
   "notification_dispatch",
   "schedule_transition",
   "recovery_support",
+  "relationship_nudge",
 ];
 
 /**
@@ -36,6 +37,7 @@ const JOB_GROUPS: Record<string, JobName[]> = {
     "recommendation_expiry",
     "daily_insight",
     "morning_briefing",
+    "relationship_nudge",
     "reminder_sweep",
     "schedule_transition",
     "recovery_support",

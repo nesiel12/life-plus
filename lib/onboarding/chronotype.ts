@@ -45,6 +45,19 @@ export function dayPartForHour(hour: number): DayPart | null {
   return DAY_PARTS.find((p) => hour >= p.startHour && hour < p.endHour)?.key ?? null;
 }
 
+/**
+ * Every clock hour a day part covers.
+ *
+ * The hour bounds already exist here as the single source of truth; this
+ * exposes them as a flat list so scheduling code can ask "is 16:00 a peak
+ * hour for this person" without re-deriving the ranges.
+ */
+export function dayPartToHours(key: DayPart): number[] {
+  const meta = META_BY_KEY.get(key);
+  if (!meta) return [];
+  return Array.from({ length: meta.endHour - meta.startHour }, (_, i) => meta.startHour + i);
+}
+
 export function dayPartMeta(key: DayPart): DayPartMeta | undefined {
   return META_BY_KEY.get(key);
 }

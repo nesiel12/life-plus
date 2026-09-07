@@ -212,7 +212,12 @@ interface AtlasState extends HydratedState {
   reorderSummaryInSection: (summaryId: string, delta: number) => Promise<void>;
   deleteSummary: (summaryId: string) => Promise<void>;
 
-  addTask: (task: { title: string; description?: string; dueDate?: string }) => Promise<void>;
+  addTask: (task: {
+    title: string;
+    description?: string;
+    dueDate?: string;
+    isHighPriority?: boolean;
+  }) => Promise<void>;
   updateTask: (taskId: string, patch: Partial<Task>) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
 
