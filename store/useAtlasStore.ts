@@ -17,6 +17,13 @@ import {
   setChatMessagePinnedAction,
 } from "@/app/actions/chat";
 import { addInsightAction } from "@/app/actions/insights";
+import {
+  addRoutineBlockAction,
+  deleteRoutineBlockAction,
+  importRoutineBlocksAction,
+  updateRoutineBlockAction,
+  type RoutineBlockInput,
+} from "@/app/actions/routineBlocks";
 import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/actions/knowledge";
 import { addBookAction, updateBookAction, deleteBookAction } from "@/app/actions/books";
 import { addRabbiAction, updateRabbiAction, deleteRabbiAction } from "@/app/actions/rabbis";
@@ -68,6 +75,7 @@ import { EMPTY_PERSONAL_DNA } from "@/types";
 import type {
   AppNotification,
   Book,
+  RoutineBlock,
   ChatMessage,
   DailyRecommendation,
   Goal,
@@ -127,6 +135,7 @@ export interface HydratedState {
   learningResources: LearningResource[];
   meals: Meal[];
   workouts: Workout[];
+  routineBlocks: RoutineBlock[];
   notifications: AppNotification[];
   /** Badge count. Kept separately from notifications.length because the list
    *  is one page and the count is over everything unread. */
@@ -294,6 +303,11 @@ interface AtlasState extends HydratedState {
 
   setPersonalDnaTimezone: (timezone: string) => void;
 
+  addRoutineBlock: (input: RoutineBlockInput) => Promise<void>;
+  updateRoutineBlock: (blockId: string, patch: Partial<RoutineBlock>) => Promise<void>;
+  deleteRoutineBlock: (blockId: string) => Promise<void>;
+  importRoutineBlocks: (blocks: RoutineBlockInput[], options?: { replace?: boolean }) => Promise<void>;
+
   refreshNotifications: () => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   dismissNotification: (id: string) => Promise<void>;
@@ -327,6 +341,7 @@ const EMPTY_STATE: HydratedState = {
   learningResources: [],
   meals: [],
   workouts: [],
+  routineBlocks: [],
   notifications: [],
   notificationUnreadCount: 0,
 };
@@ -993,6 +1008,53 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   // firing again on the next render.
   setPersonalDnaTimezone: (timezone) =>
     set((state) => ({ personalDNA: { ...state.personalDNA, timezone } })),
+
+  addRoutineBlock: async (input) => {
+    const created = await addRoutineBlockAction(input);
+    set((state) => ({
+      routineBlocks: [...state.routineBlocks, created].sort((a, b) => a.startMinute - b.startMinute),
+    }));
+  },
+
+  updateRoutineBlock: async (blockId, patch) => {
+    const previous = get().routineBlocks;
+    set((state) => ({
+      routineBlocks: state.routineBlocks
+        .map((b) => (b.id === blockId ? { ...b, ...patch } : b))
+        .sort((a, b) => a.startMinute - b.startMinute),
+    }));
+    try {
+      const updated = await updateRoutineBlockAction(blockId, patch);
+      set((state) => ({
+        routineBlocks: state.routineBlocks
+          .map((b) => (b.id === blockId ? updated : b))
+          .sort((a, b) => a.startMinute - b.startMinute),
+      }));
+    } catch (err) {
+      set({ routineBlocks: previous });
+      throw err;
+    }
+  },
+
+  deleteRoutineBlock: async (blockId) => {
+    const previous = get().routineBlocks;
+    set((state) => ({ routineBlocks: state.routineBlocks.filter((b) => b.id !== blockId) }));
+    try {
+      await deleteRoutineBlockAction(blockId);
+    } catch (err) {
+      set({ routineBlocks: previous });
+      throw err;
+    }
+  },
+
+  importRoutineBlocks: async (blocks, options) => {
+    const created = await importRoutineBlocksAction(blocks, options);
+    set((state) => ({
+      routineBlocks: (options?.replace ? created : [...state.routineBlocks, ...created]).sort(
+        (a, b) => a.startMinute - b.startMinute
+      ),
+    }));
+  },
 
   refreshNotifications: async () => {
     const res = await fetch("/api/notifications");

@@ -26,6 +26,7 @@ export interface NotificationSettingsPatch {
   maxPerDay?: number;
   mutedKinds?: string[];
   timezone?: string;
+  scheduleAlertMinutes?: number;
 }
 
 function clampHour(value: number): number {
@@ -53,6 +54,11 @@ export async function updateNotificationSettingsAction(
     // A cap of 0 would silently disable every notification while the toggles
     // still read "on"; 20 a day is already far past useful.
     prefsPatch.max_per_day = Math.min(20, Math.max(1, Math.round(patch.maxPerDay)));
+  }
+  if (patch.scheduleAlertMinutes !== undefined) {
+    // 0 is meaningful — it turns transition alerts off — so this clamps
+    // rather than treating 0 as "unset". 120 is the column's own ceiling.
+    prefsPatch.schedule_alert_minutes = Math.min(120, Math.max(0, Math.round(patch.scheduleAlertMinutes)));
   }
   if (patch.mutedKinds !== undefined) {
     // Drop anything that isn't a kind the app actually produces, so a stale

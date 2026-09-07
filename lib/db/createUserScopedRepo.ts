@@ -30,7 +30,8 @@ type UserScopedTableName =
   | "learning_resources"
   | "meals"
   | "workouts"
-  | "notifications";
+  | "notifications"
+  | "routine_blocks";
 
 export function createUserScopedRepo<T extends UserScopedTableName>(table: T) {
   type Row = Database["public"]["Tables"][T]["Row"];

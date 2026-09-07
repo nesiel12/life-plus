@@ -8,6 +8,7 @@ import type { Database, Json } from "@/types/database";
 import type {
   AppNotification,
   Book,
+  RoutineBlock,
   ChronotypeSettings,
   DayPart,
   ChatMessage,
@@ -39,6 +40,8 @@ import type { GoalWithMilestones } from "@/lib/db/goals";
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
 type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
+type RoutineBlockRow = Database["public"]["Tables"]["routine_blocks"]["Row"];
+type RoutineBlockUpdate = Database["public"]["Tables"]["routine_blocks"]["Update"];
 type LifeAreaScoreRow = Database["public"]["Tables"]["life_area_scores"]["Row"];
 type PersonRow = Database["public"]["Tables"]["people"]["Row"];
 type PersonUpdate = Database["public"]["Tables"]["people"]["Update"];
@@ -592,4 +595,31 @@ export function toNotification(row: NotificationRow): AppNotification {
     readAt: row.read_at ?? undefined,
     createdAt: row.created_at,
   };
+}
+
+export function toRoutineBlock(row: RoutineBlockRow): RoutineBlock {
+  return {
+    id: row.id,
+    title: row.title,
+    kind: row.kind,
+    // Postgres smallint[] arrives as numbers; the engine treats Sunday as 0
+    // to match Date.getDay(), which is the same convention the column uses.
+    weekdays: row.weekdays ?? [],
+    startMinute: row.start_minute,
+    endMinute: row.end_minute,
+    note: row.note ?? undefined,
+    isActive: row.is_active,
+  };
+}
+
+export function toRoutineBlockPatch(patch: Partial<RoutineBlock>): RoutineBlockUpdate {
+  const row: RoutineBlockUpdate = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.kind !== undefined) row.kind = patch.kind;
+  if (patch.weekdays !== undefined) row.weekdays = patch.weekdays;
+  if (patch.startMinute !== undefined) row.start_minute = patch.startMinute;
+  if (patch.endMinute !== undefined) row.end_minute = patch.endMinute;
+  if (patch.note !== undefined) row.note = patch.note || null;
+  if (patch.isActive !== undefined) row.is_active = patch.isActive;
+  return row;
 }

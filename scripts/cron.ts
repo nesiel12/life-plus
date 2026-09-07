@@ -18,6 +18,7 @@ const VALID: JobName[] = [
   "recommendation_expiry",
   "busy_week_scan",
   "notification_dispatch",
+  "schedule_transition",
 ];
 
 const job = process.argv[2] as JobName | undefined;

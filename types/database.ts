@@ -17,6 +17,17 @@ export type LearningTopicStatusDb = "planning" | "active" | "completed";
 export type LearningResourceTypeDb = "youtube" | "podcast" | "article" | "equipment" | "summary";
 export type MealTypeDb = "breakfast" | "lunch" | "dinner" | "snack" | "post-workout";
 export type JobRunStatusDb = "running" | "succeeded" | "failed" | "skipped";
+export type RoutineKindDb =
+  | "work"
+  | "study"
+  | "torah"
+  | "training"
+  | "rest"
+  | "meal"
+  | "commute"
+  | "family"
+  | "free"
+  | "other";
 export type NotificationStatusDb =
   | "pending"
   | "sent"
@@ -1026,6 +1037,7 @@ export interface Database {
           muted_kinds: string[];
           whatsapp_number: string | null;
           max_per_day: number;
+          schedule_alert_minutes: number;
           updated_at: string;
         },
         {
@@ -1038,6 +1050,7 @@ export interface Database {
           muted_kinds?: string[];
           whatsapp_number?: string | null;
           max_per_day?: number;
+          schedule_alert_minutes?: number;
         },
         {
           quiet_hours_start?: number;
@@ -1048,6 +1061,7 @@ export interface Database {
           muted_kinds?: string[];
           whatsapp_number?: string | null;
           max_per_day?: number;
+          schedule_alert_minutes?: number;
         }
       >;
 
@@ -1093,6 +1107,44 @@ export interface Database {
           byte_size?: number;
           caption?: string | null;
           caption_generated_at?: string | null;
+        }
+      >;
+      routine_blocks: TableDef<
+        {
+          id: string;
+          user_id: string;
+          title: string;
+          kind: RoutineKindDb;
+          weekdays: number[];
+          start_minute: number;
+          end_minute: number;
+          note: string | null;
+          is_active: boolean;
+          imported_at: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          title: string;
+          kind?: RoutineKindDb;
+          weekdays: number[];
+          start_minute: number;
+          end_minute: number;
+          note?: string | null;
+          is_active?: boolean;
+          imported_at?: string | null;
+        },
+        {
+          title?: string;
+          kind?: RoutineKindDb;
+          weekdays?: number[];
+          start_minute?: number;
+          end_minute?: number;
+          note?: string | null;
+          is_active?: boolean;
+          imported_at?: string | null;
         }
       >;
       google_calendar_credentials: TableDef<

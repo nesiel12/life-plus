@@ -14,6 +14,7 @@ import { GoalsPanel } from "@/components/features/GoalsPanel";
 import { RecentActivityCard } from "@/components/features/RecentActivityCard";
 import { MemoryCards } from "@/components/features/memories/MemoryCards";
 import { DecisionStream } from "@/components/features/dashboard/DecisionStream";
+import { NowNextCard } from "@/components/features/dashboard/NowNextCard";
 import { IntentionComposer } from "@/components/features/dashboard/IntentionComposer";
 import { TodayTimelineCard } from "@/components/features/dashboard/TodayTimelineCard";
 import { FinanceAlertCard } from "@/components/features/dashboard/FinanceAlertCard";
@@ -198,6 +199,7 @@ export default function Home() {
             // Pillar 3): if the dashboard is meant to have zero cognitive
             // overload, the at-most-three things actually needing a decision
             // have to be the first thing read.
+            "now-next": { node: <NowNextCard /> },
             "decision-stream": { node: <DecisionStream /> },
             "daily-checkin": { node: <DailyCheckIn />, tilt: false },
             "ai-briefing": { node: <AIBriefing bare /> },

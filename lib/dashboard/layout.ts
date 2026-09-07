@@ -33,6 +33,10 @@ export const MAX_SPAN: WidgetSpan = 3;
 
 /** The dashboard as shipped. Order here is the default order. */
 export const WIDGETS: WidgetDefinition[] = [
+  // First by default: "where am I in my day" is the question the dashboard
+  // is opened to answer, and it is the one thing here that changes by the
+  // hour rather than by the day.
+  { id: "now-next", title: "עכשיו והבא", defaultSpan: 1, minSpan: 1 },
   { id: "decision-stream", title: "החלטות להיום", defaultSpan: 1, minSpan: 1 },
   { id: "daily-checkin", title: "צ׳ק-אין יומי", defaultSpan: 1, minSpan: 1 },
   { id: "ai-briefing", title: "תדריך AI", defaultSpan: 2, minSpan: 2 },

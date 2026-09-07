@@ -20,6 +20,8 @@ export const JOB_LOADERS: Partial<Record<JobName, () => Promise<Job>>> = {
     import("@/lib/proactive/jobs/morningBriefing").then((m) => m.morningBriefingJob),
   reminder_sweep: () => import("@/lib/proactive/jobs/reminderSweep").then((m) => m.reminderSweepJob),
   busy_week_scan: () => import("@/lib/proactive/jobs/busyWeekScan").then((m) => m.busyWeekScanJob),
+  schedule_transition: () =>
+    import("@/lib/proactive/jobs/scheduleTransition").then((m) => m.scheduleTransitionJob),
   notification_dispatch: () =>
     import("@/lib/proactive/jobs/notificationDispatch").then((m) => m.notificationDispatchJob),
 };

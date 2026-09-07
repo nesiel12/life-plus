@@ -330,6 +330,8 @@ export interface Workout {
  * a global by that name — a bare `Notification` in a client component would
  * silently resolve to the Web Notifications API instead of this.
  */
+export type { RoutineBlock, RoutineKind } from "@/lib/schedule/routine";
+
 export interface AppNotification {
   id: string;
   kind: string;

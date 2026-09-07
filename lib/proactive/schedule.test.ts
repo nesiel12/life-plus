@@ -12,6 +12,7 @@ const base: NotificationPreferences = {
   mutedKinds: [],
   whatsappNumber: null,
   maxPerDay: 6,
+  scheduleAlertMinutes: 15,
 };
 
 describe("resolveChannels", () => {

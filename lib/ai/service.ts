@@ -100,6 +100,9 @@ const GENERATION_TIMEOUT_MS = 40_000;
 // and the client aborts sooner on a *stall* anyway.
 const STREAM_TIMEOUT_MS = 50_000;
 const STRUCTURED_TIMEOUT_MS = 45_000; // generateObject re-prompts on schema mismatch — give it more room
+// Vision requests carry an image, not a sentence: uploading and reading a
+// photographed timetable takes materially longer than a text prompt.
+const VISION_TIMEOUT_MS = 90_000;
 
 // Returns the SDK's own stream result as-is (callers use its
 // toTextStreamResponse method directly, exactly as before) — this service
@@ -122,9 +125,14 @@ const STRUCTURED_TIMEOUT_MS = 45_000; // generateObject re-prompts on schema mis
  */
 async function withModelFallback<T>(
   operation: string,
-  attempt: (candidate: ChatModelCandidate) => Promise<T>
+  attempt: (candidate: ChatModelCandidate) => Promise<T>,
+  options: { filter?: (candidate: ChatModelCandidate) => boolean } = {}
 ): Promise<T> {
-  const chain = getChatModelChain();
+  const full = getChatModelChain();
+  const chain = options.filter ? full.filter(options.filter) : full;
+  if (chain.length === 0) {
+    throw new Error(`[ai] ${operation}: no configured model supports this request`);
+  }
   let lastError: unknown;
 
   for (let i = 0; i < chain.length; i++) {
@@ -205,9 +213,45 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
   actor: AiActor;
   /** Defaults to a plain structured call; pass "course_module" for the heavy one. */
   operation?: AiOperation;
+  /**
+   * Images to read alongside the prompt — a photographed timetable, say.
+   *
+   * Restricts the fallback chain to SDK candidates: lib/ai/bytez.ts is a
+   * prompted-JSON text integration with no image path, so including it would
+   * mean silently answering a "read this picture" request from the prompt
+   * alone. Better to have one fewer fallback than a confidently wrong answer
+   * about an image the model never saw.
+   */
+  images?: Uint8Array[];
 }) {
   await chargeQuota(params.actor, params.operation ?? "structured");
-  return withModelFallback("generateStructuredData", async (candidate) => {
+  const { images } = params;
+  return withModelFallback(
+    "generateStructuredData",
+    async (candidate) => {
+    if (images && images.length > 0) {
+      if (candidate.kind === "bytez") throw new Error("bytez cannot read images");
+      const { object } = await generateObject({
+        model: candidate.model,
+        schema: params.schema,
+        system: params.system,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: params.prompt },
+              ...images.map((image) => ({ type: "image" as const, image })),
+            ],
+          },
+        ],
+        maxRetries: 1,
+        // Vision calls carry far more input than a text prompt, so they get
+        // the longer of the two budgets rather than the standard one.
+        abortSignal: AbortSignal.timeout(VISION_TIMEOUT_MS),
+      });
+      return object;
+    }
+
     if (candidate.kind === "bytez") {
       // See lib/ai/bytez.ts: prompted JSON, not native schema enforcement.
       // No abortSignal/maxRetries plumbing to match here — callBytez
@@ -238,7 +282,9 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
       abortSignal: AbortSignal.timeout(STRUCTURED_TIMEOUT_MS),
     });
     return object;
-  });
+    },
+    images && images.length > 0 ? { filter: (c) => c.kind === "sdk" } : {}
+  );
 }
 
 export interface TranscriptionResult {

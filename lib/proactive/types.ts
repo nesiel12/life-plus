@@ -6,12 +6,14 @@ export type JobName =
   | "reminder_sweep"
   | "recommendation_expiry"
   | "busy_week_scan"
-  | "notification_dispatch";
+  | "notification_dispatch"
+  | "schedule_transition";
 
 export type NotificationKind =
   | "daily_insight"
   | "briefing_ready"
   | "reminder_event"
+  | "schedule_transition"
   | "reminder_family"
   | "reminder_review"
   | "reminder_medical"
@@ -24,6 +26,7 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   daily_insight: "תובנה יומית",
   briefing_ready: "תדריך בוקר",
   reminder_event: "תזכורות לאירועים",
+  schedule_transition: "מעברים בלוז",
   reminder_family: "תזכורות משפחה",
   reminder_review: "תזכורות חזרה על חומר",
   reminder_medical: "תזכורות רפואיות",
@@ -78,6 +81,8 @@ export interface NotificationPreferences {
   mutedKinds: NotificationKind[];
   whatsappNumber: string | null;
   maxPerDay: number;
+  /** Lead time for schedule-transition alerts, in minutes. 0 disables them. */
+  scheduleAlertMinutes: number;
 }
 
 export interface JobResult {

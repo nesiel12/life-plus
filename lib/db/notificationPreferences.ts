@@ -15,6 +15,7 @@ const DEFAULTS: NotificationPreferences = {
   mutedKinds: [],
   whatsappNumber: null,
   maxPerDay: 6,
+  scheduleAlertMinutes: 15,
 };
 
 function toPreferences(row: Row | null): NotificationPreferences {
@@ -28,6 +29,7 @@ function toPreferences(row: Row | null): NotificationPreferences {
     mutedKinds: (row.muted_kinds ?? []) as NotificationKind[],
     whatsappNumber: row.whatsapp_number,
     maxPerDay: row.max_per_day,
+    scheduleAlertMinutes: row.schedule_alert_minutes,
   };
 }
 

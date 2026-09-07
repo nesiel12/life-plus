@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Check, Clock, Globe, Loader2, Mail } from "lucide-react";
+import { Bell, CalendarRange, Check, Clock, Globe, Loader2, Mail } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BackToHome } from "@/components/layout/BackToHome";
 import {
@@ -82,6 +82,9 @@ export default function SettingsPage() {
       ...(patch.quietHoursStart !== undefined ? { quietHoursStart: patch.quietHoursStart } : {}),
       ...(patch.quietHoursEnd !== undefined ? { quietHoursEnd: patch.quietHoursEnd } : {}),
       ...(patch.maxPerDay !== undefined ? { maxPerDay: patch.maxPerDay } : {}),
+      ...(patch.scheduleAlertMinutes !== undefined
+        ? { scheduleAlertMinutes: patch.scheduleAlertMinutes }
+        : {}),
       ...(patch.mutedKinds !== undefined
         ? { mutedKinds: patch.mutedKinds as NotificationSettings["mutedKinds"] }
         : {}),
@@ -221,6 +224,33 @@ export default function SettingsPage() {
                   className="focus-ring w-20 rounded-lg bg-fill-subtle px-2.5 py-1.5 text-sm text-foreground"
                 />
               </label>
+            </div>
+          </GlassCard>
+
+          <GlassCard>
+            <p className="mb-1 flex items-center gap-2 text-sm font-medium text-muted">
+              <CalendarRange size={16} className="text-accent-time" aria-hidden />
+              התראות מעבר בלוז
+            </p>
+            <p className="mb-4 text-xs text-muted">
+              כמה זמן לפני שבלוק בלוז מתחיל לקבל התראה. אלה לא נעצרות בשעות שקט — את הזמן קבעת אתה.
+            </p>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="זמן התראה מראש">
+              {[0, 5, 10, 15, 30, 60].map((minutes) => (
+                <button
+                  key={minutes}
+                  onClick={() => save({ scheduleAlertMinutes: minutes })}
+                  aria-pressed={settings.scheduleAlertMinutes === minutes}
+                  className={cn(
+                    "focus-ring rounded-lg border px-3 py-1.5 text-xs transition-colors",
+                    settings.scheduleAlertMinutes === minutes
+                      ? "border-gold-line bg-gold-soft font-medium text-gold-ink"
+                      : "border-hairline-card text-muted hover:text-foreground"
+                  )}
+                >
+                  {minutes === 0 ? "כבוי" : `${minutes} דק׳`}
+                </button>
+              ))}
             </div>
           </GlassCard>
 

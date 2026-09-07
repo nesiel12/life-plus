@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { CalendarPlus, Loader2, Plus, Wand2 } from "lucide-react";
+import { CalendarPlus, CalendarRange, Loader2, Plus, Wand2 } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { useApiCall } from "@/hooks/useApiCall";
 import { useInsights } from "@/hooks/useInsights";
@@ -14,6 +14,7 @@ import { NewTaskModal } from "@/components/features/time/NewTaskModal";
 import { NewManualEventModal } from "@/components/features/time/NewManualEventModal";
 import { TaskSuggestions } from "@/components/features/time/TaskSuggestions";
 import { DayCarousel, toDateKey } from "@/components/features/time/DayCarousel";
+import { WeeklySchedule } from "@/components/features/schedule/WeeklySchedule";
 import { Timeline } from "@/components/features/time/Timeline";
 import {
   buildDailyTimelineRows,
@@ -263,6 +264,20 @@ export default function TimeSpacePage() {
         selectedDate={selectedDate}
         existingTasks={tasks.filter((t) => t.status !== "done")}
       />
+
+      {/* The weekly skeleton sits above the day view on purpose: it is the
+          thing that explains the day, and it is the surface people come here
+          to edit when their term or shift pattern changes. */}
+      <GlassCard className="mb-8">
+        <p className="mb-1 flex items-center gap-2 text-sm font-medium text-muted">
+          <CalendarRange size={16} className="text-accent-time" aria-hidden />
+          הלוז השבועי
+        </p>
+        <p className="mb-4 text-xs text-muted">
+          השלד הקבוע של השבוע שלך. על בסיסו האפליקציה יודעת מה עכשיו, מה הבא, ומתי אתה באמת פנוי.
+        </p>
+        <WeeklySchedule />
+      </GlassCard>
 
       <DayCarousel selectedDate={selectedDate} onSelect={setSelectedDate} />
       <div className="mb-10">
