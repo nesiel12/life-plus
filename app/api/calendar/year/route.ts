@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { cached } from "@/lib/api/ttlCache";
-import { fetchCalendarWindow } from "@/lib/googleCalendar/fetchWindow";
+import { fetchAllCalendarsWindow } from "@/lib/googleCalendar/fetchWindow";
 import { countEventsByDay } from "@/lib/calendar/yearDensity";
 
 // Per-day event counts for a whole year, for the calendar's year heat grid.
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const counts = await cached(`calendar-year:${token.email}:${year}`, CACHE_TTL_MS, async () => {
-      const events = await fetchCalendarWindow(accessToken, from, to);
+      const events = await fetchAllCalendarsWindow(accessToken, from, to);
       return countEventsByDay(events, from, to);
     });
     return NextResponse.json({ connected: true, year, counts } satisfies YearResponse);

@@ -69,12 +69,22 @@ export function MonthView({ anchor, onSelectDay }: MonthViewProps) {
     const firstWeekday = new Date(y, m - 1, 1).getDay();
     const dayCount = new Date(y, m, 0).getDate();
 
-    const countByDay = new Map<number, number>();
+    const titlesByDay = new Map<number, string[]>();
     for (const event of events) {
-      const start = new Date(event.start);
-      if (Number.isNaN(start.getTime())) continue;
-      if (start.getFullYear() !== y || start.getMonth() !== m - 1) continue;
-      countByDay.set(start.getDate(), (countByDay.get(start.getDate()) ?? 0) + 1);
+      // An all-day event's start is a bare "YYYY-MM-DD"; new Date() would
+      // read it as UTC midnight and shift it a day back in a positive-offset
+      // timezone — putting a birthday on the wrong square.
+      const day = event.isAllDay
+        ? Number(event.start.slice(8, 10))
+        : (() => {
+            const start = new Date(event.start);
+            if (Number.isNaN(start.getTime())) return null;
+            if (start.getFullYear() !== y || start.getMonth() !== m - 1) return null;
+            return start.getDate();
+          })();
+      if (event.isAllDay && event.start.slice(0, 7) !== month) continue;
+      if (day === null || !Number.isFinite(day)) continue;
+      titlesByDay.set(day, [...(titlesByDay.get(day) ?? []), event.title]);
     }
 
     const today = new Date();
@@ -82,11 +92,15 @@ export function MonthView({ anchor, onSelectDay }: MonthViewProps) {
 
     return [
       ...Array.from({ length: firstWeekday }, () => null),
-      ...Array.from({ length: dayCount }, (_, i) => ({
-        day: i + 1,
-        count: countByDay.get(i + 1) ?? 0,
-        isToday: isCurrentMonth && today.getDate() === i + 1,
-      })),
+      ...Array.from({ length: dayCount }, (_, i) => {
+        const titles = titlesByDay.get(i + 1) ?? [];
+        return {
+          day: i + 1,
+          count: titles.length,
+          titles,
+          isToday: isCurrentMonth && today.getDate() === i + 1,
+        };
+      }),
     ];
   }, [month, events]);
 
@@ -154,7 +168,19 @@ export function MonthView({ anchor, onSelectDay }: MonthViewProps) {
                       },
                     }
                   : {})}
-                aria-label={`${cell.day} — ${cell.count} אירועים`}
+                // Previewing what is actually on the day, rather than only how
+                // many things are on it: the count alone gives no reason to
+                // click, so the grid read as decoration instead of navigation.
+                title={
+                  cell.count === 0
+                    ? undefined
+                    : `${cell.titles.slice(0, 8).join("\n")}${cell.count > 8 ? `\n…ועוד ${cell.count - 8}` : ""}`
+                }
+                aria-label={
+                  cell.count === 0
+                    ? `${cell.day} — אין אירועים`
+                    : `${cell.day} — ${cell.count} אירועים. פתח את היום`
+                }
                 className={cn(
                   "flex aspect-square flex-col items-center justify-center rounded-lg border text-xs transition-colors",
                   onSelectDay && "focus-ring cursor-pointer hover:border-gold-line",

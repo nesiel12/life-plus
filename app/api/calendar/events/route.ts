@@ -4,11 +4,11 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
-import { invalidate } from "@/lib/api/ttlCache";
+import { invalidatePrefix } from "@/lib/api/ttlCache";
 
 export const runtime = "nodejs";
 
-const RATE_LIMIT = { limit: 10, windowMs: 5 * 60 * 1000 }; // 10 requests / 5 min
+const RATE_LIMIT = { limit: 30, windowMs: 5 * 60 * 1000 }; // 30 requests / 5 min
 
 const createEventSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -18,19 +18,26 @@ const createEventSchema = z.object({
 
 const deleteEventSchema = z.object({
   googleEventId: z.string().trim().min(1),
+  /** Which calendar the event lives on. Omitted for events read before
+   *  multi-calendar support, which were all necessarily on primary. */
+  calendarId: z.string().trim().min(1).max(200).optional(),
 });
 
-// The read routes (app/api/calendar/week, /upcoming) cache Google's response
-// for 60s. Any write here has to drop those entries immediately, or an event
-// the user just created or deleted would keep showing the pre-write calendar
-// for up to a minute — which reads as "it didn't work".
+// The read routes cache Google's response for 60s (5min for /year). Any write
+// here has to drop those entries immediately, or an event the user just
+// created or deleted would keep showing the pre-write calendar for up to a
+// minute — which reads as "it didn't work".
+//
+// Prefix-based, not exact-key: the day and week grids cache under
+// `calendar-range:{email}:{fromISO}:{toISO}`, an unbounded set of windows this
+// writer cannot enumerate. The previous exact-key version cleared only
+// week/upcoming/month for *today's* date, so deleting an event left it on
+// screen in the Day and Week views — the two places most likely to be open
+// when you delete something.
 function invalidateCalendarCaches(email: string): void {
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  invalidate(`calendar-week:${email}:${today}`);
-  invalidate(`calendar-upcoming:${email}:${today}`);
-  invalidate(`calendar-month:${email}:${month}`);
+  for (const scope of ["range", "week", "upcoming", "month", "year"]) {
+    invalidatePrefix(`calendar-${scope}:${email}`);
+  }
 }
 
 interface GoogleEventResponse {
@@ -116,11 +123,11 @@ export async function DELETE(request: NextRequest) {
 
   const parsed = await parseJsonBody(request, deleteEventSchema);
   if (parsed.error) return parsed.error;
-  const { googleEventId } = parsed.data;
+  const { googleEventId, calendarId = "primary" } = parsed.data;
 
   try {
     const res = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(googleEventId)}`,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(googleEventId)}`,
       { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
@@ -128,7 +135,22 @@ export async function DELETE(request: NextRequest) {
     // success too, since the end state ("this event no longer exists") is
     // exactly what was asked for.
     if (!res.ok && res.status !== 410) {
-      return NextResponse.json({ error: "Google Calendar rejected the deletion." }, { status: 502 });
+      // 403 on a delete means the grant cannot write to *this* calendar —
+      // a subscribed holiday feed, or a shared calendar with reader access.
+      // That is a different problem from "Google rejected it", and the user
+      // can act on it, so it gets its own message.
+      const message =
+        res.status === 403
+          ? "אין לך הרשאת עריכה ביומן הזה, אז אי אפשר למחוק ממנו אירועים."
+          : res.status === 404
+            ? "האירוע כבר לא קיים ביומן."
+            : "היומן של Google דחה את המחיקה.";
+      // A 404 means the end state is already what was asked for, same as 410.
+      if (res.status === 404) {
+        invalidateCalendarCaches(token.email);
+        return NextResponse.json({ deleted: true });
+      }
+      return NextResponse.json({ error: message }, { status: 502 });
     }
 
     invalidateCalendarCaches(token.email);

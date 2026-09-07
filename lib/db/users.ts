@@ -12,6 +12,22 @@ export async function listAllUserIds(): Promise<string[]> {
   return (data ?? []).map((r) => r.id);
 }
 
+/**
+ * Look a user up by id.
+ *
+ * Every request-scoped path resolves the user from the session email
+ * (lib/currentUser.ts) and must keep doing so — trusting a client-supplied id
+ * is how tenancy breaks. This is for the other direction: a scheduled job
+ * already holds a user id from listAllUserIds() and needs the row (an email
+ * address to send to, a name to greet).
+ */
+export async function getUserById(id: string): Promise<UserRow | null> {
+  const client = getSupabaseClient();
+  const { data, error } = await client.from("users").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function getUserByEmail(email: string): Promise<UserRow | null> {
   const client = getSupabaseClient();
   const { data, error } = await client

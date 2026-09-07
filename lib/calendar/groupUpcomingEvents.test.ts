@@ -3,7 +3,7 @@ import { groupUpcomingEvents } from "@/lib/calendar/groupUpcomingEvents";
 import type { GoogleCalendarEvent } from "@/lib/googleCalendar/fetchEvents";
 
 function event(id: string, start: string): GoogleCalendarEvent {
-  return { id, title: `Event ${id}`, start, end: start };
+  return { id, title: `Event ${id}`, start, end: start, calendarId: "primary", canEdit: true };
 }
 
 describe("groupUpcomingEvents", () => {

@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { TopicCard } from "@/components/features/learning/TopicCard";
 import { VideoStudyPanel } from "@/components/features/learning/VideoStudyPanel";
 import { LearningSplitView } from "@/components/features/learning/LearningSplitView";
+import { BackToHome } from "@/components/layout/BackToHome";
 
 // Learning & Knowledge Space (Phase 7): replaces the previous generic
 // AreaMomentsView placeholder (which just logged free-text "knowledge"
@@ -48,6 +49,7 @@ export default function LearningSpacePage() {
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
       <h1 className="mb-1 text-2xl font-medium tracking-tight">למידה</h1>
       <p className="mb-8 text-sm text-muted">
         מרחב הלמידה האישי שלך — נושאים, מקורות והדרכה מבוססת AI, כל נושא עם מסלול משלו.

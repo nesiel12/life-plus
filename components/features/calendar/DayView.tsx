@@ -1,8 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { VerticalTimeline, type TimelineEvent } from "@/components/features/calendar/VerticalTimeline";
+import {
+  DeleteEventButton,
+  DeleteEventDialog,
+  useEventDeletion,
+  type DeletableEvent,
+} from "@/components/features/calendar/DeleteEventDialog";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { useInsights } from "@/hooks/useInsights";
 import { buildCheckInProfile } from "@/lib/checkins/analyze";
@@ -49,7 +55,25 @@ export function DayView({ anchor, chronotype }: DayViewProps) {
   const query = `/api/calendar/range?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(
     to.toISOString()
   )}`;
-  const { data, loading } = useInsights<RangeResponse>(query, FALLBACK, [query]);
+  const { data, loading, setData, refresh } = useInsights<RangeResponse>(query, FALLBACK, [query]);
+
+  // Drop the row the moment Google confirms the delete, then revalidate. The
+  // server-side TTL cache is invalidated by the write, so the refetch is
+  // already authoritative — the optimistic step just removes the ~1s window
+  // where a deleted event is still sitting on screen.
+  const handleDeleted = useCallback(
+    (deleted: DeletableEvent) => {
+      setData((current) =>
+        current
+          ? { ...current, events: current.events.filter((e) => e.id !== deleted.id) }
+          : current
+      );
+      refresh();
+    },
+    [setData, refresh]
+  );
+
+  const deletion = useEventDeletion(handleDeleted);
 
   const events = useMemo(() => data?.events ?? [], [data]);
 
@@ -60,7 +84,14 @@ export function DayView({ anchor, chronotype }: DayViewProps) {
     () =>
       events
         .filter((e) => !e.isAllDay)
-        .map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end })),
+        .map((e) => ({
+          id: e.id,
+          title: e.title,
+          start: e.start,
+          end: e.end,
+          calendarId: e.calendarId,
+          canEdit: e.canEdit,
+        })),
     [events]
   );
   const allDay = useMemo(() => events.filter((e) => e.isAllDay), [events]);
@@ -84,8 +115,12 @@ export function DayView({ anchor, chronotype }: DayViewProps) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted">כל היום</span>
           {allDay.map((event) => (
-            <span key={event.id} className="rounded-lg bg-gold-soft px-2 py-1 text-xs text-gold-ink">
+            <span
+              key={event.id}
+              className="group flex items-center gap-1 rounded-lg bg-gold-soft px-2 py-1 text-xs text-gold-ink"
+            >
               {event.title}
+              <DeleteEventButton event={event} onRequest={deletion.request} size="sm" />
             </span>
           ))}
         </div>
@@ -99,6 +134,15 @@ export function DayView({ anchor, chronotype }: DayViewProps) {
         events={timed}
         chronotype={chronotype}
         observedEnergy={observedEnergy}
+        onDeleteEvent={deletion.request}
+      />
+
+      <DeleteEventDialog
+        event={deletion.pending}
+        deleting={deletion.deleting}
+        error={deletion.error}
+        onCancel={deletion.cancel}
+        onConfirm={deletion.confirm}
       />
     </div>
   );

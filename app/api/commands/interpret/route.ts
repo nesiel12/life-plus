@@ -147,15 +147,27 @@ export async function POST(request: NextRequest) {
       const { period, day } = result.clearCalendarRange;
       const { timeMin, timeMax } = buildCommandTimeWindow(period, day, new Date());
 
-      let events: { googleEventId: string; title: string; start: string; end: string }[];
+      let events: {
+        googleEventId: string;
+        calendarId: string;
+        title: string;
+        start: string;
+        end: string;
+      }[];
       try {
         const rawEvents = await fetchGoogleCalendarEvents(accessToken, timeMin, timeMax);
-        events = rawEvents.map((event) => ({
-          googleEventId: event.id,
-          title: event.title,
-          start: event.start,
-          end: event.end,
-        }));
+        events = rawEvents
+          // Now that the read spans every calendar, some results come from
+          // subscribed feeds the user cannot write to. Proposing to delete
+          // those would produce a confirmation that silently half-fails.
+          .filter((event) => event.canEdit)
+          .map((event) => ({
+            googleEventId: event.id,
+            calendarId: event.calendarId,
+            title: event.title,
+            start: event.start,
+            end: event.end,
+          }));
       } catch (err) {
     const quota = aiQuotaResponse(err);
     if (quota) return quota;

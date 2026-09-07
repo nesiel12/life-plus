@@ -11,6 +11,7 @@ import { CfoPanel } from "@/components/features/finances/CfoPanel";
 import { StatementImport } from "@/components/features/finances/StatementImport";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/types";
+import { BackToHome } from "@/components/layout/BackToHome";
 
 function formatDateHeading(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("he-IL", {
@@ -78,6 +79,7 @@ export default function FinancesSpacePage() {
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
             <GlassCard className="mb-6">
         <CfoPanel />
       </GlassCard>

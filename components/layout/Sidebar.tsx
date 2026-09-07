@@ -12,12 +12,15 @@ import {
   HeartHandshake,
   HeartPulse,
   History,
+  Home,
   ListTodo,
   LogOut,
+  Settings,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
+import { NotificationCenter } from "@/components/layout/NotificationCenter";
 import { KineticText } from "@/components/magicui/kinetic-text";
 import { AnimatedThemeToggler } from "@/components/magicui/animated-theme-toggler";
 import { useTheme } from "@/components/providers/ThemeProvider";
@@ -37,8 +40,11 @@ interface NavItem {
 // the app's own existing life-area accent tokens (app/globals.css) rather
 // than a new arbitrary color per item — active state reads as "this life
 // area," consistent with every other accent-colored surface in the app.
-// "Today" (home) isn't a labeled item — the logo itself is the home link,
-// matching how a wordmark conventionally behaves.
+// On desktop, "Today" (home) isn't a labeled item — the logo above the nav is
+// the home link, matching how a wordmark conventionally behaves. That reasoning
+// does not survive the jump to a phone: MobileTabBar renders these items and
+// *not* the logo, so on mobile there was no way back to the dashboard at all.
+// HOME_ITEM is therefore prepended in MobileTabBar only.
 const NAV_ITEMS: NavItem[] = [
   { href: "/calendar", label: "יומן חכם", icon: CalendarClock, colorVar: "--accent-career" },
   { href: "/areas/learning", label: "למידה", icon: Lightbulb, colorVar: "--accent-learning" },
@@ -49,6 +55,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/areas/finances", label: "כספים", icon: Wallet, colorVar: "--accent-finance" },
   { href: "/timeline", label: "ציר זמן", icon: History, colorVar: "--muted" },
 ];
+
+const HOME_ITEM: NavItem = { href: "/", label: "היום", icon: Home, colorVar: "--gold" };
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
@@ -127,26 +135,38 @@ export function Sidebar() {
       </nav>
 
       {session?.user && (
-        <div className="mt-4 flex items-center gap-2 border-t border-glass-border pt-4 lg:justify-between">
-          <div className="flex items-center gap-2">
-            {session.user.image && (
-              <Image
-                src={session.user.image}
-                alt={session.user.name ?? "avatar"}
-                width={28}
-                height={28}
-                className="rounded-full ring-1 ring-glass-border"
-              />
-            )}
-            <span className="hidden truncate text-xs text-muted lg:inline">{session.user.name}</span>
+        <div className="mt-4 flex flex-col gap-2 border-t border-glass-border pt-4">
+          <div className="flex items-center justify-center gap-1 lg:justify-start">
+            <NotificationCenter />
+            <Link
+              href="/settings"
+              className="focus-ring glass-control-hover grid size-9 place-items-center rounded-lg text-muted transition-colors hover:text-foreground"
+              aria-label="הגדרות"
+            >
+              <Settings size={17} aria-hidden />
+            </Link>
           </div>
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="focus-ring rounded-lg p-2 text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
-            aria-label="התנתק"
-          >
-            <LogOut size={16} />
-          </button>
+          <div className="flex items-center gap-2 lg:justify-between">
+            <div className="flex items-center gap-2">
+              {session.user.image && (
+                <Image
+                  src={session.user.image}
+                  alt={session.user.name ?? "avatar"}
+                  width={28}
+                  height={28}
+                  className="rounded-full ring-1 ring-glass-border"
+                />
+              )}
+              <span className="hidden truncate text-xs text-muted lg:inline">{session.user.name}</span>
+            </div>
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="focus-ring rounded-lg p-2 text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
+              aria-label="התנתק"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
       )}
     </aside>
@@ -154,28 +174,43 @@ export function Sidebar() {
 }
 
 // Mobile fallback (< sm): the full sidebar doesn't fit a phone screen, so
-// this renders a compact icon-only bottom bar with the same six
-// destinations instead of a slide-out drawer — one fewer interaction step
-// on the surface most likely to be used one-handed.
+// this renders a compact icon-only bottom bar with the same destinations
+// instead of a slide-out drawer — one fewer interaction step on the surface
+// most likely to be used one-handed.
+//
+// Home leads, because the desktop home affordance (the logo) isn't rendered
+// here — without it the dashboard was unreachable from any area page on a
+// phone except via the browser's back button.
 export function MobileTabBar() {
   const pathname = usePathname();
+  const items = [HOME_ITEM, ...NAV_ITEMS];
 
   return (
-    <nav className="glass-panel fixed inset-x-0 bottom-0 z-30 flex items-center justify-around px-2 py-2 sm:hidden">
-      {NAV_ITEMS.map((item) => {
+    <nav className="glass-panel fixed inset-x-0 bottom-0 z-30 flex items-center justify-around px-1 py-2 sm:hidden">
+      {items.map((item) => {
         const Icon = item.icon;
-        const active = pathname.startsWith(item.href);
+        // `startsWith` would light Home up on every route, since every path
+        // starts with "/". Home is active only on an exact match.
+        const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         return (
           <Link
             key={item.href}
             href={item.href}
-            className="focus-ring flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5"
+            aria-current={active ? "page" : undefined}
+            className="focus-ring flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-1.5"
             aria-label={item.label}
           >
             <Icon size={18} style={active ? { color: `var(${item.colorVar})` } : undefined} className={!active ? "text-muted" : undefined} aria-hidden />
           </Link>
         );
       })}
+
+      {/* The sidebar isn't rendered below `sm`, so without this the bell —
+          and with it every proactive notification the app produces — would be
+          unreachable on a phone, which is where they matter most. */}
+      <div className="flex items-center px-1.5">
+        <NotificationCenter />
+      </div>
     </nav>
   );
 }

@@ -12,6 +12,7 @@ import { OnboardingFlow } from "@/components/features/OnboardingFlow";
 import { Logo } from "@/components/ui/Logo";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { getInitialState } from "@/app/actions/bootstrap";
+import { setTimezoneAction } from "@/app/actions/timezone";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -44,6 +45,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [isAuthPage, hydrated, status, hydrate, retryToken]);
 
   const retry = useCallback(() => setRetryToken((t) => t + 1), []);
+
+  // Keep the stored timezone in step with the device.
+  //
+  // Scheduled work runs with no browser, so the server has no other way to
+  // know what hour it is where the user is — and a "morning briefing" sent at
+  // the server's 07:00 is just a notification at a random time. Written only
+  // when it differs from what is stored, so this is one write on first load
+  // and one more if the user moves timezone, not a write per app open.
+  const storedTimezone = useAtlasStore((s) => s.personalDNA.timezone);
+  const setStoredTimezone = useAtlasStore((s) => s.setPersonalDnaTimezone);
+  useEffect(() => {
+    if (!hydrated) return;
+    const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!deviceTimezone || deviceTimezone === storedTimezone) return;
+    setTimezoneAction(deviceTimezone)
+      .then((saved) => {
+        if (saved) setStoredTimezone(saved);
+      })
+      .catch(() => {
+        // Best-effort: the engine falls back to the app default zone, which
+        // is right for most of this app's users anyway. Never block the UI.
+      });
+  }, [hydrated, storedTimezone, setStoredTimezone]);
 
   // The splash overlay self-manages (once per session, skippable) and sits
   // above whichever state the shell is in, so it renders alongside every

@@ -10,6 +10,7 @@ import { useInsights } from "@/hooks/useInsights";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import type { PersonInsight } from "@/lib/family/types";
 import type { Person } from "@/types";
+import { BackToHome } from "@/components/layout/BackToHome";
 
 // Family Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §10): a
 // relationship workspace, not a contacts list. Score/note/birthday still
@@ -116,6 +117,7 @@ export default function FamilyCarePage() {
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
       <h1 className="mb-1 text-2xl font-medium tracking-tight">לוח הקשבה משפחתי</h1>
       <p className="mb-10 text-sm text-muted">לא CRM — פשוט מקום לזכור את מי שחשוב.</p>
 

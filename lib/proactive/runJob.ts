@@ -16,7 +16,12 @@ export const JOB_LOADERS: Partial<Record<JobName, () => Promise<Job>>> = {
   recommendation_expiry: () =>
     import("@/lib/proactive/jobs/recommendationExpiry").then((m) => m.recommendationExpiryJob),
   daily_insight: () => import("@/lib/proactive/jobs/dailyInsight").then((m) => m.dailyInsightJob),
-  // morning_briefing, reminder_sweep, busy_week_scan — next in M2
+  morning_briefing: () =>
+    import("@/lib/proactive/jobs/morningBriefing").then((m) => m.morningBriefingJob),
+  reminder_sweep: () => import("@/lib/proactive/jobs/reminderSweep").then((m) => m.reminderSweepJob),
+  busy_week_scan: () => import("@/lib/proactive/jobs/busyWeekScan").then((m) => m.busyWeekScanJob),
+  notification_dispatch: () =>
+    import("@/lib/proactive/jobs/notificationDispatch").then((m) => m.notificationDispatchJob),
 };
 
 /** The job names that currently have an implementation. */
@@ -56,20 +61,48 @@ export async function runJob(name: JobName, now: Date = new Date()): Promise<Run
     itemsProduced: 0,
   };
 
+  const ledger = job.ledger ?? "job_runs";
+
   for (const scopeKey of scopeKeys) {
+    const ctx = {
+      userId: job.scope === "per_user" ? scopeKey : undefined,
+      logicalDay,
+      now,
+    };
+
+    // Self-ledgered jobs run every sweep and carry their own idempotency in
+    // their own data (a `sent_at` stamp, a conditional `reminded_at` update).
+    // Claiming a day-grained job_runs row for them would let the first run of
+    // the day block every later one — exactly backwards.
+    if (ledger === "self") {
+      try {
+        const result = await job.run(ctx);
+        summary.scopesRun++;
+        summary.itemsProduced += result.itemsProduced;
+      } catch (err) {
+        console.error(`[proactive] ${name} failed for ${scopeKey}:`, err);
+        summary.scopesFailed++;
+      }
+      continue;
+    }
+
     const runId = await jobRunsRepo.claim(name, scopeKey, logicalDay);
     if (!runId) {
       summary.scopesSkipped++;
       continue;
     }
     try {
-      const result = await job.run({
-        userId: job.scope === "per_user" ? scopeKey : undefined,
-        logicalDay,
-        now,
-      });
-      await jobRunsRepo.finish(runId, "succeeded", result.itemsProduced, result.detail ?? {});
-      summary.scopesRun++;
+      const result = await job.run(ctx);
+      const status = result.status ?? "succeeded";
+      await jobRunsRepo.finish(runId, status, result.itemsProduced, result.detail ?? {});
+      if (status === "skipped") {
+        // Not yet this user's hour. The run is recorded as skipped, which
+        // jobRunsRepo.claim treats as re-claimable, so a later invocation
+        // today can still do the work.
+        summary.scopesSkipped++;
+      } else {
+        summary.scopesRun++;
+      }
       summary.itemsProduced += result.itemsProduced;
     } catch (err) {
       await jobRunsRepo.finish(runId, "failed", 0, {

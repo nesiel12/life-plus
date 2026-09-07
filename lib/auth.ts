@@ -5,6 +5,7 @@ import { getOrCreateUserByEmail } from "@/lib/db/users";
 import { lifeAreaScoresRepo } from "@/lib/db/lifeAreaScores";
 import { personalDnaRepo } from "@/lib/db/personalDna";
 import { notificationPreferencesRepo } from "@/lib/db/notificationPreferences";
+import { googleCalendarCredentialsRepo } from "@/lib/db/googleCalendarCredentials";
 import { sessionCookieConfig } from "@/lib/sessionCookie";
 
 // calendar.events (not calendar.readonly) — accepting a schedule suggestion
@@ -12,14 +13,22 @@ import { sessionCookieConfig } from "@/lib/sessionCookie";
 // which needs write access; calendar.events also covers the freeBusy reads
 // calendar.readonly used to provide. gmail.readonly was requested but never
 // used by any feature — dropped per docs/BACKLOG.md (an unused scope is a
-// trust and OAuth-verification liability with nothing behind it). Anyone
-// already signed in under the old scopes will be re-prompted to consent on
-// next sign-in.
+// trust and OAuth-verification liability with nothing behind it).
+//
+// calendar.calendarlist.readonly is the narrowest scope that permits
+// calendarList.list, which is what lets the app see calendars *other than*
+// primary — a second work or family calendar was previously invisible in
+// every view. It grants no access to event contents beyond what
+// calendar.events already allows; it only enumerates which calendars exist.
+// lib/googleCalendar/fetchWindow.ts degrades to primary-only when this scope
+// is absent, so a session granted under the old list keeps working until the
+// user next signs in and re-consents.
 const GOOGLE_SCOPES = [
   "openid",
   "profile",
   "email",
   "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 ].join(" ");
 
 interface GoogleRefreshResponse {
@@ -138,7 +147,7 @@ export const authOptions: NextAuthOptions = {
     // Runs after a sign-in the `signIn` callback already approved. Ensures a
     // `users` row (and its dependent per-user rows) exists before any page
     // tries to read/write data for this identity.
-    async signIn({ user }) {
+    async signIn({ user, account }) {
       if (!user.email) return;
       const dbUser = await getOrCreateUserByEmail(user.email, {
         name: user.name ?? user.email,
@@ -149,6 +158,28 @@ export const authOptions: NextAuthOptions = {
         personalDnaRepo.upsert(dbUser.id, {}),
         notificationPreferencesRepo.upsert(dbUser.id, {}),
       ]);
+
+      // Persist the Google grant so the Proactive Engine can read the user's
+      // calendar with nobody signed in. The JWT copy above serves requests
+      // made by a browser; a 07:00 cron job has neither browser nor cookie,
+      // and a morning briefing that cannot see today's meetings is not a
+      // briefing. See lib/googleCalendar/serverAccess.ts for the read path.
+      //
+      // Failure here must not block sign-in: the user still gets a working
+      // session, they just don't get proactive calendar-aware notifications
+      // until a later sign-in stores the grant successfully.
+      if (account?.access_token && account.expires_at) {
+        try {
+          await googleCalendarCredentialsRepo.upsert(dbUser.id, {
+            accessToken: account.access_token,
+            refreshToken: account.refresh_token ?? null,
+            expiresAt: new Date(account.expires_at * 1000).toISOString(),
+            scope: account.scope ?? GOOGLE_SCOPES,
+          });
+        } catch (err) {
+          console.error("[auth] Failed to store Google Calendar credentials:", err);
+        }
+      }
     },
   },
 };

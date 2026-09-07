@@ -13,6 +13,10 @@
     "cron": "node --conditions=react-server --env-file=.env.local --import tsx scripts/cron.ts",
     "cron:daily-insight": "npm run cron -- daily_insight",
     "cron:recommendation-expiry": "npm run cron -- recommendation_expiry",
+    "cron:morning-briefing": "npm run cron -- morning_briefing",
+    "cron:reminder-sweep": "npm run cron -- reminder_sweep",
+    "cron:busy-week-scan": "npm run cron -- busy_week_scan",
+    "cron:dispatch": "npm run cron -- notification_dispatch",
     "check:schema": "node --env-file=.env.local scripts/check-schema-drift.mjs"
   },
   "dependencies": {

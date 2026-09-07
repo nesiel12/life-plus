@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Moon, Sparkles, TrendingDown } from "lucide-react";
 import { energyForHour, type HourEnergy, type ObservedEnergy } from "@/lib/calendar/energy";
+import { DeleteEventButton, type DeletableEvent } from "@/components/features/calendar/DeleteEventDialog";
 import { cn } from "@/lib/utils";
 import type { ChronotypeSettings } from "@/types";
 
@@ -12,6 +13,9 @@ export interface TimelineEvent {
   title: string;
   start: string;
   end: string;
+  /** Which Google calendar it belongs to — needed to delete it. */
+  calendarId?: string;
+  canEdit?: boolean;
 }
 
 interface VerticalTimelineProps {
@@ -27,6 +31,9 @@ interface VerticalTimelineProps {
   /** Hours to render, inclusive start, exclusive end. */
   fromHour?: number;
   toHour?: number;
+  /** Opt-in: renders a delete affordance on each event. Omitted where the
+   *  timeline is a read-only summary (the dashboard card). */
+  onDeleteEvent?: (event: DeletableEvent) => void;
 }
 
 const ROW_HEIGHT_REM = 3.5;
@@ -64,6 +71,7 @@ export function VerticalTimeline({
   now,
   fromHour = 6,
   toHour = 24,
+  onDeleteEvent,
 }: VerticalTimelineProps) {
   const reduce = useReducedMotion();
 
@@ -171,11 +179,16 @@ export function VerticalTimeline({
             initial={reduce ? false : { opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.35, delay: Math.min(i * 0.04, 0.3), ease: [0.16, 1, 0.3, 1] }}
-            className="absolute end-0 start-16 overflow-hidden rounded-xl border border-hairline-card bg-surface px-3 py-2 shadow-[0_1px_2px_rgba(16,16,20,0.04),0_10px_24px_-18px_rgba(16,16,20,0.25)]"
+            className="group absolute end-0 start-16 flex items-start gap-2 overflow-hidden rounded-xl border border-hairline-card bg-surface px-3 py-2 shadow-[0_1px_2px_rgba(16,16,20,0.04),0_10px_24px_-18px_rgba(16,16,20,0.25)]"
             style={{ top: `${topRem + 0.15}rem`, minHeight: `${heightRem - 0.3}rem` }}
           >
-            <p className="truncate text-sm font-medium text-foreground">{event.title}</p>
-            <p className="ltr text-xs text-muted">{clockRange(event.start, event.end)}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-foreground">{event.title}</p>
+              <p className="ltr text-xs text-muted">{clockRange(event.start, event.end)}</p>
+            </div>
+            {onDeleteEvent && (
+              <DeleteEventButton event={event} onRequest={onDeleteEvent} className="-me-1 mt-0.5" />
+            )}
           </motion.div>
         ))}
 

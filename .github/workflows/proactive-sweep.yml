@@ -1,0 +1,83 @@
+# Frequent Proactive Engine sweeps, on the free tier.
+#
+# WHY THIS EXISTS
+# Vercel's Hobby plan allows two cron entries, each at most once a day
+# (vercel.json). That is enough for the morning briefing, but not for
+# reminders: "your event starts in 15 minutes" cannot be delivered by a
+# scheduler that fires twice a day. GitHub Actions gives a ~15-minute
+# schedule for free, so it drives the sweeps and Vercel Cron keeps the
+# daily cycle.
+#
+# TO ENABLE
+#   1. Push this repository to GitHub (it currently has no remote).
+#   2. Add two repository secrets under Settings → Secrets and variables →
+#      Actions:
+#        APP_URL       e.g. https://your-app.vercel.app  (no trailing slash)
+#        CRON_SECRET   the same value set in Vercel's environment variables
+#   3. Enable Actions for the repo. The schedule starts on the next push to
+#      the default branch.
+#
+# TO DISABLE (e.g. after upgrading to Vercel Pro, which can do */15 itself)
+#   Delete this file, or comment out the `schedule:` block below.
+#
+# CAVEAT worth knowing before relying on it: GitHub's scheduled workflows are
+# best-effort. Under load they can be delayed by 10-30 minutes or skipped
+# entirely, and they pause after 60 days without repository activity. A
+# reminder is therefore "usually on time", not guaranteed. Vercel Pro's cron
+# is the dependable version of this.
+
+name: Proactive sweep
+
+on:
+  schedule:
+    # Every 15 minutes: fires due reminders and delivers queued email.
+    - cron: "*/15 * * * *"
+    # Sunday 15:00 UTC: the weekly busy-week scan.
+    - cron: "0 15 * * 0"
+  # So you can prove it works without waiting for a schedule.
+  workflow_dispatch:
+    inputs:
+      group:
+        description: "Which cron group to run"
+        required: true
+        default: sweep
+        type: choice
+        options: [sweep, daily, weekly]
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    # Overlapping runs would have two dispatchers reading the same queue.
+    # The dispatcher is idempotent (sent_at), but there is no reason to race.
+    concurrency:
+      group: proactive-sweep
+      cancel-in-progress: false
+    steps:
+      - name: Pick the group for this trigger
+        id: pick
+        run: |
+          if [ -n "${{ inputs.group }}" ]; then
+            echo "group=${{ inputs.group }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 15 * * 0" ]; then
+            echo "group=weekly" >> "$GITHUB_OUTPUT"
+          else
+            echo "group=sweep" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run the Proactive Engine
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          GROUP: ${{ steps.pick.outputs.group }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL and CRON_SECRET repository secrets are required." >&2
+            exit 1
+          fi
+
+          # --fail-with-body so a 401 or 500 fails the workflow visibly
+          # instead of succeeding quietly with an error page in the log.
+          curl --fail-with-body --silent --show-error \
+               --max-time 300 \
+               -H "Authorization: Bearer $CRON_SECRET" \
+               "$APP_URL/api/cron/$GROUP"

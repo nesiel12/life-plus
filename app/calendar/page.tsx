@@ -14,11 +14,18 @@ import { RangeTabs } from "@/components/features/calendar/RangeTabs";
 import { CalendarAgentPanel } from "@/components/features/calendar/CalendarAgentPanel";
 import { MonthView } from "@/components/features/calendar/MonthView";
 import { ScheduleCopilotBar } from "@/components/features/calendar/ScheduleCopilotBar";
+import {
+  DeleteEventButton,
+  DeleteEventDialog,
+  useEventDeletion,
+  type DeletableEvent,
+} from "@/components/features/calendar/DeleteEventDialog";
 import { useInsights } from "@/hooks/useInsights";
 import { groupUpcomingEvents } from "@/lib/calendar/groupUpcomingEvents";
 import { isWithinRange, rangeLabel, stepAnchor, type CalendarRange } from "@/lib/calendar/ranges";
 import { daysUntil } from "@/lib/utils";
 import type { GoogleCalendarEvent } from "@/lib/googleCalendar/fetchEvents";
+import { BackToHome } from "@/components/layout/BackToHome";
 
 interface UpcomingResponse {
   connected: boolean;
@@ -43,7 +50,21 @@ function formatEventTime(iso: string): string {
 export default function CalendarPage() {
   const upcomingEvents = useAtlasStore((s) => s.upcomingEvents);
   const chronotype = useAtlasStore((s) => s.personalDNA.chronotype);
-  const { data, refresh } = useInsights<UpcomingResponse>("/api/calendar/upcoming", FALLBACK);
+  const { data, setData, refresh } = useInsights<UpcomingResponse>("/api/calendar/upcoming", FALLBACK);
+
+  const handleDeleted = useCallback(
+    (deleted: DeletableEvent) => {
+      setData((current) =>
+        current
+          ? { ...current, events: current.events.filter((e) => e.id !== deleted.id) }
+          : current
+      );
+      refresh();
+    },
+    [setData, refresh]
+  );
+
+  const deletion = useEventDeletion(handleDeleted);
   // Day is the default: the hour-by-hour timeline is what this page is
   // for day to day, and the wider ranges are the step back you take
   // occasionally. Each view fetches only its own window, when opened.
@@ -80,6 +101,7 @@ export default function CalendarPage() {
 
   return (
     <main className="hero-gradient relative min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -193,11 +215,12 @@ export default function CalendarPage() {
               </p>
               <ul className="flex flex-col gap-3">
                 {group.events.map((event) => (
-                  <li key={event.id} className="flex items-center justify-between text-sm">
-                    <span className="text-foreground/90">{event.title}</span>
-                    <span className="ltr text-xs text-muted">
+                  <li key={event.id} className="group flex items-center justify-between gap-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate text-foreground/90">{event.title}</span>
+                    <span className="ltr shrink-0 text-xs text-muted">
                       {formatEventTime(event.start)}–{formatEventTime(event.end)}
                     </span>
+                    <DeleteEventButton event={event} onRequest={deletion.request} />
                   </li>
                 ))}
               </ul>
@@ -233,6 +256,14 @@ export default function CalendarPage() {
           )}
         </GlassCard>
       </div>
+
+      <DeleteEventDialog
+        event={deletion.pending}
+        deleting={deletion.deleting}
+        error={deletion.error}
+        onCancel={deletion.cancel}
+        onConfirm={deletion.confirm}
+      />
     </main>
   );
 }

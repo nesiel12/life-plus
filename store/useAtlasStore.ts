@@ -66,6 +66,7 @@ import { setTodayIntentionAction } from "@/app/actions/dailyIntention";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import { EMPTY_PERSONAL_DNA } from "@/types";
 import type {
+  AppNotification,
   Book,
   ChatMessage,
   DailyRecommendation,
@@ -126,6 +127,10 @@ export interface HydratedState {
   learningResources: LearningResource[];
   meals: Meal[];
   workouts: Workout[];
+  notifications: AppNotification[];
+  /** Badge count. Kept separately from notifications.length because the list
+   *  is one page and the count is over everything unread. */
+  notificationUnreadCount: number;
 }
 
 interface AtlasState extends HydratedState {
@@ -286,6 +291,13 @@ interface AtlasState extends HydratedState {
   dismissSuggestion: (id: string) => void;
 
   setDailyRecommendations: (dateKey: string, recommendations: DailyRecommendation[]) => void;
+
+  setPersonalDnaTimezone: (timezone: string) => void;
+
+  refreshNotifications: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
+  dismissNotification: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
 }
 
 const EMPTY_STATE: HydratedState = {
@@ -315,6 +327,8 @@ const EMPTY_STATE: HydratedState = {
   learningResources: [],
   meals: [],
   workouts: [],
+  notifications: [],
+  notificationUnreadCount: 0,
 };
 
 export const useAtlasStore = create<AtlasState>((set, get) => ({
@@ -971,6 +985,95 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     recordRecommendationOutcomeAction(id, "rejected").catch((err) => {
       console.error("Failed to record recommendation outcome:", err);
     });
+  },
+
+  // Local-only: the write already happened via setTimezoneAction in AppShell,
+  // and re-reading the whole DNA row to reflect one string would be a round
+  // trip for nothing. Keeping the store in step is what stops the effect
+  // firing again on the next render.
+  setPersonalDnaTimezone: (timezone) =>
+    set((state) => ({ personalDNA: { ...state.personalDNA, timezone } })),
+
+  refreshNotifications: async () => {
+    const res = await fetch("/api/notifications");
+    if (!res.ok) throw new Error("failed to load notifications");
+    const data = (await res.json()) as {
+      notifications: AppNotification[];
+      unreadCount: number;
+    };
+    set({ notifications: data.notifications, notificationUnreadCount: data.unreadCount });
+  },
+
+  markNotificationRead: async (id) => {
+    const previous = get().notifications;
+    const previousCount = get().notificationUnreadCount;
+    const target = previous.find((n) => n.id === id);
+    if (!target || target.readAt) return; // already read — nothing to do
+
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        n.id === id ? { ...n, status: "read" as const, readAt: new Date().toISOString() } : n
+      ),
+      notificationUnreadCount: Math.max(0, state.notificationUnreadCount - 1),
+    }));
+
+    try {
+      const res = await fetch(`/api/notifications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "read" }),
+      });
+      if (!res.ok) throw new Error("failed");
+    } catch (err) {
+      set({ notifications: previous, notificationUnreadCount: previousCount });
+      throw err;
+    }
+  },
+
+  dismissNotification: async (id) => {
+    const previous = get().notifications;
+    const previousCount = get().notificationUnreadCount;
+    const wasUnread = previous.find((n) => n.id === id)?.readAt == null;
+
+    set((state) => ({
+      notifications: state.notifications.filter((n) => n.id !== id),
+      notificationUnreadCount: wasUnread
+        ? Math.max(0, state.notificationUnreadCount - 1)
+        : state.notificationUnreadCount,
+    }));
+
+    try {
+      const res = await fetch(`/api/notifications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "dismiss" }),
+      });
+      if (!res.ok) throw new Error("failed");
+    } catch (err) {
+      set({ notifications: previous, notificationUnreadCount: previousCount });
+      throw err;
+    }
+  },
+
+  markAllNotificationsRead: async () => {
+    const previous = get().notifications;
+    const previousCount = get().notificationUnreadCount;
+    const now = new Date().toISOString();
+
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        n.readAt ? n : { ...n, status: "read" as const, readAt: now }
+      ),
+      notificationUnreadCount: 0,
+    }));
+
+    try {
+      const res = await fetch("/api/notifications/read-all", { method: "POST" });
+      if (!res.ok) throw new Error("failed");
+    } catch (err) {
+      set({ notifications: previous, notificationUnreadCount: previousCount });
+      throw err;
+    }
   },
 }));
 

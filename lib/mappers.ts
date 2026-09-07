@@ -6,6 +6,7 @@ import { LIFE_AREAS, LIFE_AREA_LIST } from "@/lib/lifeAreas";
 import { isDayPart } from "@/lib/onboarding/chronotype";
 import type { Database, Json } from "@/types/database";
 import type {
+  AppNotification,
   Book,
   ChronotypeSettings,
   DayPart,
@@ -37,6 +38,7 @@ import type {
 import type { GoalWithMilestones } from "@/lib/db/goals";
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
+type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 type LifeAreaScoreRow = Database["public"]["Tables"]["life_area_scores"]["Row"];
 type PersonRow = Database["public"]["Tables"]["people"]["Row"];
 type PersonUpdate = Database["public"]["Tables"]["people"]["Update"];
@@ -233,6 +235,7 @@ export function toPersonalDNA(row: PersonalDnaRow | null): PersonalDNA {
     sleepNotes: row?.sleep_notes ?? undefined,
     careerNotes: row?.career_notes ?? undefined,
     motivationTriggers: row?.motivation_triggers ?? [],
+    timezone: row?.timezone ?? undefined,
   };
 }
 
@@ -254,6 +257,7 @@ export function toPersonalDnaPatch(patch: Partial<PersonalDNA>): PersonalDnaUpda
   if (patch.sleepNotes !== undefined) row.sleep_notes = patch.sleepNotes;
   if (patch.careerNotes !== undefined) row.career_notes = patch.careerNotes;
   if (patch.motivationTriggers !== undefined) row.motivation_triggers = patch.motivationTriggers;
+  if (patch.timezone !== undefined) row.timezone = patch.timezone || null;
   return row;
 }
 
@@ -419,6 +423,10 @@ export function toManualEvent(row: ManualEventRow): ManualEvent {
     category: row.category ?? undefined,
     reminderMinutes: row.reminder_minutes ?? undefined,
     linkedContactIds: row.linked_contact_ids ?? [],
+    // Read-only on the client: only reminder_sweep writes it, and it does so
+    // with a conditional UPDATE that is the feature's idempotency guarantee.
+    // Deliberately absent from toManualEventPatch for the same reason.
+    remindedAt: row.reminded_at ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -563,5 +571,25 @@ export function toCheckIn(row: CheckInRow): CheckIn {
     activity: row.activity as CheckIn["activity"],
     energy: row.energy,
     note: row.note ?? undefined,
+  };
+}
+
+export function toNotification(row: NotificationRow): AppNotification {
+  return {
+    id: row.id,
+    kind: row.kind,
+    title: row.title,
+    body: row.body,
+    reason: row.reason ?? undefined,
+    // `action` is jsonb, so the row type is an open record. The shape is
+    // written by lib/proactive only (never by a client), and the renderer
+    // treats an unknown `type` as "no affordance" rather than trusting it.
+    action: row.action
+      ? (row.action as unknown as { type: string; payload: Record<string, unknown> })
+      : undefined,
+    status: row.status,
+    scheduledFor: row.scheduled_for,
+    readAt: row.read_at ?? undefined,
+    createdAt: row.created_at,
   };
 }

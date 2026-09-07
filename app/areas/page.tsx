@@ -6,6 +6,7 @@ import { useInsights } from "@/hooks/useInsights";
 import { LIFE_AREAS } from "@/lib/lifeAreas";
 import type { AreaInsight } from "@/lib/areas/types";
 import type { LifeAreaKey } from "@/types";
+import { BackToHome } from "@/components/layout/BackToHome";
 
 // Areas Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §10): the Life
 // Dashboard — a central map, not a navigation grid. Score/progress still
@@ -29,6 +30,7 @@ export default function AreasPage() {
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
       <h1 className="mb-1 text-2xl font-medium tracking-tight">תחומי חיים</h1>
       <p className="mb-10 text-sm text-muted">המפה המרכזית של החיים שלך.</p>
 

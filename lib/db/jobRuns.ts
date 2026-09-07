@@ -30,14 +30,20 @@ export const jobRunsRepo = {
       const isOrphanedRunning =
         existing.status === "running" &&
         Date.now() - new Date(existing.started_at).getTime() > STALE_RUNNING_MS;
-      if (existing.status === "failed" || isOrphanedRunning) {
+      // `skipped` is re-claimable, and that is what makes user-local
+      // scheduling possible: morning_briefing is invoked from several
+      // UTC-spaced cron runs and returns "skipped" until it is actually
+      // 07:00 for this user. Treating skipped as terminal (as this did) meant
+      // the first invocation of the day permanently burned the key at
+      // whatever hour it happened to fire — so the briefing never ran.
+      if (existing.status === "failed" || existing.status === "skipped" || isOrphanedRunning) {
         await client
           .from("job_runs")
           .update({ status: "running", started_at: new Date().toISOString(), finished_at: null })
           .eq("id", existing.id);
         return existing.id;
       }
-      return null; // succeeded / (fresh) running / skipped — nothing to do
+      return null; // succeeded / (fresh) running — nothing to do
     }
 
     const { data, error } = await client

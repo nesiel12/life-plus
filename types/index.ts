@@ -254,6 +254,9 @@ export interface ManualEvent {
   category?: MomentCategory;
   reminderMinutes?: number;
   linkedContactIds: string[];
+  /** When reminder_sweep fired for this event. Set by the server only; the
+   *  presence of a value is what stops a second reminder going out. */
+  remindedAt?: string;
   createdAt: string;
 }
 
@@ -320,6 +323,28 @@ export interface Workout {
   createdAt: string;
 }
 
+/**
+ * A proactive notification, as the client renders it.
+ *
+ * Named AppNotification rather than Notification because the DOM already has
+ * a global by that name — a bare `Notification` in a client component would
+ * silently resolve to the Web Notifications API instead of this.
+ */
+export interface AppNotification {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  /** The "על סמך…" attribution. Every proactive item explains itself. */
+  reason?: string;
+  /** An Approve/Modify affordance. Never executed without the user tapping. */
+  action?: { type: string; payload: Record<string, unknown> };
+  status: "pending" | "sent" | "read" | "acted" | "dismissed" | "expired";
+  scheduledFor: string;
+  readAt?: string;
+  createdAt: string;
+}
+
 export interface UpcomingEvent {
   id: string;
   title: string;
@@ -359,6 +384,10 @@ export interface PersonalDNA {
   sleepNotes?: string;
   careerNotes?: string;
   motivationTriggers: string[];
+  /** IANA zone, e.g. "Asia/Jerusalem". Inferred from the browser on first
+   *  load and overridable in settings. Drives every user-local decision the
+   *  Proactive Engine makes — what "07:00" and "today" mean for this person. */
+  timezone?: string;
 }
 
 export const EMPTY_PERSONAL_DNA: PersonalDNA = {

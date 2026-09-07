@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Send, Sparkles } from "lucide-react";
 import { CourseQuiz } from "@/components/features/learning/CourseQuiz";
 import { TheaterVideo } from "@/components/features/learning/TheaterVideo";
@@ -14,6 +14,47 @@ import {
 import { cn } from "@/lib/utils";
 import type { CourseModule } from "@/lib/ai/courseModule";
 import { readAiError } from "@/lib/api/aiClient";
+
+interface PagerArrowProps {
+  /** `start` is the right edge in RTL, which is where "back" belongs. */
+  side: "start" | "end";
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}
+
+/**
+ * One of the two arrows flanking the course material.
+ *
+ * Anchored to the material card, not to the prose inside it: a stage can be
+ * several screens long in a scrolling column, and an arrow positioned within
+ * that flow would scroll away from the reader. Pinned to the card's vertical
+ * centre, both controls stay reachable no matter how far down the stage the
+ * reader is — which is the whole point of moving them off the bottom bar.
+ */
+function PagerArrow({ side, label, disabled, onClick }: PagerArrowProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "glass-control focus-ring absolute top-1/2 z-10 hidden size-9 -translate-y-1/2 place-items-center",
+        "rounded-full text-foreground shadow-sm transition-opacity sm:grid",
+        "hover:opacity-90 disabled:pointer-events-none disabled:opacity-25",
+        side === "start" ? "start-1.5" : "end-1.5"
+      )}
+    >
+      {side === "start" ? (
+        <ChevronRight size={16} aria-hidden />
+      ) : (
+        <ChevronLeft size={16} aria-hidden />
+      )}
+    </button>
+  );
+}
 
 interface LearningSplitViewProps {
   topicTitle: string;
@@ -58,7 +99,36 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
   const isFirst = stageIndex <= 0;
   const isLast = stageIndex >= stages.length - 1;
 
-  const goTo = (index: number) => setStageIndex(clampStage(index, stages.length));
+  const goTo = useCallback(
+    (index: number) => setStageIndex(clampStage(index, stages.length)),
+    [stages.length]
+  );
+
+  // Scrolling the material column back to the top on every stage change.
+  // Without it, moving to the next section lands the reader wherever the
+  // previous one happened to be scrolled — usually its last paragraph, which
+  // reads as "nothing happened".
+  const materialRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    materialRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [stageIndex]);
+
+  // Arrow keys page the course. RTL: ArrowRight moves back, ArrowLeft
+  // forward — the same direction the on-screen chevrons point. Ignored while
+  // focus is in a text field, so typing a question to the assistant doesn't
+  // navigate the material out from under it.
+  useEffect(() => {
+    if (stages.length === 0) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable='true']")) return;
+      e.preventDefault();
+      setStageIndex((i) => clampStage(e.key === "ArrowRight" ? i - 1 : i + 1, stages.length));
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [stages.length]);
 
   async function loadModule() {
     setLoading(true);
@@ -150,9 +220,35 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* ── Left: the course itself ── */}
+        {/* The pager now lives on the material rather than under it. It used
+            to be a bar pinned below the column, which on a long section sat
+            off the bottom of the scroll — you had to scroll past everything
+            to reach "next", then scroll back up to keep reading. Flanking the
+            card keeps both controls in the same place the whole way through.
+
+            The extra sm:px-14 on the section is the gutter the arrows sit in,
+            so they never cover a line of prose. */}
+        <div className="relative min-w-0">
+        {module && stages.length > 1 && (
+          <>
+            <PagerArrow
+              side="start"
+              label="השלב הקודם"
+              disabled={isFirst}
+              onClick={() => goTo(stageIndex - 1)}
+            />
+            <PagerArrow
+              side="end"
+              label="השלב הבא"
+              disabled={isLast}
+              onClick={() => goTo(stageIndex + 1)}
+            />
+          </>
+        )}
         <section
+          ref={materialRef}
           aria-label="חומר הלימוד"
-          className="flex max-h-[70vh] min-w-0 flex-col gap-4 overflow-y-auto rounded-2xl border border-hairline-card bg-surface p-5"
+          className="flex max-h-[70vh] min-w-0 flex-col gap-4 overflow-y-auto rounded-2xl border border-hairline-card bg-surface p-5 sm:px-14"
         >
           {videoId && <TheaterVideo videoId={videoId} title={topicTitle} />}
 
@@ -257,13 +353,15 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
                 )}
               </div>
 
-              {/* ChevronRight is "back" and ChevronLeft is "forward": the app
-                  is RTL, so forward runs leftward. */}
-              <div className="flex items-center justify-between gap-3 border-t border-hairline-card pt-3">
+              {/* Phone fallback for the flanking arrows, plus the position
+                  counter at every size. Deliberately unbordered — the old
+                  `border-t` bar read as a separate footer belonging to the
+                  card; this reads as part of the material. */}
+              <div className="flex items-center justify-between gap-3 pt-1">
                 <button
                   onClick={() => goTo(stageIndex - 1)}
                   disabled={isFirst}
-                  className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground disabled:opacity-40"
+                  className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground disabled:opacity-40 sm:invisible"
                 >
                   <ChevronRight size={14} aria-hidden />
                   חזור
@@ -276,7 +374,7 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
                 <button
                   onClick={() => goTo(stageIndex + 1)}
                   disabled={isLast}
-                  className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground disabled:opacity-40"
+                  className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground disabled:opacity-40 sm:invisible"
                 >
                   הבא
                   <ChevronLeft size={14} aria-hidden />
@@ -285,6 +383,7 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
             </article>
           )}
         </section>
+        </div>
 
         {/* ── Right: the assistant, in this topic's context ── */}
         <section

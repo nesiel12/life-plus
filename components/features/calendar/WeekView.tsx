@@ -1,7 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Loader2 } from "lucide-react";
+import {
+  DeleteEventButton,
+  DeleteEventDialog,
+  useEventDeletion,
+  type DeletableEvent,
+} from "@/components/features/calendar/DeleteEventDialog";
 import { useInsights } from "@/hooks/useInsights";
 import { dateKey, isSameDay, rangeBounds, weekDays } from "@/lib/calendar/ranges";
 import { layoutDayEvents, minutesIntoDay } from "@/lib/calendar/layoutDayEvents";
@@ -47,7 +53,21 @@ export function WeekView({ anchor }: WeekViewProps) {
   const query = `/api/calendar/range?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(
     to.toISOString()
   )}`;
-  const { data, loading } = useInsights<RangeResponse>(query, FALLBACK, [query]);
+  const { data, loading, setData, refresh } = useInsights<RangeResponse>(query, FALLBACK, [query]);
+
+  const handleDeleted = useCallback(
+    (deleted: DeletableEvent) => {
+      setData((current) =>
+        current
+          ? { ...current, events: current.events.filter((e) => e.id !== deleted.id) }
+          : current
+      );
+      refresh();
+    },
+    [setData, refresh]
+  );
+
+  const deletion = useEventDeletion(handleDeleted);
 
   const events = useMemo(() => data?.events ?? [], [data]);
 
@@ -137,9 +157,10 @@ export function WeekView({ anchor }: WeekViewProps) {
                   <span
                     key={event.id}
                     title={event.title}
-                    className="truncate rounded bg-gold-soft px-1.5 py-0.5 text-[0.65rem] text-gold-ink"
+                    className="group flex items-center gap-0.5 rounded bg-gold-soft px-1.5 py-0.5 text-[0.65rem] text-gold-ink"
                   >
-                    {event.title}
+                    <span className="min-w-0 flex-1 truncate">{event.title}</span>
+                    <DeleteEventButton event={event} onRequest={deletion.request} size="sm" />
                   </span>
                 ))}
               </div>
@@ -187,7 +208,7 @@ export function WeekView({ anchor }: WeekViewProps) {
                   <div
                     key={event.id}
                     title={`${event.title} · ${clockTime(event.start)}`}
-                    className="absolute overflow-hidden rounded-md border border-gold-line bg-surface px-1 py-0.5 text-[0.65rem] leading-tight text-foreground shadow-sm"
+                    className="group absolute overflow-hidden rounded-md border border-gold-line bg-surface px-1 py-0.5 text-[0.65rem] leading-tight text-foreground shadow-sm"
                     style={{
                       top: `${top * 100}%`,
                       height: `${height * 100}%`,
@@ -199,6 +220,15 @@ export function WeekView({ anchor }: WeekViewProps) {
                   >
                     <span className="block truncate font-medium">{event.title}</span>
                     <span className="ltr block truncate text-muted">{clockTime(event.start)}</span>
+                    {/* Floated over the block rather than in flow: these cells
+                        can be as short as a 15-minute meeting, where a third
+                        line would push the title out of view entirely. */}
+                    <DeleteEventButton
+                      event={event}
+                      onRequest={deletion.request}
+                      size="sm"
+                      className="absolute end-0.5 top-0.5 bg-surface/90"
+                    />
                   </div>
                 ))}
               </div>
@@ -206,6 +236,14 @@ export function WeekView({ anchor }: WeekViewProps) {
           })}
         </div>
       </div>
+
+      <DeleteEventDialog
+        event={deletion.pending}
+        deleting={deletion.deleting}
+        error={deletion.error}
+        onCancel={deletion.cancel}
+        onConfirm={deletion.confirm}
+      />
     </div>
   );
 }

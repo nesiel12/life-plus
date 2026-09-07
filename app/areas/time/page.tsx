@@ -22,6 +22,7 @@ import {
   type WeekCalendarEvent,
 } from "@/lib/time/buildDailyTimeline";
 import type { Task } from "@/types";
+import { BackToHome } from "@/components/layout/BackToHome";
 
 interface WeekCalendarResponse {
   connected: boolean;
@@ -218,6 +219,7 @@ export default function TimeSpacePage() {
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="mb-1 text-2xl font-medium tracking-tight">זמן ומשימות</h1>

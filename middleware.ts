@@ -53,7 +53,13 @@ const authMiddleware = withAuth({
 // Paths that require a signed-in session — unchanged from before. /login and
 // /api/auth/:path* deliberately stay outside this set: they need the host
 // canonicalized (below), never the sign-in gate itself.
-const PROTECTED = [/^\/$/, /^\/timeline(\/|$)/, /^\/areas(\/|$)/, /^\/calendar(\/|$)/];
+const PROTECTED = [
+  /^\/$/,
+  /^\/timeline(\/|$)/,
+  /^\/areas(\/|$)/,
+  /^\/calendar(\/|$)/,
+  /^\/settings(\/|$)/,
+];
 
 export default function middleware(req: NextRequestWithAuth, event: NextFetchEvent) {
   if (shouldCanonicalize) {
@@ -87,5 +93,6 @@ export const config = {
     "/timeline/:path*",
     "/areas/:path*",
     "/calendar/:path*",
+    "/settings/:path*",
   ],
 };

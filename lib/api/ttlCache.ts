@@ -62,6 +62,22 @@ export function invalidate(key: string): void {
   store.delete(key);
 }
 
+/**
+ * Drops every key starting with `prefix`.
+ *
+ * The exact-key `invalidate` above can only clear entries whose full key the
+ * writer can reconstruct. The day/week grids cache under
+ * `calendar-range:{email}:{fromISO}:{toISO}` — an unbounded set of windows the
+ * writer has no way to enumerate — so after creating or deleting an event they
+ * kept serving the pre-write calendar for the rest of the TTL, which reads as
+ * "the delete didn't work". Clearing by prefix is the only honest option.
+ */
+export function invalidatePrefix(prefix: string): void {
+  for (const key of store.keys()) {
+    if (key.startsWith(prefix)) store.delete(key);
+  }
+}
+
 /** Test-only: reset all state between cases. */
 export function __clearCache(): void {
   store.clear();

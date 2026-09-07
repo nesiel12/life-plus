@@ -267,6 +267,7 @@ export interface Database {
           birth_date: string | null;
           chronotype_settings: Json;
           core_priorities: Json;
+          timezone: string | null;
           created_at: string;
           updated_at: string;
         },
@@ -284,6 +285,7 @@ export interface Database {
           birth_date?: string | null;
           chronotype_settings?: Json;
           core_priorities?: Json;
+          timezone?: string | null;
         },
         {
           user_id?: string;
@@ -299,6 +301,7 @@ export interface Database {
           birth_date?: string | null;
           chronotype_settings?: Json;
           core_priorities?: Json;
+          timezone?: string | null;
         }
       >;
       goals: TableDef<
@@ -756,6 +759,7 @@ export interface Database {
           category: MomentCategoryDb | null;
           reminder_minutes: number | null;
           linked_contact_ids: string[];
+          reminded_at: string | null;
           created_at: string;
           updated_at: string;
         },
@@ -778,6 +782,7 @@ export interface Database {
           category?: MomentCategoryDb | null;
           reminder_minutes?: number | null;
           linked_contact_ids?: string[];
+          reminded_at?: string | null;
         }
       >;
       learning_topics: TableDef<
@@ -973,6 +978,7 @@ export interface Database {
           read_at: string | null;
           acted_at: string | null;
           expires_at: string | null;
+          delivery: Record<string, unknown>;
           created_at: string;
         },
         {
@@ -991,6 +997,7 @@ export interface Database {
           read_at?: string | null;
           acted_at?: string | null;
           expires_at?: string | null;
+          delivery?: Record<string, unknown>;
         },
         {
           kind?: string;
@@ -1005,6 +1012,7 @@ export interface Database {
           read_at?: string | null;
           acted_at?: string | null;
           expires_at?: string | null;
+          delivery?: Record<string, unknown>;
         }
       >;
       notification_preferences: TableDef<
@@ -1085,6 +1093,35 @@ export interface Database {
           byte_size?: number;
           caption?: string | null;
           caption_generated_at?: string | null;
+        }
+      >;
+      google_calendar_credentials: TableDef<
+        {
+          user_id: string;
+          access_token: string;
+          refresh_token: string | null;
+          expires_at: string;
+          scope: string;
+          invalid_at: string | null;
+          connected_at: string;
+          updated_at: string;
+        },
+        {
+          user_id: string;
+          access_token: string;
+          refresh_token?: string | null;
+          expires_at: string;
+          scope: string;
+          invalid_at?: string | null;
+          updated_at?: string;
+        },
+        {
+          access_token?: string;
+          refresh_token?: string | null;
+          expires_at?: string;
+          scope?: string;
+          invalid_at?: string | null;
+          updated_at?: string;
         }
       >;
       google_photos_credentials: TableDef<

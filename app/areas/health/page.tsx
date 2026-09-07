@@ -10,6 +10,7 @@ import { NewMealModal } from "@/components/features/health/NewMealModal";
 import { NewWorkoutModal } from "@/components/features/health/NewWorkoutModal";
 import { NutritionCoach } from "@/components/features/health/NutritionCoach";
 import type { MealType } from "@/types";
+import { BackToHome } from "@/components/layout/BackToHome";
 
 const MEAL_TYPE_LABEL: Record<MealType, string> = {
   breakfast: "ארוחת בוקר",
@@ -94,6 +95,7 @@ export default function HealthSpacePage() {
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
       <h1 className="mb-1 text-2xl font-medium tracking-tight">בריאות</h1>
       <p className="mb-8 text-sm text-muted">ארוחות, אימונים, והדרכה תזונתית מבוססת AI — הכל במקום אחד.</p>
 

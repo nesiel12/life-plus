@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { cached } from "@/lib/api/ttlCache";
-import { fetchCalendarWindow, type WindowEvent } from "@/lib/googleCalendar/fetchWindow";
+import { fetchAllCalendarsWindow, type WindowEvent } from "@/lib/googleCalendar/fetchWindow";
 
 // Events in an arbitrary window, for the calendar's navigable Day and Week
 // views.
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     const events = await cached(
       `calendar-range:${token.email}:${payload.from}:${payload.to}`,
       CACHE_TTL_MS,
-      () => fetchCalendarWindow(accessToken, from, to)
+      () => fetchAllCalendarsWindow(accessToken, from, to)
     );
     return NextResponse.json({ connected: true, ...payload, events } satisfies RangeResponse);
   } catch (err) {

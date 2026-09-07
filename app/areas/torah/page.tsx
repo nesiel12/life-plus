@@ -13,6 +13,7 @@ import { TorahTabs, isCustomTab, type TorahTab } from "@/components/features/tor
 import { EntityHub } from "@/components/features/torah/EntityHub";
 import { AddStudyItem } from "@/components/features/torah/AddStudyItem";
 import { StudyItemList } from "@/components/features/torah/StudyItemList";
+import { SectionHeader } from "@/components/features/torah/SectionHeader";
 import { buildSectionHub } from "@/lib/torah/studyHub";
 import { orderSummaries, sectionAndDescendants } from "@/lib/summaries/hierarchy";
 import type { EntityRef, EntitySources } from "@/lib/summaries/entityRef";
@@ -29,6 +30,7 @@ import { useInsights } from "@/hooks/useInsights";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import type { Book, KnowledgeEntry, Rabbi, Summary } from "@/types";
 import type { LearningInsights } from "@/lib/learning/types";
+import { BackToHome } from "@/components/layout/BackToHome";
 
 interface ExtractedShiur {
   fileName: string;
@@ -193,6 +195,8 @@ export default function TorahSpacePage() {
   const [editorTarget, setEditorTarget] = useState<string | null>(null);
   const summarySections = useAtlasStore((s) => s.summarySections);
   const updateSummary = useAtlasStore((s) => s.updateSummary);
+  const updateSummarySection = useAtlasStore((s) => s.updateSummarySection);
+  const deleteSummarySection = useAtlasStore((s) => s.deleteSummarySection);
   const reorderSummaryInSection = useAtlasStore((s) => s.reorderSummaryInSection);
   // null = the "all" tab.
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
@@ -263,6 +267,17 @@ export default function TorahSpacePage() {
       : summaries;
     return orderSummaries(scoped);
   }, [summaries, summarySections, activeSectionId]);
+
+  // The section the custom tab is currently showing — the target of the
+  // rename/pin/delete controls in its header. Distinct from activeSectionId
+  // above, which is the SectionManager's own selection on the summaries tab.
+  const activeSection = useMemo(
+    () =>
+      isCustomTab(activeTab)
+        ? (summarySections.find((s) => s.id === activeTab.sectionId) ?? null)
+        : null,
+    [activeTab, summarySections]
+  );
 
   const handleTogglePin = useCallback(
     (summary: Summary) => {
@@ -351,6 +366,7 @@ export default function TorahSpacePage() {
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
       <h1 className="mb-1 text-2xl font-medium tracking-tight">מרחב תורה</h1>
       <p className="mb-8 text-sm text-muted">הספרייה האישית שלך — ספרים, רבנים, שיעורים וסיכומים, במקום אחד.</p>
 
@@ -393,6 +409,27 @@ export default function TorahSpacePage() {
       {/* A custom section: mixed study items, ordered by the user. */}
       {!openEntity && isCustomTab(activeTab) && (
         <div className="flex flex-col gap-5">
+          {activeSection && (
+            <SectionHeader
+              section={activeSection}
+              itemCount={summaries.filter((s) => s.sectionId === activeSection.id).length}
+              onRename={(name) => updateSummarySection(activeSection.id, { name })}
+              onTogglePin={() =>
+                updateSummarySection(activeSection.id, {
+                  // A timestamp, not a boolean, so pins keep their own order.
+                  pinnedAt: activeSection.pinnedAt ? undefined : new Date().toISOString(),
+                })
+              }
+              onDelete={async () => {
+                await deleteSummarySection(activeSection.id);
+                // The tab the user is standing on no longer exists; stay in
+                // the space rather than rendering an empty custom section.
+                setActiveTab("summaries");
+                setSectionEditorTarget(null);
+              }}
+            />
+          )}
+
           {sectionEditorTarget !== null ? (
             <GlassCard>
               <SummaryWorkspace

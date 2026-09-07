@@ -11,6 +11,7 @@ import { LIFE_AREA_LIST, momentCategoryColorVar } from "@/lib/lifeAreas";
 import { LIFE_AREA_ICONS } from "@/lib/lifeAreaIcons";
 import { cn } from "@/lib/utils";
 import type { MomentCategory } from "@/types";
+import { BackToHome } from "@/components/layout/BackToHome";
 
 type FilterValue = MomentCategory | "all";
 
@@ -75,6 +76,7 @@ export default function TimelinePage() {
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
       <h1 className="mb-1 text-2xl font-medium tracking-tight">ציר הזמן</h1>
       <p className="mb-6 text-sm text-muted">
         הסיפור של החיים שלך — רגעים, יעדים והישגים במקום אחד. ⌘K בכל מקום כדי להוסיף רגע חדש.

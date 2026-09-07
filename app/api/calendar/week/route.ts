@@ -2,8 +2,8 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
-import { sanitizeEventTitle } from "@/lib/calendar/sanitizeEventTitle";
 import { cached } from "@/lib/api/ttlCache";
+import { fetchAllCalendarsWindow } from "@/lib/googleCalendar/fetchWindow";
 import type { WeekCalendarEvent } from "@/lib/time/buildDailyTimeline";
 
 // Google Calendar events for the Time & Tasks unified timeline
@@ -29,40 +29,23 @@ const WINDOW_DAYS = 7;
 // event added elsewhere shows up promptly.
 const CACHE_TTL_MS = 60_000;
 
-interface RawGoogleEvent {
-  id: string;
-  summary?: string;
-  start?: { dateTime?: string; date?: string };
-  end?: { dateTime?: string; date?: string };
-}
-interface RawGoogleEventsResponse {
-  items?: RawGoogleEvent[];
-}
-
-async function fetchWeekEvents(accessToken: string, timeMin: string, timeMax: string): Promise<WeekCalendarEvent[]> {
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(
-      timeMin
-    )}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  if (!res.ok) {
-    // TEMPORARY: same enrichment as lib/googleCalendar/fetchEvents.ts —
-    // surface Google's actual status/body instead of a generic message.
-    const body = await res.text().catch(() => "");
-    throw new Error(`Google Calendar request failed: ${res.status} ${res.statusText} — ${body}`);
-  }
-
-  const data = (await res.json()) as RawGoogleEventsResponse;
-  return (data.items ?? [])
-    .filter((item) => (item.start?.dateTime ?? item.start?.date) && (item.end?.dateTime ?? item.end?.date))
-    .map((item) => ({
-      id: item.id,
-      title: sanitizeEventTitle(item.summary),
-      start_time: (item.start?.dateTime ?? item.start?.date) as string,
-      end_time: (item.end?.dateTime ?? item.end?.date) as string,
-      is_all_day: !item.start?.dateTime,
-    }));
+// Reshapes the shared window fetch into the snake_case row shape
+// buildDailyTimeline consumes alongside real DB rows. This used to be a
+// hand-rolled events.list call, which meant the unified timeline quietly
+// missed both paginated results and every non-primary calendar.
+async function fetchWeekEvents(
+  accessToken: string,
+  from: Date,
+  to: Date
+): Promise<WeekCalendarEvent[]> {
+  const events = await fetchAllCalendarsWindow(accessToken, from, to);
+  return events.map((event) => ({
+    id: event.id,
+    title: event.title,
+    start_time: event.start,
+    end_time: event.end,
+    is_all_day: event.isAllDay,
+  }));
 }
 
 export async function GET(request: NextRequest) {
@@ -88,7 +71,7 @@ export async function GET(request: NextRequest) {
     const events = await cached(
       `calendar-week:${token.email}:${now.toISOString().slice(0, 10)}`,
       CACHE_TTL_MS,
-      () => fetchWeekEvents(accessToken, now.toISOString(), until.toISOString())
+      () => fetchWeekEvents(accessToken, now, until)
     );
     return NextResponse.json({ connected: true, events });
   } catch (err) {

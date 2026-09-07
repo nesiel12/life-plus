@@ -13,6 +13,9 @@ type CommandDay = "today" | "tomorrow";
 
 interface CalendarEventProposal {
   googleEventId: string;
+  /** Absent on proposals produced before multi-calendar support, which were
+   *  all necessarily on the primary calendar. */
+  calendarId?: string;
   title: string;
   start: string;
   end: string;
@@ -122,7 +125,10 @@ export function CommandPanel() {
           await fetch("/api/calendar/events", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ googleEventId: event.googleEventId }),
+            body: JSON.stringify({
+              googleEventId: event.googleEventId,
+              calendarId: event.calendarId ?? "primary",
+            }),
           });
         }
       }
