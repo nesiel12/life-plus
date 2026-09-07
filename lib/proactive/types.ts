@@ -7,13 +7,15 @@ export type JobName =
   | "recommendation_expiry"
   | "busy_week_scan"
   | "notification_dispatch"
-  | "schedule_transition";
+  | "schedule_transition"
+  | "recovery_support";
 
 export type NotificationKind =
   | "daily_insight"
   | "briefing_ready"
   | "reminder_event"
   | "schedule_transition"
+  | "recovery_support"
   | "reminder_family"
   | "reminder_review"
   | "reminder_medical"
@@ -27,6 +29,7 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   briefing_ready: "תדריך בוקר",
   reminder_event: "תזכורות לאירועים",
   schedule_transition: "מעברים בלוז",
+  recovery_support: "תמיכה במרחב האישי",
   reminder_family: "תזכורות משפחה",
   reminder_review: "תזכורות חזרה על חומר",
   reminder_medical: "תזכורות רפואיות",

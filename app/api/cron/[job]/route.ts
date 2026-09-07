@@ -13,6 +13,7 @@ const VALID_JOBS: JobName[] = [
   "busy_week_scan",
   "notification_dispatch",
   "schedule_transition",
+  "recovery_support",
 ];
 
 /**
@@ -37,12 +38,13 @@ const JOB_GROUPS: Record<string, JobName[]> = {
     "morning_briefing",
     "reminder_sweep",
     "schedule_transition",
+    "recovery_support",
     "notification_dispatch",
   ],
   // A lighter pass for later in the day: fires reminders whose window opened
   // since the morning run, and delivers anything the morning's quiet hours
   // deferred.
-  sweep: ["reminder_sweep", "schedule_transition", "notification_dispatch"],
+  sweep: ["reminder_sweep", "schedule_transition", "recovery_support", "notification_dispatch"],
   // Weekly.
   weekly: ["busy_week_scan", "notification_dispatch"],
 };

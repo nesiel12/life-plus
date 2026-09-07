@@ -16,6 +16,7 @@ import {
   ListTodo,
   LogOut,
   Settings,
+  ShieldCheck,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -53,6 +54,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/areas/health", label: "בריאות", icon: HeartPulse, colorVar: "--accent-health" },
   { href: "/areas/time", label: "זמן ומשימות", icon: ListTodo, colorVar: "--accent-time" },
   { href: "/areas/finances", label: "כספים", icon: Wallet, colorVar: "--accent-finance" },
+  // Labelled "אישי", not by what it contains. The recovery space is locked
+  // precisely so a bystander learns nothing from the screen, and a nav item
+  // naming it would undo that before the lock ever gets a chance to work.
+  { href: "/areas/recovery", label: "אישי", icon: ShieldCheck, colorVar: "--muted" },
   { href: "/timeline", label: "ציר זמן", icon: History, colorVar: "--muted" },
 ];
 

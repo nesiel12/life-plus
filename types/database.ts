@@ -17,6 +17,8 @@ export type LearningTopicStatusDb = "planning" | "active" | "completed";
 export type LearningResourceTypeDb = "youtube" | "podcast" | "article" | "equipment" | "summary";
 export type MealTypeDb = "breakfast" | "lunch" | "dinner" | "snack" | "post-workout";
 export type JobRunStatusDb = "running" | "succeeded" | "failed" | "skipped";
+export type RecoveryEventKindDb = "relapse" | "urge" | "note";
+export type RecoveryChallengePurposeDb = "register" | "authenticate";
 export type RoutineKindDb =
   | "work"
   | "study"
@@ -1107,6 +1109,125 @@ export interface Database {
           byte_size?: number;
           caption?: string | null;
           caption_generated_at?: string | null;
+        }
+      >;
+      recovery_programs: TableDef<
+        {
+          id: string;
+          user_id: string;
+          title: string;
+          clean_since: string;
+          reasons: string[];
+          triggers: string[];
+          risk_hours: number[];
+          coping_strategies: string[];
+          celebrated_milestones: number[];
+          is_active: boolean;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          title: string;
+          clean_since: string;
+          reasons?: string[];
+          triggers?: string[];
+          risk_hours?: number[];
+          coping_strategies?: string[];
+          celebrated_milestones?: number[];
+          is_active?: boolean;
+          archived_at?: string | null;
+        },
+        {
+          title?: string;
+          clean_since?: string;
+          reasons?: string[];
+          triggers?: string[];
+          risk_hours?: number[];
+          coping_strategies?: string[];
+          celebrated_milestones?: number[];
+          is_active?: boolean;
+          archived_at?: string | null;
+          updated_at?: string;
+        }
+      >;
+      recovery_events: TableDef<
+        {
+          id: string;
+          user_id: string;
+          program_id: string;
+          kind: RecoveryEventKindDb;
+          occurred_at: string;
+          intensity: number | null;
+          trigger: string | null;
+          note: string | null;
+          created_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          program_id: string;
+          kind: RecoveryEventKindDb;
+          occurred_at?: string;
+          intensity?: number | null;
+          trigger?: string | null;
+          note?: string | null;
+        },
+        {
+          kind?: RecoveryEventKindDb;
+          occurred_at?: string;
+          intensity?: number | null;
+          trigger?: string | null;
+          note?: string | null;
+        }
+      >;
+      recovery_credentials: TableDef<
+        {
+          id: string;
+          user_id: string;
+          credential_id: string;
+          public_key: string;
+          counter: number;
+          transports: string[];
+          device_label: string | null;
+          created_at: string;
+          last_used_at: string | null;
+        },
+        {
+          id?: string;
+          user_id: string;
+          credential_id: string;
+          public_key: string;
+          counter?: number;
+          transports?: string[];
+          device_label?: string | null;
+        },
+        {
+          counter?: number;
+          device_label?: string | null;
+          last_used_at?: string | null;
+        }
+      >;
+      recovery_challenges: TableDef<
+        {
+          user_id: string;
+          challenge: string;
+          purpose: RecoveryChallengePurposeDb;
+          expires_at: string;
+          created_at: string;
+        },
+        {
+          user_id: string;
+          challenge: string;
+          purpose: RecoveryChallengePurposeDb;
+          expires_at: string;
+        },
+        {
+          challenge?: string;
+          purpose?: RecoveryChallengePurposeDb;
+          expires_at?: string;
         }
       >;
       routine_blocks: TableDef<

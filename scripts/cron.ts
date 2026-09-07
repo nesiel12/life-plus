@@ -19,6 +19,7 @@ const VALID: JobName[] = [
   "busy_week_scan",
   "notification_dispatch",
   "schedule_transition",
+  "recovery_support",
 ];
 
 const job = process.argv[2] as JobName | undefined;

@@ -22,6 +22,8 @@ export const JOB_LOADERS: Partial<Record<JobName, () => Promise<Job>>> = {
   busy_week_scan: () => import("@/lib/proactive/jobs/busyWeekScan").then((m) => m.busyWeekScanJob),
   schedule_transition: () =>
     import("@/lib/proactive/jobs/scheduleTransition").then((m) => m.scheduleTransitionJob),
+  recovery_support: () =>
+    import("@/lib/proactive/jobs/recoverySupport").then((m) => m.recoverySupportJob),
   notification_dispatch: () =>
     import("@/lib/proactive/jobs/notificationDispatch").then((m) => m.notificationDispatchJob),
 };
