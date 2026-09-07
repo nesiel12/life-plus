@@ -3,7 +3,7 @@
 > The Proactive Engine is what makes Atlas *Atlas*. Everything before it was reactive: the user opens
 > the app, the app shows them synthesised data. The Proactive Engine runs **without the user present**,
 > notices things, and reaches out. This document is the architecture; `docs/ATLAS_BIBLE.md` §7 is the
-> milestone scope. Status: **scaffolding in place, jobs being implemented.**
+> milestone scope. Status: **live** — all jobs implemented, email delivery wired, cron deployed.
 
 ---
 
@@ -91,12 +91,17 @@ lib/proactive/
   quietHours.ts       — pure: isWithinQuietHours(hour, start, end)      [tested]
   dedupe.ts           — pure: buildDedupeKey(kind, entityId, logicalDay) [tested]
   schedule.ts         — pure: nextSendTime(now, prefs) honoring quiet hours + daily cap [tested]
+  timezone.ts         — pure: resolve/validate an IANA zone, local day bounds, next local hour [tested]
   jobs/
     dailyInsight.ts        — nightly: run the Intelligence Engine, persist one insights row + a notification
-    morningBriefing.ts     — early AM: pre-compute /api/briefing, attach DNA focus-window guidance
-    reminderSweep.ts       — family contact overdue / shiur review due / milestone slipping / medical test due
+    morningBriefing.ts     — self-gates to the user's local 07:00; real Google Calendar + tasks + relationships
+    reminderSweep.ts       — fires manual_events.reminder_minutes (its first ever consumer)
+    scheduleTransition.ts  — "training in 20 minutes", plus what is free afterwards
+    relationshipNudge.ts   — one overdue contact a day; the producer for `reminder_family`
+    recoverySupport.ts     — anodyne check-in an hour before a declared/learned risk hour
     recommendationExpiry.ts— sweep pending recommendation_events + notifications past expires_at → expired
     busyWeekScan.ts        — read next 7 days of Google Calendar; if load > threshold, propose recovery blocks
+    notificationDispatch.ts— the only thing that actually sends (see §4a)
 lib/db/
   jobRuns.ts
   notifications.ts
@@ -104,7 +109,9 @@ lib/db/
 lib/notify/
   index.ts            — send(notification, channels): fan-out
   channels/inApp.ts   — just persists (already done by the job); marks in_app
-  channels/email.ts   — transactional email (provider TBD: Resend) — STUB until creds
+  channels/email.ts   — Resend over REST; never throws, returns {ok}|{ok:false,error}
+  email/renderNotificationEmail.ts — pure RTL Hebrew template [tested]
+  email/unsubscribeToken.ts        — HMAC one-click unsubscribe, RFC 8058 [tested]
   channels/whatsapp.ts— WhatsApp Business send — STUB until creds
 app/api/cron/[job]/route.ts — POST, Bearer CRON_SECRET, calls runJob(job). The only external trigger.
 ```
@@ -125,26 +132,76 @@ try/catch → `failed` with the error in `detail`, and never throwing to the cal
 
 ## 4. Scheduling / trigger
 
-The engine is trigger‑agnostic — `POST /api/cron/{job}` with `Authorization: Bearer $CRON_SECRET` runs
-one job for all due scopes. Two supported drivers, pick at deploy time (**founder/deploy decision**,
-noted in BACKLOG):
+`GET|POST /api/cron/{name}` with `Authorization: Bearer $CRON_SECRET` runs one
+job — or one **group** — for all due scopes. Vercel Cron issues GET and injects
+that header automatically when an env var of exactly that name exists, so both
+verbs are exported.
 
-- **Vercel Cron** (`vercel.json` `crons`) — simplest if Atlas deploys to Vercel.
-- **Supabase scheduled functions** (`pg_cron` + `pg_net` calling the route) — keeps it inside Supabase.
+### Groups, and why they exist
 
-Local dev: a `npm run cron:<job>` script hits the route directly. No scheduler needed to build/test the
-jobs — they're plain functions.
+Vercel's free tier allows **two cron entries, each at most once a day**.
+Producing a notification and delivering it are deliberately separate jobs
+(see §4a), so one-job-per-slot would generate briefings that never get emailed.
+`JOB_GROUPS` in `app/api/cron/[job]/route.ts` runs an ordered sequence in one
+invocation — producers first, dispatcher last — so anything created in a cycle
+goes out in the same cycle.
 
-Cadence (all times user‑local, resolved from `personal_dna` timezone inference):
-| Job | When |
+| Group | Sequence |
 |---|---|
-| `daily_insight` | 03:00 |
-| `morning_briefing` | 05:30, or 90 min before the user's earliest known wake/first event |
-| `reminder_sweep` | 07:00 and 17:00 |
-| `recommendation_expiry` | 02:00 |
-| `busy_week_scan` | Sunday 18:00 |
+| `daily` | recommendation_expiry → daily_insight → morning_briefing → relationship_nudge → reminder_sweep → schedule_transition → recovery_support → notification_dispatch |
+| `sweep` | reminder_sweep → schedule_transition → recovery_support → notification_dispatch |
+| `weekly` | busy_week_scan → notification_dispatch |
 
----
+### Deployed cadence
+
+`vercel.json`: `daily` at 05:00 UTC, `sweep` at 15:00 UTC. Schedules are UTC;
+05:00Z is 07:00–08:00 in Israel, inside the local 07:00–11:00 window
+`morning_briefing` self-gates on. **Moving timezone means changing that hour**
+or the briefing skips every day.
+
+Two fixed times a day cannot deliver a 15-minute transition alert, so
+`.github/workflows/proactive-sweep.yml` drives the `sweep` group every ~15
+minutes for free (and `weekly` on Sundays). It is opt-in — see the file header
+for the two repository secrets it needs. Vercel Pro is the dependable
+alternative: add `{"path": "/api/cron/sweep", "schedule": "*/15 * * * *"}`.
+
+Local: `npm run cron -- <job>` runs the real code path. Every job also has a
+named script (`npm run cron:morning-briefing`, `cron:dispatch`, …).
+
+### User-local scheduling without a per-user scheduler
+
+Cron knows nothing about users. Jobs that must happen at a *user's* hour
+self-gate instead: `morning_briefing` returns `status: "skipped"` until it is
+07:00 for that person, and `jobRunsRepo.claim` treats `skipped` as
+re-claimable, so a later invocation the same day can still do the work. The
+first run at or after 07:00 records `succeeded`, and the unique index makes
+every later invocation that day a no-op.
+
+## 4a. Decide vs. deliver
+
+`notify()` **persists only**. It resolves channel preferences, computes
+`scheduled_for` against the user's quiet hours *in their own timezone*, and
+writes the row. In-app delivery is the row existing.
+
+`notification_dispatch` does the sending. Splitting them is what finally made
+three things work that shipped in M2 and were never wired up:
+
+- **Quiet hours.** `canSendNow` existed and nothing called it — a 03:00 job
+  emailed at 03:00.
+- **The daily cap.** `isUnderDailyCap` existed and nothing called it, and
+  `countSentSince` reads `sent_at`, which nothing ever stamped.
+- **Retry.** A send failing inside the producing job was lost, and that job's
+  idempotency key then prevented it ever being retried.
+
+The dispatcher also refuses to send anything older than 12 hours
+(`STALE_OUTBOUND_MS`). Without that floor, the first run on an existing
+deployment would email the entire backlog of notifications produced before
+delivery existed, starting with a daily insight from weeks ago.
+
+When email is unconfigured, `sendEmail` reports success-with-`skipped` and the
+dispatcher records **nothing** — stamping `sent_at` would mean that the day
+someone adds `RESEND_API_KEY`, every notification produced before then is
+permanently marked delivered.
 
 ## 5. Personal DNA wiring (part of M2)
 
@@ -175,20 +232,35 @@ closes this:
 
 | Layer | M2 deliverable | Needs |
 |---|---|---|
-| **WhatsApp** | `lib/notify/channels/whatsapp.ts` stub + inbound webhook route `app/api/whatsapp/webhook` (signature verify, message → command parse via existing `/api/commands/interpret`, reply). | Meta WhatsApp Business API **or** Twilio creds → **founder stop**. |
+| **WhatsApp** | `lib/notify/channels/whatsapp.ts` stub + inbound webhook route `app/api/whatsapp/webhook` (signature verify, message → command parse via existing `/api/commands/interpret`, reply). No longer called by `notify()` — delivery goes through `notification_dispatch`, which is email-only today. | Meta WhatsApp Business API **or** Twilio creds → **founder stop**. |
 | **Second Brain** | `lib/secondBrain/` — parsers for markdown / Obsidian / Notion export; maps notes → `knowledge_entries` with backlinks preserved as `moments`/links. Import route `app/api/second-brain/import`. | A file upload UX (M4). |
 | **Screen Time** | `lib/health/screenTime.ts` — ingest endpoint `app/api/health/screen-time` accepting daily totals + per‑category; writes to `health_logs` (or a new `screen_time_logs`); feeds the M6 correlation engine. | Client capture (web: Atlas‑tab time, honestly labelled; native/OS export later). |
 
 ---
 
-## 8. Definition of Done for M2
+## 8. Definition of Done for M2 — status
 
-- `job_runs`, `notifications`, `notification_preferences` migrated to the live DB; repos + types in.
-- All five jobs implemented, each producing real notifications for the founder's account, verified via
-  a `npm run cron:*` local run against live data.
-- Quiet hours, daily cap, dedupe, and per‑kind mute all enforced (unit‑tested).
-- In‑app notification centre renders the queue (Hebrew, Approve/Modify); email channel live via Resend.
-- Personal DNA visibly changes ranking + chat tone.
-- Semantic chat memory returns relevant past items.
-- WhatsApp + Second Brain + Screen Time scaffolds compile and are documented as "awaiting X".
-- `lint && typecheck && test && build` green; `BACKLOG.md` + `ATLAS_BIBLE.md` updated; milestone commit.
+- [x] `job_runs`, `notifications`, `notification_preferences` migrated; repos + types in.
+- [x] All jobs implemented (nine now, not five), producing real notifications
+      for the founder's account, verified via local `npm run cron` runs
+      against live data.
+- [x] Quiet hours, daily cap, dedupe and per-kind mute all enforced — and now
+      actually *invoked*, which they were not (see §4a). Unit-tested.
+- [x] In-app notification centre renders the queue (Hebrew, Approve/Modify).
+- [x] Email channel live via Resend, with one-click unsubscribe.
+- [x] Per-user timezone, inferred from the browser and overridable in
+      `/settings`, so "morning" means the user's morning.
+- [x] Google Calendar readable without a browser (`google_calendar_credentials`
+      + `lib/googleCalendar/serverAccess.ts`) — the morning briefing's whole
+      premise.
+- [x] Cron deployed (`vercel.json` + a GitHub Actions sweep for the cadence
+      the free tier cannot schedule).
+- [ ] Personal DNA visibly changes ranking + chat tone.
+- [ ] Semantic chat memory returns relevant past items (needs pgvector).
+- [ ] WhatsApp scaffold — still awaiting Business API credentials.
+- [x] `lint && typecheck && test && build` green.
+
+**Not done, and worth naming:** email delivery has never been observed
+end-to-end, because `RESEND_API_KEY` is unset. The dispatcher correctly
+reports `skipped` and records nothing in that state; the first real send is
+still unproven.
