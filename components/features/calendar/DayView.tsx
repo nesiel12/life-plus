@@ -23,6 +23,8 @@ interface DayViewProps {
   /** The day to show. */
   anchor: Date;
   chronotype: ChronotypeSettings;
+  /** Edit Mode: enables per-event hour-shift controls. */
+  editMode?: boolean;
 }
 
 interface RangeResponse {
@@ -51,7 +53,7 @@ function toDateKey(date: Date): string {
 // window from now, so yesterday is not in it and neither is anything past a
 // fortnight. Asking for the day being viewed is the only way navigation can
 // be honest about days outside that window.
-export function DayView({ anchor, chronotype }: DayViewProps) {
+export function DayView({ anchor, chronotype, editMode = false }: DayViewProps) {
   const { from, to } = useMemo(() => rangeBounds("day", anchor), [anchor]);
 
   // The declared chronotype says what the user predicted about themselves
@@ -211,6 +213,43 @@ export function DayView({ anchor, chronotype }: DayViewProps) {
     [anchor, refresh]
   );
 
+  const shiftEvent = useCallback(
+    async (event: TimelineEvent, deltaMinutes: number) => {
+      const newStart = new Date(new Date(event.start).getTime() + deltaMinutes * 60_000);
+      const newEnd = new Date(new Date(event.end).getTime() + deltaMinutes * 60_000);
+      // Optimistic: move it on screen now, revalidate after Google confirms.
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              events: current.events.map((e) =>
+                e.id === event.id
+                  ? { ...e, start: newStart.toISOString(), end: newEnd.toISOString() }
+                  : e
+              ),
+            }
+          : current
+      );
+      const res = await fetch("/api/calendar/events", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          googleEventId: event.id,
+          calendarId: event.calendarId,
+          start: newStart.toISOString(),
+          end: newEnd.toISOString(),
+        }),
+      });
+      if (!res.ok) {
+        refresh(); // roll back to the server's truth
+        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "לא הצלחנו להזיז את האירוע.");
+      }
+      refresh();
+    },
+    [setData, refresh]
+  );
+
   if (loading && !data) {
     return (
       <p className="flex items-center gap-2 py-8 text-sm text-muted">
@@ -247,13 +286,15 @@ export function DayView({ anchor, chronotype }: DayViewProps) {
         // an arbitrary day would claim the current time is inside it.
         now={isToday ? new Date() : undefined}
         events={timed}
-        gaps={gaps}
+        gaps={editMode ? [] : gaps}
         onScheduleGapTask={scheduleGapTask}
         fromHour={fromHour}
         toHour={toHour}
         chronotype={chronotype}
         observedEnergy={observedEnergy}
         onDeleteEvent={deletion.request}
+        editMode={editMode}
+        onShiftEvent={shiftEvent}
       />
 
       <DeleteEventDialog

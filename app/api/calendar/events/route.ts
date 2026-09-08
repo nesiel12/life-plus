@@ -31,6 +31,17 @@ const deleteEventSchema = z.object({
   calendarId: z.string().trim().min(1).max(200).optional(),
 });
 
+// Move an existing timed event. The Smart Calendar's Edit Mode shifts an
+// event by whole 15-minute steps rather than offering free drag — a step is
+// unambiguous on a phone and in RTL, where a drag onto "one row up" is a
+// coin toss. Only start/end change; title and recurrence are untouched.
+const updateEventSchema = z.object({
+  googleEventId: z.string().trim().min(1),
+  calendarId: z.string().trim().min(1).max(200).optional(),
+  start: z.string().datetime({ offset: true }),
+  end: z.string().datetime({ offset: true }),
+});
+
 // The read routes cache Google's response for 60s (5min for /year). Any write
 // here has to drop those entries immediately, or an event the user just
 // created or deleted would keep showing the pre-write calendar for up to a
@@ -164,6 +175,60 @@ export async function DELETE(request: NextRequest) {
 
     invalidateCalendarCaches(token.email);
     return NextResponse.json({ deleted: true });
+  } catch {
+    return NextResponse.json({ error: "Could not reach Google Calendar." }, { status: 502 });
+  }
+}
+
+
+// Edit Mode's hour-shift: PATCH the start/end of one event. Mirrors DELETE's
+// auth + calendar-scoping + cache invalidation; a 403 means the calendar is
+// read-only for this grant (a subscribed feed), which the user can act on.
+export async function PATCH(request: NextRequest) {
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  if (!token?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limited = rateLimitResponse(`calendar-events-patch:${token.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
+  if (limited) return limited;
+
+  const accessToken = token.error ? undefined : token.accessToken;
+  if (!accessToken) {
+    return NextResponse.json({ error: "Google Calendar is not connected." }, { status: 409 });
+  }
+
+  const parsed = await parseJsonBody(request, updateEventSchema);
+  if (parsed.error) return parsed.error;
+  const { googleEventId, calendarId = "primary", start, end } = parsed.data;
+
+  if (new Date(end).getTime() <= new Date(start).getTime()) {
+    return NextResponse.json({ error: "End must be after start." }, { status: 400 });
+  }
+
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(googleEventId)}`,
+      {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ start: { dateTime: start }, end: { dateTime: end } }),
+      }
+    );
+
+    if (!res.ok) {
+      const message =
+        res.status === 403
+          ? "אין לך הרשאת עריכה ביומן הזה, אז אי אפשר להזיז ממנו אירועים."
+          : res.status === 404
+            ? "האירוע כבר לא קיים ביומן."
+            : "היומן של Google דחה את השינוי.";
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
+
+    invalidateCalendarCaches(token.email);
+    const data = (await res.json().catch(() => ({}))) as GoogleEventResponse;
+    return NextResponse.json({ id: data.id ?? googleEventId, updated: true });
   } catch {
     return NextResponse.json({ error: "Could not reach Google Calendar." }, { status: 502 });
   }

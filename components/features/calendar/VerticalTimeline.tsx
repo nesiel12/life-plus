@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { CalendarPlus, Check, Loader2, Moon, Sparkles, TrendingDown } from "lucide-react";
+import { CalendarPlus, Check, ChevronDown, ChevronUp, Loader2, Moon, Sparkles, TrendingDown } from "lucide-react";
 import { energyForHour, type HourEnergy, type ObservedEnergy } from "@/lib/calendar/energy";
 import { DeleteEventButton, type DeletableEvent } from "@/components/features/calendar/DeleteEventDialog";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,93 @@ interface VerticalTimelineProps {
     startMinute: number;
     endMinute: number;
   }) => Promise<void>;
+  /** Edit Mode: show per-event hour-shift controls. */
+  editMode?: boolean;
+  /** Shift one event by whole minutes (±15). Rejects with a message on failure. */
+  onShiftEvent?: (event: TimelineEvent, deltaMinutes: number) => Promise<void>;
+}
+
+const SHIFT_STEP_MINUTES = 15;
+
+// One event block. A component so Edit Mode's shift buttons can carry their
+// own pending/error state without lifting it into the timeline.
+function EventBlock({
+  event,
+  topRem,
+  heightRem,
+  reduce,
+  index,
+  onDeleteEvent,
+  editMode,
+  onShiftEvent,
+}: {
+  event: TimelineEvent;
+  topRem: number;
+  heightRem: number;
+  reduce: boolean | null;
+  index: number;
+  onDeleteEvent?: (event: DeletableEvent) => void;
+  editMode?: boolean;
+  onShiftEvent?: (event: TimelineEvent, deltaMinutes: number) => Promise<void>;
+}) {
+  const [shifting, setShifting] = useState<"up" | "down" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const canShift = editMode && event.canEdit !== false && Boolean(onShiftEvent);
+
+  function shift(delta: number) {
+    if (!onShiftEvent || shifting) return;
+    setShifting(delta < 0 ? "up" : "down");
+    setError(null);
+    onShiftEvent(event, delta)
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "לא הצלחנו להזיז את האירוע."))
+      .finally(() => setShifting(null));
+  }
+
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, x: 8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.3), ease: [0.16, 1, 0.3, 1] }}
+      className={cn(
+        "group absolute end-0 start-16 flex items-start gap-2 overflow-hidden rounded-xl border bg-surface px-3 py-2",
+        canShift
+          ? "border-gold-line shadow-[0_0_0_1px_var(--gold-line)]"
+          : "border-hairline-card shadow-[0_1px_2px_rgba(16,16,20,0.04),0_10px_24px_-18px_rgba(16,16,20,0.25)]"
+      )}
+      style={{ top: `${topRem + 0.15}rem`, minHeight: `${heightRem - 0.3}rem` }}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{event.title}</p>
+        <p className="ltr text-xs text-muted">{clockRange(event.start, event.end)}</p>
+        {error && <p className="mt-0.5 text-[0.65rem] text-red-500">{error}</p>}
+      </div>
+
+      {canShift && (
+        <div className="flex shrink-0 flex-col gap-0.5">
+          <button
+            onClick={() => shift(-SHIFT_STEP_MINUTES)}
+            disabled={Boolean(shifting)}
+            aria-label={`הקדם את ${event.title} ברבע שעה`}
+            className="focus-ring grid size-6 place-items-center rounded-md bg-fill-subtle text-muted transition-colors hover:text-foreground disabled:opacity-40"
+          >
+            {shifting === "up" ? <Loader2 size={11} className="animate-spin" aria-hidden /> : <ChevronUp size={12} aria-hidden />}
+          </button>
+          <button
+            onClick={() => shift(SHIFT_STEP_MINUTES)}
+            disabled={Boolean(shifting)}
+            aria-label={`דחה את ${event.title} ברבע שעה`}
+            className="focus-ring grid size-6 place-items-center rounded-md bg-fill-subtle text-muted transition-colors hover:text-foreground disabled:opacity-40"
+          >
+            {shifting === "down" ? <Loader2 size={11} className="animate-spin" aria-hidden /> : <ChevronDown size={12} aria-hidden />}
+          </button>
+        </div>
+      )}
+
+      {!editMode && onDeleteEvent && (
+        <DeleteEventButton event={event} onRequest={onDeleteEvent} className="-me-1 mt-0.5" />
+      )}
+    </motion.div>
+  );
 }
 
 // Tighter than it was (3.5rem): an 18-hour column at the old height was a
@@ -230,6 +317,8 @@ export function VerticalTimeline({
   onDeleteEvent,
   gaps = [],
   onScheduleGapTask,
+  editMode = false,
+  onShiftEvent,
 }: VerticalTimelineProps) {
   const reduce = useReducedMotion();
 
@@ -359,22 +448,17 @@ export function VerticalTimeline({
 
         {/* Events float above the banding, inset past the hour gutter. */}
         {positioned.map(({ event, topRem, heightRem }, i) => (
-          <motion.div
+          <EventBlock
             key={event.id}
-            initial={reduce ? false : { opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.35, delay: Math.min(i * 0.04, 0.3), ease: [0.16, 1, 0.3, 1] }}
-            className="group absolute end-0 start-16 flex items-start gap-2 overflow-hidden rounded-xl border border-hairline-card bg-surface px-3 py-2 shadow-[0_1px_2px_rgba(16,16,20,0.04),0_10px_24px_-18px_rgba(16,16,20,0.25)]"
-            style={{ top: `${topRem + 0.15}rem`, minHeight: `${heightRem - 0.3}rem` }}
-          >
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground">{event.title}</p>
-              <p className="ltr text-xs text-muted">{clockRange(event.start, event.end)}</p>
-            </div>
-            {onDeleteEvent && (
-              <DeleteEventButton event={event} onRequest={onDeleteEvent} className="-me-1 mt-0.5" />
-            )}
-          </motion.div>
+            event={event}
+            topRem={topRem}
+            heightRem={heightRem}
+            reduce={reduce}
+            index={i}
+            onDeleteEvent={onDeleteEvent}
+            editMode={editMode}
+            onShiftEvent={onShiftEvent}
+          />
         ))}
 
         {nowOffsetRem !== null && (

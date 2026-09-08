@@ -3,10 +3,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
-import { CalendarClock, CalendarDays, CalendarHeart, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarHeart, ChevronDown, ChevronLeft, ChevronRight, Clock, Pencil, Sparkles } from "lucide-react";
 import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { ScheduleSuggestions } from "@/components/features/ScheduleSuggestions";
 import { DayView } from "@/components/features/calendar/DayView";
 import { WeekView } from "@/components/features/calendar/WeekView";
 import { YearView } from "@/components/features/calendar/YearView";
@@ -14,6 +13,8 @@ import { RangeTabs } from "@/components/features/calendar/RangeTabs";
 import { CalendarAgentPanel } from "@/components/features/calendar/CalendarAgentPanel";
 import { MonthView } from "@/components/features/calendar/MonthView";
 import { ScheduleCopilotBar } from "@/components/features/calendar/ScheduleCopilotBar";
+import { DayTasksPanel } from "@/components/features/calendar/DayTasksPanel";
+import type { WeekCalendarEvent } from "@/lib/time/buildDailyTimeline";
 import {
   DeleteEventButton,
   DeleteEventDialog,
@@ -26,6 +27,7 @@ import { isWithinRange, rangeLabel, stepAnchor, type CalendarRange } from "@/lib
 import { daysUntil } from "@/lib/utils";
 import type { GoogleCalendarEvent } from "@/lib/googleCalendar/fetchEvents";
 import { BackToHome } from "@/components/layout/BackToHome";
+import { cn } from "@/lib/utils";
 
 interface UpcomingResponse {
   connected: boolean;
@@ -75,6 +77,14 @@ export default function CalendarPage() {
   // be navigated. Keeping one anchor also means switching range holds your
   // place instead of snapping back to today.
   const [anchor, setAnchor] = useState(() => new Date());
+  const [editMode, setEditMode] = useState(false);
+
+  // Week calendar events feed the AI task suggester in DayTasksPanel — the
+  // same /api/calendar/week source /areas/time uses, so the two agree.
+  const { data: weekCal } = useInsights<{ connected: boolean; events: WeekCalendarEvent[] }>(
+    "/api/calendar/week",
+    { connected: false, events: [] }
+  );
 
   // Drilling in from a wider view moves both the range and the anchor, so
   // clicking the 14th of March lands on the 14th of March rather than on
@@ -117,18 +127,22 @@ export default function CalendarPage() {
       </motion.div>
 
       <div className="flex flex-col gap-6">
-        <ScheduleSuggestions />
-
         {data?.connected && (
-          <GlassCard delay={0.06}>
-            <ScheduleCopilotBar busy={busy} onScheduled={refresh} />
-          </GlassCard>
-        )}
-
-        {data?.connected && (
-          <GlassCard delay={0.08}>
-            <CalendarAgentPanel busy={busy} onCreated={refresh} />
-          </GlassCard>
+          <details className="group rounded-2xl border border-hairline-card bg-surface-sunken/40 [&_summary]:list-none">
+            <summary className="focus-ring flex cursor-pointer items-center justify-between gap-2 rounded-2xl px-4 py-3.5">
+              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Sparkles size={16} className="text-gold-ink" aria-hidden />
+                הוסף לו״ז
+              </span>
+              <ChevronDown size={16} className="text-muted transition-transform group-open:rotate-180" aria-hidden />
+            </summary>
+            <div className="flex flex-col gap-5 px-4 pb-4">
+              <CalendarAgentPanel busy={busy} onCreated={refresh} />
+              <div className="border-t border-hairline-card pt-4">
+                <ScheduleCopilotBar busy={busy} onScheduled={refresh} />
+              </div>
+            </div>
+          </details>
         )}
 
         {data?.connected && (
@@ -171,13 +185,40 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              <RangeTabs value={range} onChange={setRange} />
+              <div className="flex items-center gap-2">
+                {range === "day" && (
+                  <button
+                    onClick={() => setEditMode((v) => !v)}
+                    aria-pressed={editMode}
+                    className={cn(
+                      "focus-ring flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      editMode
+                        ? "border-gold-line bg-gold-soft text-gold-ink"
+                        : "border-hairline-card text-muted hover:text-foreground"
+                    )}
+                  >
+                    <Pencil size={12} aria-hidden />
+                    {editMode ? "סיום עריכה" : "מצב עריכה"}
+                  </button>
+                )}
+                <RangeTabs value={range} onChange={setRange} />
+              </div>
             </div>
 
-            {range === "day" && <DayView anchor={anchor} chronotype={chronotype} />}
+            {editMode && range === "day" && (
+              <p className="mb-3 text-xs text-muted">
+                החצים על כל אירוע מזיזים אותו ברבע שעה קדימה או אחורה. השינוי נשמר ביומן Google.
+              </p>
+            )}
+
+            {range === "day" && <DayView anchor={anchor} chronotype={chronotype} editMode={editMode} />}
             {range === "week" && <WeekView anchor={anchor} />}
             {range === "month" && <MonthView anchor={anchor} onSelectDay={openDay} />}
             {range === "year" && <YearView anchor={anchor} onSelectMonth={openMonth} />}
+
+            {range === "day" && !editMode && (
+              <DayTasksPanel anchor={anchor} weekEvents={weekCal?.events ?? []} />
+            )}
           </GlassCard>
         )}
 

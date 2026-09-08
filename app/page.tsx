@@ -14,6 +14,7 @@ import { GoalsPanel } from "@/components/features/GoalsPanel";
 import { RecentActivityCard } from "@/components/features/RecentActivityCard";
 import { MemoryCards } from "@/components/features/memories/MemoryCards";
 import { NowNextCard } from "@/components/features/dashboard/NowNextCard";
+import { TodayStructureCard } from "@/components/features/dashboard/TodayStructureCard";
 import { UniversalInputBar } from "@/components/features/dashboard/UniversalInputBar";
 import { SlotSuggestions } from "@/components/features/dashboard/SlotSuggestions";
 import { RelationshipAutopilot } from "@/components/features/dashboard/RelationshipAutopilot";
@@ -196,6 +197,7 @@ export default function Home() {
           const CONTENT: Record<string, { node: ReactNode; tilt?: boolean; href?: string; cta?: string }> = {
             "command-bar": { node: <UniversalInputBar /> },
             "now-next": { node: <NowNextCard /> },
+            "today-structure": { node: <TodayStructureCard /> },
             "slot-suggestions": { node: <SlotSuggestions /> },
             "relationship-autopilot": { node: <RelationshipAutopilot /> },
             "daily-checkin": { node: <DailyCheckIn />, tilt: false },

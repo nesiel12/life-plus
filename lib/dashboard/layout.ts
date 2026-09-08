@@ -42,6 +42,7 @@ export const WIDGETS: WidgetDefinition[] = [
   { id: "now-next", title: "עכשיו והבא", defaultSpan: 1, minSpan: 1 },
   { id: "daily-checkin", title: "צ׳ק-אין יומי", defaultSpan: 1, minSpan: 1 },
   { id: "ai-briefing", title: "תדריך AI", defaultSpan: 2, minSpan: 2 },
+  { id: "today-structure", title: "מבנה היום", defaultSpan: 1, minSpan: 1 },
   { id: "intention", title: "כוונת היום", defaultSpan: 1, minSpan: 1 },
   { id: "slot-suggestions", title: "מתי לעשות את זה", defaultSpan: 1, minSpan: 1 },
   { id: "relationship-autopilot", title: "כדאי ליצור קשר", defaultSpan: 1, minSpan: 1 },
