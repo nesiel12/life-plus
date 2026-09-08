@@ -13,6 +13,15 @@ const heebo = Heebo({
 
 export const metadata: Metadata = {
   title: "Life Plus",
+  // Google Search Console — HTML-tag verification. Renders
+  // <meta name="google-site-verification" content="..."> into <head> on every
+  // page, including the public /login page an auth redirect lands on, so the
+  // verifier sees it without a session. Kept alongside the
+  // public/google1c8382cd2dfa822b.html file method; Search Console allows more
+  // than one and dropping a verified method later can un-verify the property.
+  verification: {
+    google: "google1c8382cd2dfa822b",
+  },
 };
 
 export default function RootLayout({
