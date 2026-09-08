@@ -16,6 +16,7 @@ export const Z_INDEX = {
   panel: "z-50",
   modal: "z-[60]",
   onboarding: "z-[70]",
+  welcome: "z-[80]",
 } as const;
 
 interface ModalProps {

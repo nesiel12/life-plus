@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveGapActivity, type GapTaskCandidate } from "@/lib/calendar/gapActivity";
+import { resolveGapActivity, pickGapTask, type GapTaskCandidate } from "@/lib/calendar/gapActivity";
 import type { RoutineBlock } from "@/lib/schedule/routine";
 import type { DayGap } from "@/lib/calendar/dayGaps";
 
@@ -25,14 +25,10 @@ function block(partial: Partial<RoutineBlock>): RoutineBlock {
 describe("resolveGapActivity", () => {
   const todayKey = "2026-01-15";
 
-  it("labels a gap as free time with no blocks and no pressing tasks", () => {
-    const result = resolveGapActivity(gap(600, 720), {
-      blocks: [],
-      weekday: 4,
-      tasks: [],
-      todayKey,
+  it("labels an ordinary gap as free time", () => {
+    expect(resolveGapActivity(gap(600, 720), { blocks: [], weekday: 4, tasks: [], todayKey })).toEqual({
+      label: "זמן פנוי",
     });
-    expect(result).toEqual({ label: "זמן פנוי" });
   });
 
   it("uses a covering rest block and never attaches a task to protected time", () => {
@@ -43,31 +39,37 @@ describe("resolveGapActivity", () => {
       tasks: [overdue],
       todayKey,
     });
-    expect(result.label).toBe("מנוחת צהריים");
-    expect(result.task).toBeUndefined();
+    expect(result).toEqual({ label: "מנוחת צהריים", accentVar: "--accent-time" });
   });
 
-  it("suggests the most pressing task that fits an open gap", () => {
+  it("labels a planned 'free' block but still allows a task in it", () => {
+    const result = resolveGapActivity(gap(600, 720), {
+      blocks: [block({ kind: "free", startMinute: 540, endMinute: 780 })],
+      weekday: 4,
+      tasks: [{ id: "t1", title: "call bank", status: "todo", dueDate: "2026-01-15" }],
+      todayKey,
+    });
+    expect(result.label).toBe("זמן פנוי מתוכנן");
+    expect(result.task?.id).toBe("t1");
+  });
+});
+
+describe("pickGapTask", () => {
+  const todayKey = "2026-01-15";
+
+  it("prefers overdue, then due-today, then pinned", () => {
     const tasks: GapTaskCandidate[] = [
-      { id: "low", title: "someday", status: "todo" },
-      { id: "today", title: "call bank", status: "todo", dueDate: "2026-01-15" },
-      { id: "overdue", title: "file form", status: "todo", dueDate: "2026-01-09" },
+      { id: "pinned", title: "p", status: "todo", isHighPriority: true },
+      { id: "today", title: "t", status: "todo", dueDate: "2026-01-15" },
+      { id: "overdue", title: "o", status: "todo", dueDate: "2026-01-09" },
     ];
-    const result = resolveGapActivity(gap(600, 720), { blocks: [], weekday: 4, tasks, todayKey });
-    expect(result.task?.id).toBe("overdue");
+    expect(pickGapTask(tasks, 90, todayKey)?.id).toBe("overdue");
   });
 
-  it("does not suggest a task for a gap under 30 minutes", () => {
-    const tasks: GapTaskCandidate[] = [
-      { id: "overdue", title: "file form", status: "todo", dueDate: "2026-01-09" },
-    ];
-    const result = resolveGapActivity(gap(600, 625), { blocks: [], weekday: 4, tasks, todayKey });
-    expect(result.task).toBeUndefined();
-  });
-
-  it("ignores non-pressing tasks entirely", () => {
-    const tasks: GapTaskCandidate[] = [{ id: "low", title: "someday", status: "todo" }];
-    const result = resolveGapActivity(gap(600, 800), { blocks: [], weekday: 4, tasks, todayKey });
-    expect(result.task).toBeUndefined();
+  it("ignores non-pressing tasks and tiny gaps", () => {
+    expect(pickGapTask([{ id: "x", title: "x", status: "todo" }], 90, todayKey)).toBeNull();
+    expect(
+      pickGapTask([{ id: "o", title: "o", status: "todo", dueDate: "2026-01-01" }], 20, todayKey)
+    ).toBeNull();
   });
 });

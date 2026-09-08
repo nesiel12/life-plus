@@ -6,6 +6,7 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useApiCall } from "@/hooks/useApiCall";
 import type { LifeAreaKey } from "@/types";
+import { BackToHome } from "@/components/layout/BackToHome";
 
 interface AreaMomentsViewProps {
   title: string;
@@ -42,6 +43,7 @@ export function AreaMomentsView({ title, description, areaKey }: AreaMomentsView
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
       <h1 className="mb-1 text-2xl font-medium tracking-tight">{title}</h1>
       <p className="mb-10 text-sm text-muted">{description}</p>
 

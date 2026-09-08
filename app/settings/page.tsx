@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, CalendarRange, Check, Clock, Globe, Loader2, Mail } from "lucide-react";
+import { Bell, CalendarRange, Check, Clock, Globe, Languages, Loader2, Mail } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { EmailDiagnostics } from "@/components/features/settings/EmailDiagnostics";
+import { usePreferences, type AppLanguage } from "@/components/providers/PreferencesProvider";
 import {
   getNotificationSettingsAction,
   updateNotificationSettingsAction,
@@ -46,6 +47,7 @@ export default function SettingsPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const { preferences, setPreference } = usePreferences();
 
   useEffect(() => {
     let cancelled = false;
@@ -147,6 +149,38 @@ export default function SettingsPage() {
             )}
             {saveError && <span className="text-red-500">{saveError}</span>}
           </div>
+
+          <GlassCard>
+            <p className="mb-1 flex items-center gap-2 text-sm font-medium text-muted">
+              <Languages size={16} className="text-accent-learning" aria-hidden />
+              שפת האפליקציה
+            </p>
+            <p className="mb-4 text-xs text-muted">
+              נשמר במכשיר הזה. תרגום מלא לאנגלית עדיין בעבודה — כרגע ההעדפה נשמרת ותיכנס לתוקף עם השחרור.
+            </p>
+            <div className="flex gap-1.5" role="group" aria-label="שפת האפליקציה">
+              {(
+                [
+                  { value: "he", label: "עברית" },
+                  { value: "en", label: "English" },
+                ] as { value: AppLanguage; label: string }[]
+              ).map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setPreference("language", option.value)}
+                  aria-pressed={preferences.language === option.value}
+                  className={cn(
+                    "focus-ring rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                    preferences.language === option.value
+                      ? "border-gold-line bg-gold-soft font-medium text-gold-ink"
+                      : "border-hairline-card text-muted hover:text-foreground"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </GlassCard>
 
           <GlassCard>
             <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">

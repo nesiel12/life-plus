@@ -1,17 +1,12 @@
-// Turning an empty stretch on the calendar into something worth showing.
+// Turning a genuinely free stretch into something worth showing on the line.
 //
-// Two independent signals, in priority order:
-//   1. A routine block the user themselves defined for that time ("this is my
-//      rest window", "this is study time"). That is their stated intent and
-//      outranks anything the app would guess.
-//   2. A task that is actually pressing — overdue, due today, or pinned. Not
-//      just any open task: filling a free hour with busywork the user did not
-//      ask to be reminded of is how a helpful surface becomes an ignored one.
-//
-// Pure: the day view resolves store data and the weekday, this decides what
-// the gap should say.
+// By the time a gap reaches here it is already free of calendar events *and*
+// of the busy routine (see lib/calendar/dayGaps.ts). So the only routine
+// blocks that can still cover it are "free" / "rest" ones — time the user
+// deliberately protected — and those get their own label. Everything else is
+// plain open time, optionally carrying one pressing task.
 
-import { blocksForDay, ROUTINE_KIND_LABELS, type RoutineBlock } from "@/lib/schedule/routine";
+import { blocksForDay, type RoutineBlock } from "@/lib/schedule/routine";
 import type { DayGap } from "@/lib/calendar/dayGaps";
 
 export interface GapTaskCandidate {
@@ -24,17 +19,22 @@ export interface GapTaskCandidate {
 }
 
 export interface GapActivity {
-  /** Short Hebrew label for the band, e.g. "זמן פנוי" or "מנוחה". */
+  /** Short Hebrew label for the line, e.g. "זמן פנוי" or "מנוחה". */
   label: string;
-  /** The routine kind's accent token, when a block covers the gap. */
+  /** Accent token when a protected block covers the gap. */
   accentVar?: string;
-  /** A pressing task that fits, when there is one and no routine block claims the time. */
+  /** A pressing task that fits, offered with a "schedule here" action. */
   task?: GapTaskCandidate;
 }
 
 const MIN_TASK_GAP_MINUTES = 30;
 
-function pickGapTask(
+/**
+ * The one task worth surfacing for a gap: overdue first, then due today, then
+ * pinned. Never just any open task — a free hour filled with unranked
+ * busywork is how the whole affordance gets ignored.
+ */
+export function pickGapTask(
   candidates: GapTaskCandidate[],
   gapDurationMinutes: number,
   todayKey: string
@@ -68,27 +68,21 @@ export function resolveGapActivity(
 ): GapActivity {
   const midpoint = (gap.startMinute + gap.endMinute) / 2;
   const covering = blocksForDay(context.blocks, context.weekday).find(
-    (b) => b.startMinute <= midpoint && b.endMinute > midpoint
+    (b) =>
+      (b.kind === "rest" || b.kind === "free") &&
+      b.startMinute <= midpoint &&
+      b.endMinute > midpoint
   );
 
-  // A named rest/free block is the whole story — do not also push a task into
-  // time the user deliberately protected.
-  if (covering && (covering.kind === "rest" || covering.kind === "free")) {
-    return {
-      label: covering.title || ROUTINE_KIND_LABELS[covering.kind],
-      accentVar: covering.kind === "rest" ? "--accent-time" : "--gold",
-    };
+  if (covering?.kind === "rest") {
+    return { label: covering.title || "מנוחה", accentVar: "--accent-time" };
   }
 
-  const task = pickGapTask(context.tasks, gap.durationMinutes, context.todayKey);
+  const task = pickGapTask(context.tasks, gap.durationMinutes, context.todayKey) ?? undefined;
 
-  if (covering) {
-    return {
-      label: covering.title || ROUTINE_KIND_LABELS[covering.kind],
-      accentVar: undefined,
-      task: task ?? undefined,
-    };
+  if (covering?.kind === "free") {
+    return { label: covering.title || "זמן פנוי מתוכנן", accentVar: "--gold", task };
   }
 
-  return { label: "זמן פנוי", task: task ?? undefined };
+  return { label: "זמן פנוי", task };
 }

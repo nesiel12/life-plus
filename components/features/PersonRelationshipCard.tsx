@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { MonthDayPicker } from "@/components/ui/MonthDayPicker";
 import { ConfidenceBar } from "@/components/ui/ConfidenceBar";
 import { PersonAvatar } from "@/components/ui/PersonAvatar";
 import { WhatsAppComposer } from "@/components/features/family/WhatsAppComposer";
@@ -78,18 +79,23 @@ function InlineDateField({
   }
 
   return (
-    <div className="flex items-center gap-1">
-      <input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && save()}
-        placeholder="MM-DD"
-        aria-label={ariaLabel}
-        className="focus-ring ltr w-20 rounded-lg bg-fill-subtle px-2 py-1.5 text-xs text-foreground placeholder:text-muted"
-        autoFocus
-      />
-      <button onClick={save} className="focus-ring text-xs text-accent-family">
+    <div className="flex flex-wrap items-center gap-1.5">
+      <MonthDayPicker value={draft} onChange={setDraft} ariaLabel={ariaLabel} className="gap-1.5" />
+      <button
+        onClick={save}
+        disabled={!/^\d{2}-\d{2}$/.test(draft)}
+        className="focus-ring text-xs text-accent-family disabled:opacity-40"
+      >
         שמור
+      </button>
+      <button
+        onClick={() => {
+          setEditing(false);
+          setDraft("");
+        }}
+        className="focus-ring text-xs text-muted transition-colors hover:text-foreground"
+      >
+        ביטול
       </button>
     </div>
   );

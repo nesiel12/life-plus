@@ -50,9 +50,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/calendar", label: "יומן חכם", icon: CalendarClock, colorVar: "--accent-career" },
   { href: "/areas/learning", label: "למידה", icon: Lightbulb, colorVar: "--accent-learning" },
   { href: "/areas/torah", label: "מרחב תורה", icon: BookOpen, colorVar: "--accent-faith" },
+  // Directly under Torah Space — the two most-used screens sit together.
+  { href: "/areas/time", label: "זמן ומשימות", icon: ListTodo, colorVar: "--accent-time" },
   { href: "/areas/family", label: "משפחה וחברים", icon: HeartHandshake, colorVar: "--accent-family" },
   { href: "/areas/health", label: "בריאות", icon: HeartPulse, colorVar: "--accent-health" },
-  { href: "/areas/time", label: "זמן ומשימות", icon: ListTodo, colorVar: "--accent-time" },
   { href: "/areas/finances", label: "כספים", icon: Wallet, colorVar: "--accent-finance" },
   // Labelled "אישי", not by what it contains. The recovery space is locked
   // precisely so a bystander learns nothing from the screen, and a nav item

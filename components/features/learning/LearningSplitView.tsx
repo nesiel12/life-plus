@@ -15,47 +15,6 @@ import { cn } from "@/lib/utils";
 import type { CourseModule } from "@/lib/ai/courseModule";
 import { readAiError } from "@/lib/api/aiClient";
 
-interface PagerArrowProps {
-  /** `start` is the right edge in RTL, which is where "back" belongs. */
-  side: "start" | "end";
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
-}
-
-/**
- * One of the two arrows flanking the course material.
- *
- * Anchored to the material card, not to the prose inside it: a stage can be
- * several screens long in a scrolling column, and an arrow positioned within
- * that flow would scroll away from the reader. Pinned to the card's vertical
- * centre, both controls stay reachable no matter how far down the stage the
- * reader is — which is the whole point of moving them off the bottom bar.
- */
-function PagerArrow({ side, label, disabled, onClick }: PagerArrowProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      className={cn(
-        "glass-control focus-ring absolute top-1/2 z-10 hidden size-9 -translate-y-1/2 place-items-center",
-        "rounded-full text-foreground shadow-sm transition-opacity sm:grid",
-        "hover:opacity-90 disabled:pointer-events-none disabled:opacity-25",
-        side === "start" ? "start-1.5" : "end-1.5"
-      )}
-    >
-      {side === "start" ? (
-        <ChevronRight size={16} aria-hidden />
-      ) : (
-        <ChevronLeft size={16} aria-hidden />
-      )}
-    </button>
-  );
-}
-
 interface LearningSplitViewProps {
   topicTitle: string;
   /** Optional YouTube URL to study alongside the material. */
@@ -220,35 +179,11 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* ── Left: the course itself ── */}
-        {/* The pager now lives on the material rather than under it. It used
-            to be a bar pinned below the column, which on a long section sat
-            off the bottom of the scroll — you had to scroll past everything
-            to reach "next", then scroll back up to keep reading. Flanking the
-            card keeps both controls in the same place the whole way through.
-
-            The extra sm:px-14 on the section is the gutter the arrows sit in,
-            so they never cover a line of prose. */}
         <div className="relative min-w-0">
-        {module && stages.length > 1 && (
-          <>
-            <PagerArrow
-              side="start"
-              label="השלב הקודם"
-              disabled={isFirst}
-              onClick={() => goTo(stageIndex - 1)}
-            />
-            <PagerArrow
-              side="end"
-              label="השלב הבא"
-              disabled={isLast}
-              onClick={() => goTo(stageIndex + 1)}
-            />
-          </>
-        )}
         <section
           ref={materialRef}
           aria-label="חומר הלימוד"
-          className="flex max-h-[70vh] min-w-0 flex-col gap-4 overflow-y-auto rounded-2xl border border-hairline-card bg-surface p-5 sm:px-14"
+          className="relative flex max-h-[70vh] min-w-0 flex-col gap-4 overflow-y-auto rounded-2xl border border-hairline-card bg-surface p-5"
         >
           {videoId && <TheaterVideo videoId={videoId} title={topicTitle} />}
 
@@ -353,34 +288,37 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
                 )}
               </div>
 
-              {/* Phone fallback for the flanking arrows, plus the position
-                  counter at every size. Deliberately unbordered — the old
-                  `border-t` bar read as a separate footer belonging to the
-                  card; this reads as part of the material. */}
-              <div className="flex items-center justify-between gap-3 pt-1">
-                <button
-                  onClick={() => goTo(stageIndex - 1)}
-                  disabled={isFirst}
-                  className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground disabled:opacity-40 sm:invisible"
-                >
-                  <ChevronRight size={14} aria-hidden />
-                  חזור
-                </button>
-
-                <span className="ltr text-[0.7rem] tabular-nums text-muted">
-                  {stageIndex + 1} / {stages.length}
-                </span>
-
-                <button
-                  onClick={() => goTo(stageIndex + 1)}
-                  disabled={isLast}
-                  className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground disabled:opacity-40 sm:invisible"
-                >
-                  הבא
-                  <ChevronLeft size={14} aria-hidden />
-                </button>
-              </div>
             </article>
+          )}
+
+          {/* The pager: a real footer, pinned to the bottom of the scrolling
+              material so "back" and "next" are in the same place at every
+              screen size and every scroll position. Negative margins pull it
+              flush to the card edges past the section's own padding. */}
+          {module && stages.length > 1 && (
+            <div className="sticky bottom-0 -mx-5 -mb-5 mt-2 flex items-center justify-between gap-3 border-t border-hairline-card bg-surface/95 px-5 py-3 backdrop-blur-sm">
+              <button
+                onClick={() => goTo(stageIndex - 1)}
+                disabled={isFirst}
+                className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground disabled:opacity-40"
+              >
+                <ChevronRight size={14} aria-hidden />
+                חזור
+              </button>
+
+              <span className="ltr text-[0.7rem] tabular-nums text-muted">
+                {stageIndex + 1} / {stages.length}
+              </span>
+
+              <button
+                onClick={() => goTo(stageIndex + 1)}
+                disabled={isLast}
+                className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground disabled:opacity-40"
+              >
+                הבא
+                <ChevronLeft size={14} aria-hidden />
+              </button>
+            </div>
           )}
         </section>
         </div>

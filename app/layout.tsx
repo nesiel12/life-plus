@@ -5,6 +5,7 @@ import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { ThemeProvider, themeInitScript } from "@/components/providers/ThemeProvider";
+import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -44,9 +45,11 @@ export default function RootLayout({
             has actually asked for that — never forced. */}
         <MotionConfig reducedMotion="user">
           <ThemeProvider>
-            <AuthProvider>
-              <AppShell>{children}</AppShell>
-            </AuthProvider>
+            <PreferencesProvider>
+              <AuthProvider>
+                <AppShell>{children}</AppShell>
+              </AuthProvider>
+            </PreferencesProvider>
           </ThemeProvider>
         </MotionConfig>
       </body>

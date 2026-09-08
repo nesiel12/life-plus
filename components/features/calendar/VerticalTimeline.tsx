@@ -104,7 +104,7 @@ function clockRange(start: string, end: string): string {
   return `${fmt(start)}–${fmt(end)}`;
 }
 
-function GapBand({
+function GapLine({
   gap,
   topRem,
   heightRem,
@@ -115,68 +115,105 @@ function GapBand({
   heightRem: number;
   onSchedule?: VerticalTimelineProps["onScheduleGapTask"];
 }) {
-  const [state, setState] = useState<"idle" | "scheduling" | "done">("idle");
+  const [phase, setPhase] = useState<"rest" | "confirm" | "scheduling" | "done">("rest");
+  const [error, setError] = useState<string | null>(null);
   const accent = gap.accentVar ?? "--muted";
-  const roomy = heightRem >= 3;
 
-  function schedule() {
-    if (!gap.task || !onSchedule || state !== "idle") return;
-    setState("scheduling");
-    // Put it early in the gap, capped at 60 minutes.
-    const start = gap.startMinute;
-    const end = Math.min(gap.endMinute, start + 60);
-    onSchedule({ taskId: gap.task.id, title: gap.task.title, startMinute: start, endMinute: end })
-      .then(() => setState("done"))
-      .catch(() => setState("idle"));
+  // Where the task would land: the first hour of the gap, capped to its end.
+  const slotStart = gap.startMinute;
+  const slotEnd = Math.min(gap.endMinute, slotStart + 60);
+
+  function confirm() {
+    if (!gap.task || !onSchedule) return;
+    setPhase("scheduling");
+    setError(null);
+    onSchedule({ taskId: gap.task.id, title: gap.task.title, startMinute: slotStart, endMinute: slotEnd })
+      .then(() => setPhase("done"))
+      .catch((err: unknown) => {
+        setPhase("confirm");
+        setError(err instanceof Error ? err.message : "לא הצלחנו להוסיף ליומן.");
+      });
   }
 
   return (
     <div
-      className="absolute end-0 start-16 flex flex-col justify-center overflow-hidden rounded-xl border border-dashed px-3 py-1.5"
-      style={{
-        top: `${topRem + 0.15}rem`,
-        height: `${Math.max(heightRem - 0.3, 1.1)}rem`,
-        borderColor: `color-mix(in srgb, var(${accent}) 30%, transparent)`,
-        background: `color-mix(in srgb, var(${accent}) 5%, transparent)`,
-      }}
+      className="pointer-events-none absolute end-2 start-16"
+      style={{ top: `${topRem}rem`, height: `${heightRem}rem` }}
     >
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span
-            className="truncate text-xs font-medium"
-            style={{ color: `color-mix(in srgb, var(${accent}) 85%, var(--foreground))` }}
-          >
-            {gap.label}
-          </span>
-          <span className="ltr shrink-0 text-[0.65rem] text-muted">
-            {minuteLabel(gap.startMinute)} · {formatGapDuration(gap.durationMinutes)}
-          </span>
+      {/* The extent of the free stretch: one faint dashed hairline down the
+          inline-start edge. No fill, no box — the events stay the only solid
+          things on the column. */}
+      <span
+        className="absolute inset-y-1 start-0 w-px border-s border-dashed"
+        style={{ borderColor: `color-mix(in srgb, var(${accent}) 45%, transparent)` }}
+        aria-hidden
+      />
+
+      {/* A single label at the top of the stretch. */}
+      <div className="pointer-events-auto absolute -top-2 start-2 flex items-center gap-1.5">
+        <span
+          className="rounded-full bg-background px-1.5 text-[0.65rem] font-medium"
+          style={{ color: `color-mix(in srgb, var(${accent}) 80%, var(--foreground))` }}
+        >
+          {gap.label}
+        </span>
+        <span className="ltr rounded-full bg-background px-1 text-[0.6rem] tabular-nums text-muted">
+          {formatGapDuration(gap.durationMinutes)}
         </span>
 
-        {gap.task && onSchedule && state === "done" && (
-          <span className="flex shrink-0 items-center gap-1 text-[0.65rem] text-accent-health">
-            <Check size={11} aria-hidden />
+        {gap.task && onSchedule && phase === "done" && (
+          <span className="flex items-center gap-0.5 rounded-full bg-background px-1 text-[0.6rem] text-accent-health">
+            <Check size={9} aria-hidden />
             נקבע
           </span>
         )}
-        {gap.task && onSchedule && state !== "done" && roomy && (
+        {gap.task && onSchedule && phase === "rest" && (
           <button
-            onClick={schedule}
-            disabled={state === "scheduling"}
-            className="focus-ring flex shrink-0 items-center gap-1 rounded-lg bg-ink px-2 py-1 text-[0.65rem] font-medium text-[var(--background)] disabled:opacity-50"
+            onClick={() => setPhase("confirm")}
+            className="focus-ring rounded-full bg-background px-1 text-[0.6rem] font-medium text-gold-ink underline decoration-dotted underline-offset-2"
           >
-            {state === "scheduling" ? (
-              <Loader2 size={10} className="animate-spin" aria-hidden />
-            ) : (
-              <CalendarPlus size={10} aria-hidden />
-            )}
             קבע כאן
           </button>
         )}
       </div>
 
-      {gap.task && roomy && state !== "done" && (
-        <p className="mt-0.5 truncate text-[0.7rem] text-foreground/70">אפשר: {gap.task.title}</p>
+      {/* Inline confirmation — the app never writes to the real calendar
+          without a distinct confirm step. */}
+      {gap.task && (phase === "confirm" || phase === "scheduling") && (
+        <div className="pointer-events-auto absolute start-2 top-3 z-20 flex w-max max-w-[16rem] flex-col gap-1.5 rounded-lg border border-hairline-card bg-surface p-2 shadow-md">
+          <p className="text-[0.7rem] text-foreground">
+            לקבוע את <span className="font-medium">{gap.task.title}</span>{" "}
+            <span className="ltr tabular-nums text-muted">
+              {minuteLabel(slotStart)}–{minuteLabel(slotEnd)}
+            </span>
+            ?
+          </p>
+          {error && <p className="text-[0.65rem] text-red-500">{error}</p>}
+          <div className="flex gap-1.5">
+            <button
+              onClick={confirm}
+              disabled={phase === "scheduling"}
+              className="focus-ring flex items-center gap-1 rounded-md bg-ink px-2 py-1 text-[0.65rem] font-medium text-[var(--background)] disabled:opacity-50"
+            >
+              {phase === "scheduling" ? (
+                <Loader2 size={10} className="animate-spin" aria-hidden />
+              ) : (
+                <CalendarPlus size={10} aria-hidden />
+              )}
+              קבע ביומן
+            </button>
+            <button
+              onClick={() => {
+                setPhase("rest");
+                setError(null);
+              }}
+              disabled={phase === "scheduling"}
+              className="focus-ring rounded-md px-2 py-1 text-[0.65rem] text-muted hover:text-foreground disabled:opacity-50"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -239,7 +276,7 @@ export function VerticalTimeline({
       .map((gap) => {
         const start = Math.max(gap.startMinute, gridStartMin);
         const end = Math.min(gap.endMinute, gridEndMin);
-        if (end - start < 30) return null;
+        if (end - start < 25) return null;
         const topRem = ((start - gridStartMin) / 60) * ROW_HEIGHT_REM;
         const heightRem = ((end - start) / 60) * ROW_HEIGHT_REM;
         return { gap, topRem, heightRem };
@@ -311,7 +348,7 @@ export function VerticalTimeline({
 
         {/* Free-time bands: behind the events, above the hour banding. */}
         {positionedGaps.map(({ gap, topRem, heightRem }) => (
-          <GapBand
+          <GapLine
             key={gap.id}
             gap={gap}
             topRem={topRem}

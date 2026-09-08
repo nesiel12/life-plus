@@ -8,6 +8,7 @@ import { PersonAvatar } from "@/components/ui/PersonAvatar";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { useApiCall } from "@/hooks/useApiCall";
 import { resizeImageToDataUrl } from "@/lib/media/resizeImageToDataUrl";
+import { MonthDayPicker } from "@/components/ui/MonthDayPicker";
 import { usePhotoPicker } from "@/hooks/usePhotoPicker";
 import type { Person } from "@/types";
 
@@ -212,20 +213,24 @@ export function EditPersonModal({ person, onClose }: { person: Person | null; on
           aria-label="מספר טלפון"
           className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-end text-sm text-foreground placeholder:text-muted"
         />
-        <input
-          value={draft.birthday}
-          onChange={(e) => updateDraft({ birthday: e.target.value })}
-          placeholder="יום הולדת (MM-DD)"
-          aria-label="יום הולדת"
-          className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-end text-sm text-foreground placeholder:text-muted"
-        />
-        <input
-          value={draft.anniversary}
-          onChange={(e) => updateDraft({ anniversary: e.target.value })}
-          placeholder="יום נישואין (MM-DD)"
-          aria-label="יום נישואין"
-          className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-end text-sm text-foreground placeholder:text-muted"
-        />
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted">יום הולדת</span>
+          <MonthDayPicker
+            value={draft.birthday}
+            onChange={(value) => updateDraft({ birthday: value })}
+            idPrefix="edit-person-birthday"
+            ariaLabel="יום הולדת"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted">יום נישואין</span>
+          <MonthDayPicker
+            value={draft.anniversary}
+            onChange={(value) => updateDraft({ anniversary: value })}
+            idPrefix="edit-person-anniversary"
+            ariaLabel="יום נישואין"
+          />
+        </div>
         <textarea
           value={draft.note}
           onChange={(e) => updateDraft({ note: e.target.value })}

@@ -14,6 +14,7 @@ import { useInsights } from "@/hooks/useInsights";
 import { buildCheckInProfile } from "@/lib/checkins/analyze";
 import { isSameDay, rangeBounds } from "@/lib/calendar/ranges";
 import { findDayGaps } from "@/lib/calendar/dayGaps";
+import { blocksForDay } from "@/lib/schedule/routine";
 import { resolveGapActivity, type GapTaskCandidate } from "@/lib/calendar/gapActivity";
 import type { WindowEvent } from "@/lib/googleCalendar/fetchWindow";
 import type { ChronotypeSettings } from "@/types";
@@ -133,12 +134,25 @@ export function DayView({ anchor, chronotype }: DayViewProps) {
   // routine block the user defined, or just "free time") and — when the gap
   // is open and something is actually pressing — a task to drop into it.
   const gaps: TimelineGap[] = useMemo(() => {
-    if (timed.length === 0 && routineBlocks.length === 0) return [];
+    const weekday = anchor.getDay();
+    // The routine's non-"free" blocks for this weekday are unavailable time,
+    // so a gap is what is free of both the calendar and the routine.
+    const busyBlocks = blocksForDay(routineBlocks, weekday)
+      .filter((b) => b.kind !== "free")
+      .map((b) => ({ startMinute: b.startMinute, endMinute: b.endMinute }));
+    if (timed.length === 0 && busyBlocks.length === 0) return [];
     const now = new Date();
     const nowMinute = isToday ? now.getHours() * 60 + now.getMinutes() : undefined;
     const raw = findDayGaps(
       timed.map((e) => ({ start: e.start, end: e.end })),
-      { fromMinute: fromHour * 60, toMinute: toHour * 60, nowMinute, minDurationMinutes: 45 }
+      {
+        fromMinute: fromHour * 60,
+        toMinute: toHour * 60,
+        nowMinute,
+        minDurationMinutes: 45,
+        busyBlocks,
+        maxGapMinutes: 4 * 60,
+      }
     );
     const candidates: GapTaskCandidate[] = tasks.map((t) => ({
       id: t.id,
@@ -147,7 +161,6 @@ export function DayView({ anchor, chronotype }: DayViewProps) {
       dueDate: t.dueDate,
       isHighPriority: t.isHighPriority,
     }));
-    const weekday = anchor.getDay();
     const todayKey = toDateKey(anchor);
     // Only the first gap that carries a task suggestion keeps it — one nudge
     // per day view, not a task pinned into every hole.
