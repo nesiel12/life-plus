@@ -3,6 +3,7 @@ import { withAuth } from "next-auth/middleware";
 import type { NextRequestWithAuth } from "next-auth/middleware";
 import type { NextFetchEvent } from "next/server";
 import { sessionCookieConfig } from "@/lib/sessionCookie";
+import { isAlwaysPublicPath } from "@/lib/publicPaths";
 
 // The canonical host every part of the OAuth dance must run on.
 //
@@ -62,6 +63,17 @@ const PROTECTED = [
 ];
 
 export default function middleware(req: NextRequestWithAuth, event: NextFetchEvent) {
+  // Domain-ownership and search-engine files must always answer 200 from the
+  // exact host requested — never a redirect to /login, never a 308 hop to the
+  // canonical host. Google Search Console fetches /google<token>.html directly
+  // and treats any 3xx or non-200 as "file not found". config.matcher below
+  // already excludes these, so this is defence in depth: broadening the
+  // matcher later (a catch-all is the usual next step) still cannot put a
+  // verification file behind the auth gate or the host rewrite.
+  if (isAlwaysPublicPath(req.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   if (shouldCanonicalize) {
     const host = canonicalHost();
     if (host && req.nextUrl.host !== host) {
