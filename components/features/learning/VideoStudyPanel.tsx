@@ -8,6 +8,7 @@ import {
   applyMasteryDelta,
   masteryLabel,
   type StudyGrade,
+  type StudyOverview,
   type StudyQuiz,
   type StudySummary,
 } from "@/lib/ai/agents/studyAgent";
@@ -35,6 +36,8 @@ export function VideoStudyPanel() {
   const [urlInput, setUrlInput] = useState("");
   const [videoId, setVideoId] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
+  const [meta, setMeta] = useState<{ title: string; author: string | null } | null>(null);
+  const [overview, setOverview] = useState<StudyOverview | null>(null);
 
   const [summary, setSummary] = useState<StudySummary | null>(null);
   const [quiz, setQuiz] = useState<StudyQuiz | null>(null);
@@ -48,6 +51,8 @@ export function VideoStudyPanel() {
 
   function reset() {
     setTranscript(null);
+    setMeta(null);
+    setOverview(null);
     setSummary(null);
     setQuiz(null);
     setAsked([]);
@@ -73,17 +78,19 @@ export function VideoStudyPanel() {
         body: JSON.stringify({ url: `https://www.youtube.com/watch?v=${id}` }),
       });
       const data = await res.json();
+      if (data.meta && typeof data.meta.title === "string") {
+        setMeta({ title: data.meta.title, author: data.meta.author ?? null });
+      }
       if (!res.ok) {
-        // The video still plays without a transcript — only the tutor needs it.
-        setError(
-          typeof data.error === "string"
-            ? data.error
-            : "לא הצלחנו לשלוף תמלול לסרטון הזה. אפשר לצפות, אבל בלי עוזר הלימוד."
-        );
+        setError(typeof data.error === "string" ? data.error : "לא הצלחנו לטעון את הסרטון.");
         return;
       }
-      // /api/ai/fetch-youtube returns { text }, not { transcript }.
-      setTranscript(typeof data.text === "string" ? data.text : null);
+      // { text } when captions exist; { meta, transcriptError } otherwise.
+      if (typeof data.text === "string") {
+        setTranscript(data.text);
+      } else if (typeof data.transcriptError === "string") {
+        setError(`${data.transcriptError} עוזר הלימוד ייתן סקירה לפי כותרת הסרטון.`);
+      }
     } catch {
       setError("לא הצלחנו להגיע לשירות התמלול.");
     } finally {
@@ -116,8 +123,32 @@ export function VideoStudyPanel() {
   }
 
   async function getSummary() {
-    const data = await callAgent({ mode: "summary" }, "summary");
-    if (data?.summary) setSummary(data.summary as StudySummary);
+    if (transcript) {
+      const data = await callAgent({ mode: "summary" }, "summary");
+      if (data?.summary) setSummary(data.summary as StudySummary);
+      return;
+    }
+    // No transcript — best-effort overview from the video's title + channel.
+    if (!meta) return;
+    setBusy("summary");
+    setError(null);
+    try {
+      const res = await fetch("/api/ai/study-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "overview", videoTitle: meta.title, channel: meta.author ?? undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "עוזר הלימוד נכשל.");
+        return;
+      }
+      if (data?.overview) setOverview(data.overview as StudyOverview);
+    } catch {
+      setError("לא הצלחנו להגיע לעוזר הלימוד.");
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function getQuiz() {
@@ -182,7 +213,7 @@ export function VideoStudyPanel() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={getSummary}
-                disabled={!transcript || busy !== null}
+                disabled={(!transcript && !meta) || busy !== null}
                 className="focus-ring flex items-center gap-1.5 rounded-lg border border-hairline-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-fill-subtle disabled:opacity-40"
               >
                 {busy === "summary" ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Sparkles size={13} className="text-gold-ink" aria-hidden />}
@@ -230,11 +261,31 @@ export function VideoStudyPanel() {
 
             {!transcript && (
               <p className="text-xs text-muted">
-                עוזר הלימוד זמין רק כשיש תמלול לסרטון.
+                {meta
+                  ? "אין תמלול לסרטון — הסיכום יהיה סקירה לפי הכותרת והנושא. הבוחן זמין רק עם תמלול."
+                  : "טען סרטון כדי להתחיל."}
               </p>
             )}
 
             <AnimatePresence mode="wait">
+              {overview && !summary && (
+                <motion.div
+                  key="overview"
+                  initial={reduce ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                  className="flex flex-col gap-2 border-t border-hairline-card pt-3"
+                >
+                  <p className="text-sm font-medium text-foreground">{overview.headline}</p>
+                  <ul className="flex list-disc flex-col gap-1 pe-4 text-xs leading-relaxed text-foreground/80">
+                    {overview.keyPoints.map((point, i) => (
+                      <li key={`${point}-${i}`}>{point}</li>
+                    ))}
+                  </ul>
+                  <p className="rounded-lg bg-gold-soft px-3 py-2 text-xs text-gold-ink">{overview.takeaway}</p>
+                  <p className="text-[0.65rem] italic text-muted">{overview.basis}</p>
+                </motion.div>
+              )}
               {summary && (
                 <motion.div
                   key="summary"

@@ -13,6 +13,7 @@ import {
   studyQuizSchema,
   studySummarySchema,
   truncateTranscript,
+  studyOverviewSchema,
 } from "@/lib/ai/agents/studyAgent";
 
 // StudyAgent endpoint: summarize a video, quiz on it, or grade an answer.
@@ -28,6 +29,13 @@ const requestSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("summary"),
     transcript: z.string().trim().min(1),
+  }),
+  z.object({
+    // No transcript available — summarise from the video's title/channel + topic.
+    mode: z.literal("overview"),
+    videoTitle: z.string().trim().min(1).max(300),
+    channel: z.string().trim().max(200).optional(),
+    topic: z.string().trim().max(200).optional(),
   }),
   z.object({
     mode: z.literal("quiz"),
@@ -70,9 +78,26 @@ export async function POST(request: Request) {
   }
 
   const body = parsed.data;
-  const transcript = truncateTranscript(body.transcript);
 
   try {
+    if (body.mode === "overview") {
+      const overview = await generateStructuredData({
+        actor,
+        schema: studyOverviewSchema,
+        system: STUDY_AGENT_SYSTEM.overview,
+        prompt: [
+          `כותרת הסרטון: ${body.videoTitle}`,
+          body.channel ? `ערוץ: ${body.channel}` : "",
+          body.topic ? `הנושא שהמשתמש לומד: ${body.topic}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      });
+      return NextResponse.json({ mode: "overview" as const, overview });
+    }
+
+    const transcript = truncateTranscript(body.transcript);
+
     if (body.mode === "summary") {
       const summary = await generateStructuredData({
       actor,

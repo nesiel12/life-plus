@@ -5,7 +5,7 @@ import { z } from "zod";
 // Three modes, one agent, because they share the same grounding context (the
 // transcript) and the same persona. Splitting them into three routes would
 // mean re-sending the transcript three times and letting the personas drift.
-export type StudyMode = "summary" | "quiz" | "discuss";
+export type StudyMode = "summary" | "quiz" | "discuss" | "overview";
 
 export const studySummarySchema = z.object({
   headline: z.string().describe("כותרת קצרה בעברית שמתמצתת את הסרטון"),
@@ -35,7 +35,21 @@ export const studyGradeSchema = z.object({
     .describe("כמה נקודות שליטה להוסיף או להוריד: correct 10-20, partial 3-9, incorrect -10 עד 0"),
 });
 
+export const studyOverviewSchema = z.object({
+  headline: z.string().describe("כותרת קצרה בעברית: על מה כנראה הסרטון"),
+  keyPoints: z
+    .array(z.string())
+    .min(2)
+    .max(6)
+    .describe("מה סביר שהסרטון מכסה, לפי הכותרת והנושא — כל שורה משפט אחד"),
+  takeaway: z.string().describe("משפט אחד: הזווית המרכזית לצפייה איתה"),
+  basis: z
+    .string()
+    .describe("משפט קצר שמבהיר שהסיכום מבוסס על כותרת הסרטון והנושא בלבד, לא על תמלול מלא"),
+});
+
 export type StudySummary = z.infer<typeof studySummarySchema>;
+export type StudyOverview = z.infer<typeof studyOverviewSchema>;
 export type StudyQuiz = z.infer<typeof studyQuizSchema>;
 export type StudyGrade = z.infer<typeof studyGradeSchema>;
 
@@ -45,6 +59,13 @@ const BASE_PERSONA = [
 ].join("\n");
 
 export const STUDY_AGENT_SYSTEM: Record<StudyMode, string> = {
+  overview: [
+    "אתה מורה פרטי בתוך Life Plus. אתה מלמד בעברית טבעית, בגובה העיניים.",
+    "לא נמסר לך תמלול. נמסרו לך כותרת הסרטון, שם הערוץ (אם יש), והנושא שהמשתמש לומד.",
+    "המשימה: לתת סקירה מקדימה מועילה — מה הסרטון כנראה מכסה ואיך כדאי לגשת אליו — על סמך הכותרת, הערוץ, והידע הכללי שלך על הנושא.",
+    "אל תמציא ציטוטים או נתונים ספציפיים כאילו הם מהסרטון. נסח בזהירות ('כנראה', 'סביר ש').",
+    "ב-basis כתוב במפורש שהסקירה מבוססת על הכותרת והנושא ולא על תמלול מלא.",
+  ].join("\n"),
   summary: [
     BASE_PERSONA,
     "המשימה: לסכם את הסרטון בצורה שתאפשר למישהו להבין את העיקר בלי לצפות.",

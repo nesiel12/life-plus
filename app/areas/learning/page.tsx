@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { TopicCard } from "@/components/features/learning/TopicCard";
 import { VideoStudyPanel } from "@/components/features/learning/VideoStudyPanel";
 import { LearningSplitView } from "@/components/features/learning/LearningSplitView";
+import { ContinueLearning } from "@/components/features/learning/ContinueLearning";
 import { BackToHome } from "@/components/layout/BackToHome";
 
 // Learning & Knowledge Space (Phase 7): replaces the previous generic
@@ -112,6 +113,9 @@ export default function LearningSpacePage() {
             }}
             onClose={() => setStudyingTopicId(null)}
           />
+          <div className="mt-5">
+            <ContinueLearning topic={studyingTopic} />
+          </div>
         </GlassCard>
       )}
 

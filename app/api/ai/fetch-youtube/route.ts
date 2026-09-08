@@ -56,6 +56,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "יש להזין קישור תקין לסרטון YouTube." }, { status: 400 });
   }
 
+  // Public oEmbed — no API key, no quota. Gives us the title and channel even
+  // when captions are off, which is what the AI's metadata-only fallback
+  // summary is built from.
+  const meta = await fetchOembed(parsed.data.url);
+
   try {
     const segments = await YoutubeTranscript.fetchTranscript(parsed.data.url);
     const text = segments
@@ -65,21 +70,45 @@ export async function POST(request: Request) {
       .trim();
 
     if (!text) {
-      return NextResponse.json({ error: "לא נמצא תמלול עבור הסרטון הזה." }, { status: 422 });
+      // No transcript, but the video still plays and the AI can still give a
+      // metadata-based overview — 200 with meta, not an error.
+      return NextResponse.json({ meta, transcriptError: "לא נמצא תמלול עבור הסרטון הזה." });
     }
 
-    return NextResponse.json({ text });
+    return NextResponse.json({ text, meta });
   } catch (err) {
+    let transcriptError = "שליפת התמלול מהסרטון נכשלה.";
     if (err instanceof YoutubeTranscriptDisabledError || err instanceof YoutubeTranscriptNotAvailableError) {
-      return NextResponse.json({ error: "לסרטון הזה אין כתוביות/תמלול זמין." }, { status: 422 });
-    }
-    if (err instanceof YoutubeTranscriptVideoUnavailableError) {
+      transcriptError = "לסרטון הזה אין כתוביות/תמלול זמין.";
+    } else if (err instanceof YoutubeTranscriptVideoUnavailableError) {
+      // A genuinely unavailable video can't be summarised either — keep this an error.
       return NextResponse.json({ error: "הסרטון אינו זמין (הוסר, פרטי, או מוגבל אזורית)." }, { status: 422 });
+    } else if (err instanceof YoutubeTranscriptTooManyRequestError) {
+      transcriptError = "יותר מדי בקשות ל-YouTube כרגע — נסה שוב בעוד כמה דקות.";
+    } else {
+      console.error("YouTube transcript fetch failed:", err);
     }
-    if (err instanceof YoutubeTranscriptTooManyRequestError) {
-      return NextResponse.json({ error: "יותר מדי בקשות ל-YouTube כרגע. נסה שוב בעוד כמה דקות." }, { status: 429 });
-    }
-    console.error("YouTube transcript fetch failed:", err);
-    return NextResponse.json({ error: "שליפת התמלול מהסרטון נכשלה. נסה שוב." }, { status: 500 });
+    // The player works and the metadata summary works — degrade, don't fail.
+    return NextResponse.json({ meta, transcriptError });
+  }
+}
+
+interface OembedMeta {
+  title: string;
+  author: string | null;
+}
+
+async function fetchOembed(url: string): Promise<OembedMeta | null> {
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`,
+      { signal: AbortSignal.timeout(6_000) }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { title?: string; author_name?: string };
+    if (!data.title) return null;
+    return { title: data.title, author: data.author_name ?? null };
+  } catch {
+    return null;
   }
 }
