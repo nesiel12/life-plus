@@ -3,6 +3,7 @@ import { z } from "zod";
 import { generateStructuredData } from "@/lib/ai";
 import { findFocusSlots, hasConflict, type Interval } from "@/lib/calendar/findFocusSlots";
 import { sanitizeEventTitle } from "@/lib/calendar/sanitizeEventTitle";
+import { buildRRule, describeRecurrence, type Recurrence } from "@/lib/calendar/recurrence";
 import type { ChronotypeSettings } from "@/types";
 import type { AiActor } from "@/lib/ai/quota";
 
@@ -41,21 +42,54 @@ export const calendarIntentSchema = z.object({
     .string()
     .optional()
     .describe("When intent is unclear, one short Hebrew question asking for exactly what is missing"),
+  recurrence: z
+    .object({
+      freq: z.enum(["daily", "weekly"]).describe("daily = every day; weekly = specific weekdays"),
+      byWeekday: z
+        .array(z.number().int().min(0).max(6))
+        .optional()
+        .describe(
+          "For weekly: the weekdays it lands on, Sunday=0 … Saturday=6. " +
+            "'כל ערב חוץ משישי שבת' => [0,1,2,3,4]. 'כל יום שני' => [1]."
+        ),
+      count: z.number().int().min(1).max(365).optional().describe("Stop after N occurrences, if the user said so"),
+      until: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional()
+        .describe("Stop on this date (YYYY-MM-DD), if the user gave an end date"),
+    })
+    .optional()
+    .describe("Present ONLY when the user asked for something repeating ('כל יום', 'כל שני ורביעי', 'כל ערב'). Omit for a one-off event."),
 });
 
 export type CalendarIntent = z.infer<typeof calendarIntentSchema>;
 
 export const CALENDAR_AGENT_SYSTEM = [
-  "אתה סוכן היומן של Life Plus. התפקיד שלך הוא להבין בקשות בשפה טבעית בעברית ולהמיר אותן לאירוע יומן מדויק.",
+  "אתה סוכן היומן של Life Plus. אתה מקבל בקשה בשפה טבעית בעברית וממיר אותה לאירוע יומן מדויק, כפלט JSON מובנה בלבד.",
   "",
-  "כללים:",
-  "- ענה תמיד בעברית טבעית.",
-  "- פרש ביטויי זמן יחסיים ('מחר', 'יום ראשון הבא', 'עוד שעתיים') מול הזמן הנוכחי שנמסר לך.",
-  "- אם המשתמש לא ציין משך, קבע 60 דקות.",
-  "- אם המשתמש לא ציין שעה מפורשת, או שהבקשה עמומה, החזר intent=unclear ושאלה קצרה אחת בלבד ב-clarification.",
-  "- הכותרת צריכה להיות קצרה ותיאורית, בלי תאריך ובלי שעה בתוכה.",
-  "- אל תמציא פרטים שהמשתמש לא אמר.",
-  "- אתה לא בודק התנגשויות ולא בוחר חלונות פנויים. המערכת עושה זאת אחריך.",
+  "כללי פרשנות זמן:",
+  "- 'היום' = התאריך של הזמן הנוכחי שנמסר לך. 'מחר' = יום אחריו. 'מחרתיים' = יומיים.",
+  "- 'יום שלישי' / 'ביום שלישי' = ההופעה הבאה של אותו יום (אם היום שלישי — השבוע הבא).",
+  "- 'בשעה 22:00', 'ב-22:00', 'ב10 בערב', 'ב-3 אחה\"צ' — חלץ שעה מדויקת. שעה קטנה + 'בערב'/'אחה\"צ' => הוסף 12.",
+  "- start תמיד בפורמט המדויק YYYY-MM-DDTHH:MM (זמן מקומי, בלי שניות, בלי אזור זמן).",
+  "- אם אין משך — 60 דקות.",
+  "",
+  "כותרת:",
+  "- קצרה ותיאורית, בעברית, בלי תאריך/שעה בתוכה. הסר מילות פעולה כמו 'תוסיף'/'קבע'/'ליומן'.",
+  "- דוגמה: 'תוסיף בית אברך היום בשעה 22:00' => title='בית אברך'.",
+  "- אם באמת אין שום כותרת (למשל 'קבע משהו מחר ב-3') — intent=unclear עם clarification 'איך לקרוא לאירוע?'.",
+  "",
+  "אירוע חוזר:",
+  "- מלא את recurrence רק אם יש חזרתיות מפורשת: 'כל יום', 'כל ערב', 'כל שני ורביעי', 'פעמיים בשבוע'.",
+  "- 'כל ערב השבוע חוץ משישי שבת בשעה 20:30' => recurrence={freq:'weekly', byWeekday:[0,1,2,3,4]}, start ביום הקרוב מבין אלה בשעה 20:30, title לפי ההקשר.",
+  "- 'כל יום ראשון' => byWeekday:[0]. 'כל יום' => freq:'daily'.",
+  "- start הוא ההופעה הראשונה של הסדרה.",
+  "",
+  "כללי בטיחות:",
+  "- אל תמציא פרטים. אם חסר מידע קריטי (שעה, או כותרת) — intent=unclear + שאלה אחת קצרה וקונקרטית ב-clarification (למשל 'באיזו שעה?').",
+  "- אתה לא בודק התנגשויות ולא בוחר חלונות פנויים — המערכת עושה זאת אחריך.",
+  "- ענה תמיד בעברית.",
 ].join("\n");
 
 export function buildCalendarAgentPrompt(params: {
@@ -99,11 +133,19 @@ export function summarizeBusyForPrompt(busy: { start: string; end: string; title
     .join("\n");
 }
 
-/** "YYYY-MM-DDTHH:MM" in the user's local wall clock -> Date. */
+/**
+ * "YYYY-MM-DDTHH:MM" in the user's local wall clock -> Date. Tolerant of the
+ * shapes a model actually emits despite the prompt: an optional ":SS", and a
+ * trailing "Z" or "+HH:MM" offset which is dropped (the value is always read
+ * as local wall time — the model was told the user's local clock).
+ */
 export function parseLocalDateTime(value: string): Date | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value.trim());
+  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/.exec(
+    value.trim()
+  );
   if (!match) return null;
   const [, y, mo, d, h, mi] = match.map(Number) as unknown as number[];
+  if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59) return null;
   const date = new Date(y, mo - 1, d, h, mi, 0, 0);
   return Number.isNaN(date.getTime()) ? null : date;
 }
@@ -113,6 +155,8 @@ export interface ResolvedCalendarEvent {
   start: string; // ISO
   end: string; // ISO
   durationMinutes: number;
+  /** Present for a repeating request. `rrule` is the Google Calendar line. */
+  recurrence?: { rrule: string; description: string };
 }
 
 export type ResolveCalendarIntentResult =
@@ -153,16 +197,32 @@ export async function resolveCalendarIntent(params: {
     }),
   });
 
-  if (intent.intent !== "create" || !intent.start || !intent.title) {
+  if (intent.intent !== "create") {
     return {
       status: "unclear",
-      clarification: intent.clarification ?? "לא הצלחתי להבין מתי לקבוע. אפשר לנסח שוב עם תאריך ושעה?",
+      clarification: intent.clarification ?? "לא הבנתי מה לקבוע ביומן. אפשר לנסח שוב עם מה, מתי ובאיזו שעה?",
     };
+  }
+  if (!intent.title) {
+    return { status: "unclear", clarification: intent.clarification ?? "איך לקרוא לאירוע?" };
+  }
+  if (!intent.start) {
+    return { status: "unclear", clarification: intent.clarification ?? "באיזו שעה לקבוע את זה?" };
   }
 
   const start = parseLocalDateTime(intent.start);
   if (!start) {
-    return { status: "unclear", clarification: "לא הצלחתי לפענח את הזמן. אפשר לציין תאריך ושעה מפורשים?" };
+    return {
+      status: "unclear",
+      clarification: "לא הצלחתי לפענח את השעה. אפשר לכתוב תאריך ושעה מפורשים, למשל: מחר ב-14:30?",
+    };
+  }
+
+  let recurrence: ResolvedCalendarEvent["recurrence"];
+  if (intent.recurrence) {
+    const rec = intent.recurrence as Recurrence;
+    const rrule = buildRRule(rec);
+    if (rrule) recurrence = { rrule, description: describeRecurrence(rec) };
   }
 
   const durationMinutes = intent.durationMinutes ?? DEFAULT_DURATION_MINUTES;
@@ -191,6 +251,7 @@ export async function resolveCalendarIntent(params: {
       start: start.toISOString(),
       end: end.toISOString(),
       durationMinutes,
+      ...(recurrence ? { recurrence } : {}),
     },
     conflict,
     alternatives,
@@ -218,7 +279,9 @@ export function formatCalendarReply(result: ResolveCalendarIntentResult): string
   if (result.status === "unclear") return result.clarification;
 
   const { event, conflict, alternatives } = result;
-  const when = `${formatWhen(event.start)}, ${formatRange(event.start, event.end)}`;
+  const when = event.recurrence
+    ? `${event.recurrence.description}, ${formatRange(event.start, event.end)} (מתחיל ${formatWhen(event.start)})`
+    : `${formatWhen(event.start)}, ${formatRange(event.start, event.end)}`;
   const lines = [`אפשר לקבוע "${event.title}" ב-${when}.`];
 
   if (conflict) {

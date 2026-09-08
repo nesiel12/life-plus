@@ -13,6 +13,7 @@ interface ProposedEvent {
   start: string;
   end: string;
   durationMinutes: number;
+  recurrence?: { rrule: string; description: string };
 }
 
 type AgentResponse =
@@ -64,6 +65,7 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
   const [pending, setPending] = useState(false);
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(false);
+  const [createdRecurring, setCreatedRecurring] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function interpret() {
@@ -104,7 +106,11 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(typeof data.error === "string" ? data.error : "לא הצלחנו לפרש את הבקשה.");
+        setError(
+          typeof data.error === "string"
+            ? data.error
+            : "לא הצלחנו לפרש את הבקשה. נסה לכתוב מה, מתי ובאיזו שעה — למשל: פגישה מחר ב-14:30."
+        );
         return;
       }
       setResponse(data as AgentResponse);
@@ -115,14 +121,15 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
     }
   }
 
-  async function confirm(start: string, end: string, title: string) {
+  async function confirm(start: string, end: string, title: string, recurrence?: string) {
     setCreating(true);
     setError(null);
+    setCreatedRecurring(Boolean(recurrence));
     try {
       const res = await fetch("/api/calendar/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, start, end }),
+        body: JSON.stringify({ title, start, end, ...(recurrence ? { recurrence } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -175,7 +182,7 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
       {created && (
         <p className="flex items-center gap-1.5 text-xs text-accent-health">
           <Check size={12} aria-hidden />
-          האירוע נוסף ליומן.
+          {createdRecurring ? "האירוע החוזר נוסף ליומן." : "האירוע נוסף ליומן."}
         </p>
       )}
 
@@ -233,8 +240,17 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
             <div>
               <p className="text-sm font-medium text-foreground">{response.event.title}</p>
               <p className="mt-0.5 text-xs text-muted">
-                {formatWhen(response.event.start)} ·{" "}
-                <span className="ltr">{formatRange(response.event.start, response.event.end)}</span>
+                {response.event.recurrence ? (
+                  <>
+                    {response.event.recurrence.description} ·{" "}
+                    <span className="ltr">{formatRange(response.event.start, response.event.end)}</span>
+                  </>
+                ) : (
+                  <>
+                    {formatWhen(response.event.start)} ·{" "}
+                    <span className="ltr">{formatRange(response.event.start, response.event.end)}</span>
+                  </>
+                )}
               </p>
             </div>
 
@@ -247,7 +263,14 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
 
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => confirm(response.event.start, response.event.end, response.event.title)}
+                onClick={() =>
+                  confirm(
+                    response.event.start,
+                    response.event.end,
+                    response.event.title,
+                    response.event.recurrence?.rrule
+                  )
+                }
                 disabled={creating}
                 className="focus-ring flex items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-xs font-medium text-[var(--background)] transition-opacity disabled:opacity-40"
               >

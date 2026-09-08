@@ -20,11 +20,27 @@ describe("parseLocalDateTime", () => {
   it("rejects a malformed string rather than guessing", () => {
     expect(parseLocalDateTime("not a date")).toBeNull();
     expect(parseLocalDateTime("2026-09-15")).toBeNull();
-    expect(parseLocalDateTime("2026-09-15 14:30")).toBeNull();
+    expect(parseLocalDateTime("2026-13-40T14:30")).toBeNull();
   });
 
   it("trims surrounding whitespace", () => {
     expect(parseLocalDateTime("  2026-09-15T14:30  ")).not.toBeNull();
+  });
+
+  it("tolerates the shapes a model emits despite the prompt", () => {
+    // seconds, a space separator, a trailing Z / offset — all read as the
+    // same local wall time.
+    for (const v of [
+      "2026-09-15T14:30:00",
+      "2026-09-15 14:30",
+      "2026-09-15T14:30:00Z",
+      "2026-09-15T14:30:00.000+03:00",
+    ]) {
+      const d = parseLocalDateTime(v);
+      expect(d, v).not.toBeNull();
+      expect(d!.getHours(), v).toBe(14);
+      expect(d!.getMinutes(), v).toBe(30);
+    }
   });
 });
 

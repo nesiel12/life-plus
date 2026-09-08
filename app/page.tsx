@@ -13,15 +13,11 @@ import { ScreenTimeWidget } from "@/components/features/ScreenTimeWidget";
 import { GoalsPanel } from "@/components/features/GoalsPanel";
 import { RecentActivityCard } from "@/components/features/RecentActivityCard";
 import { MemoryCards } from "@/components/features/memories/MemoryCards";
-import { DecisionStream } from "@/components/features/dashboard/DecisionStream";
 import { NowNextCard } from "@/components/features/dashboard/NowNextCard";
 import { UniversalInputBar } from "@/components/features/dashboard/UniversalInputBar";
 import { SlotSuggestions } from "@/components/features/dashboard/SlotSuggestions";
 import { RelationshipAutopilot } from "@/components/features/dashboard/RelationshipAutopilot";
 import { IntentionComposer } from "@/components/features/dashboard/IntentionComposer";
-import { TodayTimelineCard } from "@/components/features/dashboard/TodayTimelineCard";
-import { FinanceAlertCard } from "@/components/features/dashboard/FinanceAlertCard";
-import { NextCourseCard } from "@/components/features/dashboard/NextCourseCard";
 import { DailyCheckIn } from "@/components/features/dashboard/DailyCheckIn";
 import { WidgetFrame } from "@/components/features/dashboard/WidgetFrame";
 import { BentoGrid, BentoCard } from "@/components/magicui/bento-grid";
@@ -198,18 +194,12 @@ export default function Home() {
             the arrangement lives in data, not in this JSX. */}
         {(() => {
           const CONTENT: Record<string, { node: ReactNode; tilt?: boolean; href?: string; cta?: string }> = {
-            // The Decision Stream leads the default order on purpose (LifeOS
-            // Pillar 3): if the dashboard is meant to have zero cognitive
-            // overload, the at-most-three things actually needing a decision
-            // have to be the first thing read.
             "command-bar": { node: <UniversalInputBar /> },
             "now-next": { node: <NowNextCard /> },
             "slot-suggestions": { node: <SlotSuggestions /> },
             "relationship-autopilot": { node: <RelationshipAutopilot /> },
-            "decision-stream": { node: <DecisionStream /> },
             "daily-checkin": { node: <DailyCheckIn />, tilt: false },
             "ai-briefing": { node: <AIBriefing bare /> },
-            "today-timeline": { node: <TodayTimelineCard /> },
             intention: { node: <IntentionComposer />, tilt: false },
             "upcoming-moments": {
               href: "/calendar",
@@ -250,10 +240,6 @@ export default function Home() {
               ),
             },
             "recent-activity": { node: <RecentActivityCard /> },
-            "finance-alert": { node: <FinanceAlertCard /> },
-            // Dense form panels — tilt is off so embedded players and inputs
-            // stay crisp.
-            "next-course": { node: <NextCourseCard />, tilt: false },
             memories: { node: <MemoryCards />, tilt: false },
             goals: { node: <GoalsPanel bare />, tilt: false },
           };

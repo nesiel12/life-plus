@@ -14,6 +14,14 @@ const createEventSchema = z.object({
   title: z.string().trim().min(1).max(200),
   start: z.string().datetime({ offset: true }),
   end: z.string().datetime({ offset: true }),
+  /** A single "RRULE:FREQ=…" line for a repeating event. Built server-side
+   *  from a structured shape (lib/calendar/recurrence.ts), never free text. */
+  recurrence: z
+    .string()
+    .trim()
+    .regex(/^RRULE:[A-Z0-9=;,:+-]+$/)
+    .max(300)
+    .optional(),
 });
 
 const deleteEventSchema = z.object({
@@ -65,7 +73,7 @@ export async function POST(request: NextRequest) {
 
   const parsed = await parseJsonBody(request, createEventSchema);
   if (parsed.error) return parsed.error;
-  const { title, start, end } = parsed.data;
+  const { title, start, end, recurrence } = parsed.data;
 
   if (new Date(end).getTime() <= new Date(start).getTime()) {
     return NextResponse.json({ error: "End must be after start." }, { status: 400 });
@@ -82,6 +90,7 @@ export async function POST(request: NextRequest) {
         summary: title,
         start: { dateTime: start },
         end: { dateTime: end },
+        ...(recurrence ? { recurrence: [recurrence] } : {}),
       }),
     });
 
