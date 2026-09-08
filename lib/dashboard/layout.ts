@@ -40,12 +40,11 @@ export const WIDGETS: WidgetDefinition[] = [
   // is opened to answer, and it is the one thing here that changes by the
   // hour rather than by the day.
   { id: "now-next", title: "עכשיו והבא", defaultSpan: 1, minSpan: 1 },
-  { id: "daily-checkin", title: "צ׳ק-אין יומי", defaultSpan: 1, minSpan: 1 },
   { id: "ai-briefing", title: "תדריך AI", defaultSpan: 2, minSpan: 2 },
   { id: "today-structure", title: "מבנה היום", defaultSpan: 1, minSpan: 1 },
+  { id: "hebrew-calendar", title: "לוח עברי", defaultSpan: 1, minSpan: 1 },
+  { id: "motivation", title: "השראה יומית", defaultSpan: 1, minSpan: 1 },
   { id: "intention", title: "כוונת היום", defaultSpan: 1, minSpan: 1 },
-  { id: "slot-suggestions", title: "מתי לעשות את זה", defaultSpan: 1, minSpan: 1 },
-  { id: "relationship-autopilot", title: "כדאי ליצור קשר", defaultSpan: 1, minSpan: 1 },
   { id: "upcoming-moments", title: "רגעים משמעותיים", defaultSpan: 2, minSpan: 1 },
   { id: "recent-activity", title: "פעילות אחרונה", defaultSpan: 1, minSpan: 1 },
   { id: "memories", title: "זיכרונות", defaultSpan: 3, minSpan: 2 },

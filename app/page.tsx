@@ -15,11 +15,10 @@ import { RecentActivityCard } from "@/components/features/RecentActivityCard";
 import { MemoryCards } from "@/components/features/memories/MemoryCards";
 import { NowNextCard } from "@/components/features/dashboard/NowNextCard";
 import { TodayStructureCard } from "@/components/features/dashboard/TodayStructureCard";
+import { HebrewCalendarCard } from "@/components/features/dashboard/HebrewCalendarCard";
+import { MotivationCard } from "@/components/features/dashboard/MotivationCard";
 import { UniversalInputBar } from "@/components/features/dashboard/UniversalInputBar";
-import { SlotSuggestions } from "@/components/features/dashboard/SlotSuggestions";
-import { RelationshipAutopilot } from "@/components/features/dashboard/RelationshipAutopilot";
 import { IntentionComposer } from "@/components/features/dashboard/IntentionComposer";
-import { DailyCheckIn } from "@/components/features/dashboard/DailyCheckIn";
 import { WidgetFrame } from "@/components/features/dashboard/WidgetFrame";
 import { BentoGrid, BentoCard } from "@/components/magicui/bento-grid";
 import { RetroGrid } from "@/components/magicui/retro-grid";
@@ -208,9 +207,8 @@ export default function Home() {
             "command-bar": { node: <UniversalInputBar /> },
             "now-next": { node: <NowNextCard /> },
             "today-structure": { node: <TodayStructureCard /> },
-            "slot-suggestions": { node: <SlotSuggestions /> },
-            "relationship-autopilot": { node: <RelationshipAutopilot /> },
-            "daily-checkin": { node: <DailyCheckIn />, tilt: false },
+            "hebrew-calendar": { node: <HebrewCalendarCard /> },
+            "motivation": { node: <MotivationCard /> },
             "ai-briefing": { node: <AIBriefing bare /> },
             intention: { node: <IntentionComposer />, tilt: false },
             "upcoming-moments": {
