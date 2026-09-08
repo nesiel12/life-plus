@@ -73,6 +73,16 @@ export async function sendEmail(input: EmailSendInput): Promise<EmailSendResult>
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 
+  // Links that resolve to localhost are a strong spam signal and are useless
+  // to the recipient. If mail is configured but the app URL isn't, say so
+  // loudly once per send rather than letting every briefing land in spam.
+  if (apiKey && from && appUrl().includes("localhost")) {
+    console.warn(
+      "[notify:email] RESEND_API_KEY is set but the app URL is localhost — " +
+        "set EMAIL_APP_URL to the public URL or emails will look like spam."
+    );
+  }
+
   if (!apiKey || !from) {
     // Unconfigured is not an error: local development and any deploy without
     // mail set up should still run jobs, produce in-app notifications, and

@@ -31,7 +31,7 @@ const WEEKDAY_INITIALS = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 /** The window the grid shows by default; widened to fit outlying events. */
 const DEFAULT_FROM_HOUR = 7;
 const DEFAULT_TO_HOUR = 23;
-const ROW_HEIGHT_REM = 3;
+const ROW_HEIGHT_REM = 2.25;
 
 function clockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });

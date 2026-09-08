@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { CalendarPlus, CalendarRange, Loader2, Plus, Wand2 } from "lucide-react";
+import { CalendarPlus, CalendarRange, ChevronDown, Loader2, Plus, Wand2 } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { useApiCall } from "@/hooks/useApiCall";
 import { useInsights } from "@/hooks/useInsights";
@@ -15,7 +15,9 @@ import { NewManualEventModal } from "@/components/features/time/NewManualEventMo
 import { TaskSuggestions } from "@/components/features/time/TaskSuggestions";
 import { DayCarousel, toDateKey } from "@/components/features/time/DayCarousel";
 import { WeeklySchedule } from "@/components/features/schedule/WeeklySchedule";
-import { Timeline } from "@/components/features/time/Timeline";
+import { DailyDigest } from "@/components/features/time/DailyDigest";
+import { HabitsSection } from "@/components/features/time/HabitsSection";
+import { DailyRecommendations } from "@/components/features/time/DailyRecommendations";
 import {
   buildDailyTimelineRows,
   selectOpenItemsForDate,
@@ -30,15 +32,10 @@ interface WeekCalendarResponse {
   events: WeekCalendarEvent[];
 }
 
-// Time & Tasks Space (Phase 5). Two layers on one page: a Day Carousel +
-// Unified Vertical Timeline (real Google Calendar events merged with
-// tasks for whichever date is selected — see lib/time/buildDailyTimeline)
-// sits above "כל המשימות", the plain status-grouped "לביצוע"/"בוצע" list
-// from the previous milestone (an 'in-progress' status exists in the
-// schema, but the checkbox is deliberately just todo <-> done) plus AI
-// Auto-Prioritization. Both views read from the same tasks slice in
-// useAtlasStore, so toggling a task done in one place updates the other
-// instantly.
+// Time & Tasks Space. One clean stack: the day at a glance (DailyDigest),
+// the day's habits and one or two AI nudges, then the task list. The weekly
+// skeleton and the AI task-suggestions live in collapsible sections at the
+// bottom — real features, but not what you came here to look at.
 export default function TimeSpacePage() {
   const tasks = useAtlasStore((s) => s.tasks);
   const addTask = useAtlasStore((s) => s.addTask);
@@ -46,38 +43,32 @@ export default function TimeSpacePage() {
   const deleteTask = useAtlasStore((s) => s.deleteTask);
   const personalDNA = useAtlasStore((s) => s.personalDNA);
   const upcomingEvents = useAtlasStore((s) => s.upcomingEvents);
-  const people = useAtlasStore((s) => s.people);
   const manualEvents = useAtlasStore((s) => s.manualEvents);
   const addManualEvent = useAtlasStore((s) => s.addManualEvent);
   const deleteManualEvent = useAtlasStore((s) => s.deleteManualEvent);
   const transactions = useAtlasStore((s) => s.transactions);
   const meals = useAtlasStore((s) => s.meals);
   const workouts = useAtlasStore((s) => s.workouts);
+  const people = useAtlasStore((s) => s.people);
   const habits = useAtlasStore((s) => s.habits);
   const habitLogs = useAtlasStore((s) => s.habitLogs);
 
   const [modalOpen, setModalOpen] = useState(false);
-  // Focus Mode is tethered to a specific task, so the overlay can show what
-  // is being worked on and offer to complete it on the way out.
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [showDone, setShowDone] = useState(false);
   const { error: toggleError, run: toggleTask } = useApiCall(updateTask);
   const { error: deleteError, run: removeTask } = useApiCall(deleteTask);
   const { error: deleteEventError, run: removeManualEvent } = useApiCall(deleteManualEvent);
 
   const todayKey = useMemo(() => toDateKey(new Date()), []);
   const [selectedDate, setSelectedDate] = useState(todayKey);
+  const isSelectedToday = selectedDate === todayKey;
 
-  // Real Google Calendar events for the carousel's 7-day window — the
-  // same progressive-enhancement pattern (useInsights) every other
-  // AI/insights-layered screen uses: renders instantly with an empty
-  // timeline, layers in real events once the fetch resolves.
   const { data: weekCalendar, refresh: refreshWeekCalendar } = useInsights<WeekCalendarResponse>(
     "/api/calendar/week",
     { connected: false, events: [] }
   );
-
-  const isSelectedToday = selectedDate === todayKey;
 
   const timelineRows = useMemo(
     () =>
@@ -99,23 +90,14 @@ export default function TimeSpacePage() {
     [selectedDate, transactions]
   );
 
-  // The day's open load only (done tasks excluded) — what
-  // DailyRecommendations actually sends to the AI, distinct from
-  // timelineRows above which still needs done tasks for display.
   const { events: openEvents, tasks: openTasks } = useMemo(
     () => selectOpenItemsForDate(selectedDate, weekCalendar?.events ?? [], tasks, isSelectedToday),
     [selectedDate, weekCalendar, tasks, isSelectedToday]
   );
 
-  // AI Auto-Prioritization: sends every currently-open task (across all
-  // dates, not just the selected day — deliberately the full open list,
-  // unlike openTasks above which is scoped to selectedDate) plus real
-  // context from the store (the user's own personalDNA and their own real
-  // upcoming events, never a fixed or invented personal fact) to
-  // /api/ai/prioritize-tasks, then flips is_high_priority on whichever IDs
-  // come back via the exact same updateTask action the done-checkbox uses.
-  // Deliberately additive only, per spec — a task not returned this run
-  // keeps whatever is_high_priority it already had, it isn't cleared.
+  // AI Auto-Prioritization: sends every open task plus real context from the
+  // store to /api/ai/prioritize-tasks, then flips is_high_priority on the IDs
+  // that come back. Additive only — a task not returned keeps its state.
   const {
     loading: prioritizing,
     error: prioritizeError,
@@ -157,8 +139,6 @@ export default function TimeSpacePage() {
     const todo = tasks
       .filter((t) => t.status !== "done")
       .sort((a, b) => {
-        // High priority always bubbles to the top, overriding due-date
-        // order — due date is only the tiebreaker within each tier.
         if (a.isHighPriority !== b.isHighPriority) return a.isHighPriority ? -1 : 1;
         if (!a.dueDate && !b.dueDate) return 0;
         if (!a.dueDate) return 1;
@@ -169,12 +149,6 @@ export default function TimeSpacePage() {
     return { todoTasks: todo, doneTasks: done };
   }, [tasks]);
 
-  // TaskCard's "הצע זמן ביומן" (Sprint 5): reuses the week's already-fetched
-  // Google Calendar events as the busy set, same source the Vertical
-  // Timeline above already renders from — no second calendar fetch. Only
-  // offered when Google Calendar is actually connected; otherwise there is
-  // no real busy set to check against, and the create-event call would just
-  // fail with "not connected" after the user already picked a slot.
   const taskSchedule = useMemo(() => {
     if (!weekCalendar?.connected) return undefined;
     return {
@@ -185,62 +159,52 @@ export default function TimeSpacePage() {
   }, [weekCalendar, personalDNA.chronotype, refreshWeekCalendar]);
 
   function handleToggleDone(task: Task) {
-    toggleTask(task.id, { status: task.status === "done" ? "todo" : "done" }).catch(() => {
-      // error is already captured in toggleError for display below
-    });
+    toggleTask(task.id, { status: task.status === "done" ? "todo" : "done" }).catch(() => {});
   }
 
-  // Pinning *is* high priority — the same field the AI prioritizer writes
-  // (handlePrioritize below) and the same updateTask action the done-toggle
-  // uses, so a pin survives a reload instead of being a view-only flourish.
   function handleTogglePin(task: Task) {
-    toggleTask(task.id, { isHighPriority: !task.isHighPriority }).catch(() => {
-      // error is already captured in toggleError for display below
-    });
+    toggleTask(task.id, { isHighPriority: !task.isHighPriority }).catch(() => {});
   }
 
   function handleDelete(taskId: string) {
-    removeTask(taskId).catch(() => {
-      // error is already captured in deleteError for display below
-    });
+    removeTask(taskId).catch(() => {});
   }
 
   function handleDeleteManualEvent(eventId: string) {
-    removeManualEvent(eventId).catch(() => {
-      // error is already captured in deleteEventError for display below
-    });
+    removeManualEvent(eventId).catch(() => {});
   }
 
   function handlePrioritize() {
     if (prioritizing) return;
-    runPrioritize().catch(() => {
-      // error is already captured in prioritizeError for display below
-    });
+    runPrioritize().catch(() => {});
   }
+
+  const anyError = toggleError ?? deleteError ?? prioritizeError ?? deleteEventError;
 
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <BackToHome className="mb-6 -ms-2.5" />
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="mb-1 text-2xl font-medium tracking-tight">זמן ומשימות</h1>
-          <p className="text-sm text-muted">ניהול חכם של המשימות והזמן שלך.</p>
+          <p className="text-sm text-muted">היום שלך, וכל מה שצריך להיעשות.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handlePrioritize}
             disabled={prioritizing || todoTasks.length === 0}
-            className="focus-ring flex items-center gap-1.5 rounded-lg bg-accent-time/20 px-4 py-2 text-sm font-medium text-accent-time transition-opacity hover:opacity-80 disabled:opacity-40"
+            className="focus-ring flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:text-foreground disabled:opacity-40"
           >
             {prioritizing ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Wand2 size={14} aria-hidden />}
             {prioritizing ? "מתעדף…" : "תעדף עם AI"}
           </button>
           <button
             onClick={() => setEventModalOpen(true)}
-            className="focus-ring flex items-center gap-1.5 rounded-lg bg-accent-time/20 px-4 py-2 text-sm font-medium text-accent-time transition-opacity hover:opacity-80"
+            className="focus-ring flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:text-foreground"
           >
             <CalendarPlus size={14} aria-hidden />
-            אירוע חדש
+            אירוע
           </button>
           <button
             onClick={() => setModalOpen(true)}
@@ -252,50 +216,128 @@ export default function TimeSpacePage() {
         </div>
       </div>
 
-      {(toggleError || deleteError || prioritizeError || deleteEventError) && (
-        <p className="mb-6 text-xs text-accent-family">{toggleError ?? deleteError ?? prioritizeError ?? deleteEventError}</p>
-      )}
+      {anyError && <p className="mb-6 text-xs text-accent-family">{anyError}</p>}
 
-      <TaskSuggestions
-        events={openEvents}
-        shifts={dayShifts}
-        habits={habits}
-        habitLogs={habitLogs}
-        selectedDate={selectedDate}
-        existingTasks={tasks.filter((t) => t.status !== "done")}
-      />
+      <div className="flex flex-col gap-6">
+        <div>
+          <DayCarousel selectedDate={selectedDate} onSelect={setSelectedDate} />
+          <DailyDigest
+            rows={timelineRows}
+            shifts={dayShifts}
+            selectedDate={selectedDate}
+            isToday={isSelectedToday}
+            onToggleTaskDone={handleToggleDone}
+            onDeleteManualEvent={handleDeleteManualEvent}
+          />
+        </div>
 
-      {/* The weekly skeleton sits above the day view on purpose: it is the
-          thing that explains the day, and it is the surface people come here
-          to edit when their term or shift pattern changes. */}
-      <GlassCard className="mb-8">
-        <p className="mb-1 flex items-center gap-2 text-sm font-medium text-muted">
-          <CalendarRange size={16} className="text-accent-time" aria-hidden />
-          הלוז השבועי
-        </p>
-        <p className="mb-4 text-xs text-muted">
-          השלד הקבוע של השבוע שלך. על בסיסו האפליקציה יודעת מה עכשיו, מה הבא, ומתי אתה באמת פנוי.
-        </p>
-        <WeeklySchedule />
-      </GlassCard>
+        <GlassCard>
+          <HabitsSection selectedDate={selectedDate} />
+        </GlassCard>
 
-      <DayCarousel selectedDate={selectedDate} onSelect={setSelectedDate} />
-      <div className="mb-10">
-        <Timeline
-          rows={timelineRows}
-          onToggleTaskDone={handleToggleDone}
-          onDeleteManualEvent={handleDeleteManualEvent}
-          selectedDate={selectedDate}
-          isToday={isSelectedToday}
-          openEvents={openEvents}
-          openTasks={openTasks}
+        <DailyRecommendations
+          dateKey={selectedDate}
+          events={openEvents}
+          tasks={openTasks}
           shifts={dayShifts}
-          people={people}
         />
+
+        <section>
+          <div className="mb-4 flex items-baseline justify-between">
+            <h2 className="text-lg font-medium tracking-tight text-foreground">המשימות שלי</h2>
+            <span className="text-xs text-muted">{todoTasks.length} פתוחות</span>
+          </div>
+
+          <PinnedList
+            items={todoTasks}
+            getKey={(task) => task.id}
+            isPinned={(task) => task.isHighPriority}
+            onTogglePin={handleTogglePin}
+            empty={<p className="text-sm text-muted">אין משימות פתוחות. הוסף אחת כדי להתחיל.</p>}
+          >
+            {(task, { pinned, togglePin }) => (
+              <TaskCard
+                task={task}
+                delay={0}
+                onToggleDone={handleToggleDone}
+                onDelete={handleDelete}
+                pinned={pinned}
+                onTogglePin={togglePin}
+                schedule={taskSchedule}
+                onFocus={() => setFocusTaskId(task.id)}
+              />
+            )}
+          </PinnedList>
+
+          {doneTasks.length > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={() => setShowDone((v) => !v)}
+                className="focus-ring flex items-center gap-1.5 rounded-lg text-sm text-muted transition-colors hover:text-foreground"
+              >
+                <ChevronDown
+                  size={14}
+                  className={showDone ? "rotate-180 transition-transform" : "transition-transform"}
+                  aria-hidden
+                />
+                בוצעו ({doneTasks.length})
+              </button>
+              {showDone && (
+                <div className="mt-3 flex flex-col gap-3">
+                  {doneTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      delay={0}
+                      onToggleDone={handleToggleDone}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        <details className="group rounded-2xl border border-hairline-card bg-surface-sunken/40 [&_summary]:list-none">
+          <summary className="focus-ring flex cursor-pointer items-center justify-between gap-2 rounded-2xl px-4 py-3.5">
+            <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <CalendarRange size={16} className="text-accent-time" aria-hidden />
+              הצעות AI למשימות
+            </span>
+            <ChevronDown size={16} className="text-muted transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <div className="px-4 pb-4">
+            <TaskSuggestions
+              events={openEvents}
+              shifts={dayShifts}
+              habits={habits}
+              habitLogs={habitLogs}
+              selectedDate={selectedDate}
+              existingTasks={tasks.filter((t) => t.status !== "done")}
+            />
+          </div>
+        </details>
+
+        <details className="group rounded-2xl border border-hairline-card bg-surface-sunken/40 [&_summary]:list-none">
+          <summary className="focus-ring flex cursor-pointer items-center justify-between gap-2 rounded-2xl px-4 py-3.5">
+            <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <CalendarRange size={16} className="text-accent-time" aria-hidden />
+              הלוז השבועי
+            </span>
+            <ChevronDown size={16} className="text-muted transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <div className="px-4 pb-4">
+            <p className="mb-4 text-xs text-muted">
+              השלד הקבוע של השבוע שלך. על בסיסו האפליקציה יודעת מה עכשיו, מה הבא, ומתי אתה באמת פנוי.
+            </p>
+            <WeeklySchedule />
+          </div>
+        </details>
       </div>
 
       {prioritizing && (
-        <GlassCard delay={0} className="mb-6 flex items-center justify-center gap-3 py-6">
+        <GlassCard delay={0} className="mt-6 flex items-center justify-center gap-3 py-6">
           <motion.div
             animate={{
               boxShadow: [
@@ -312,55 +354,6 @@ export default function TimeSpacePage() {
           <p className="text-sm text-muted">מתעדף משימות בעזרת AI…</p>
         </GlassCard>
       )}
-
-      <h2 className="mb-4 text-lg font-medium tracking-tight text-foreground">כל המשימות</h2>
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <section>
-          <h3 className="mb-3 text-sm font-medium text-muted">לביצוע ({todoTasks.length})</h3>
-          <PinnedList
-            items={todoTasks}
-            getKey={(task) => task.id}
-            isPinned={(task) => task.isHighPriority}
-            onTogglePin={handleTogglePin}
-            empty={<p className="text-sm text-muted">אין משימות לביצוע. הוסף משימה חדשה כדי להתחיל.</p>}
-          >
-            {(task, { pinned, togglePin }) => (
-              <TaskCard
-                task={task}
-                delay={0}
-                onToggleDone={handleToggleDone}
-                onDelete={handleDelete}
-                pinned={pinned}
-                onTogglePin={togglePin}
-                schedule={taskSchedule}
-                onFocus={() => setFocusTaskId(task.id)}
-              />
-            )}
-          </PinnedList>
-        </section>
-
-        <section>
-          <h3 className="mb-3 text-sm font-medium text-muted">בוצע ({doneTasks.length})</h3>
-          <PinnedList
-            items={doneTasks}
-            getKey={(task) => task.id}
-            isPinned={(task) => task.isHighPriority}
-            onTogglePin={handleTogglePin}
-            empty={<p className="text-sm text-muted">עדיין לא הושלמו משימות.</p>}
-          >
-            {(task, { pinned, togglePin }) => (
-              <TaskCard
-                task={task}
-                delay={0}
-                onToggleDone={handleToggleDone}
-                onDelete={handleDelete}
-                pinned={pinned}
-                onTogglePin={togglePin}
-              />
-            )}
-          </PinnedList>
-        </section>
-      </div>
 
       <FocusModeHost
         open={focusTaskId !== null}

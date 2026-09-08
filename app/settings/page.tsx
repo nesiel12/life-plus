@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bell, CalendarRange, Check, Clock, Globe, Loader2, Mail } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BackToHome } from "@/components/layout/BackToHome";
+import { EmailDiagnostics } from "@/components/features/settings/EmailDiagnostics";
 import {
   getNotificationSettingsAction,
   updateNotificationSettingsAction,
@@ -167,6 +168,8 @@ export default function SettingsPage() {
               />
             </label>
           </GlassCard>
+
+          <EmailDiagnostics />
 
           <GlassCard>
             <p className="mb-1 flex items-center gap-2 text-sm font-medium text-muted">

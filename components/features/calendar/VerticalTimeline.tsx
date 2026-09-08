@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Moon, Sparkles, TrendingDown } from "lucide-react";
+import { CalendarPlus, Check, Loader2, Moon, Sparkles, TrendingDown } from "lucide-react";
 import { energyForHour, type HourEnergy, type ObservedEnergy } from "@/lib/calendar/energy";
 import { DeleteEventButton, type DeletableEvent } from "@/components/features/calendar/DeleteEventDialog";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,19 @@ export interface TimelineEvent {
   /** Which Google calendar it belongs to — needed to delete it. */
   calendarId?: string;
   canEdit?: boolean;
+}
+
+/** A free stretch between events, resolved to something worth showing. */
+export interface TimelineGap {
+  id: string;
+  /** Minutes since local midnight. */
+  startMinute: number;
+  endMinute: number;
+  durationMinutes: number;
+  label: string;
+  accentVar?: string;
+  /** A pressing task that fits here, offered with a "schedule it" button. */
+  task?: { id: string; title: string } | null;
 }
 
 interface VerticalTimelineProps {
@@ -34,9 +47,23 @@ interface VerticalTimelineProps {
   /** Opt-in: renders a delete affordance on each event. Omitted where the
    *  timeline is a read-only summary (the dashboard card). */
   onDeleteEvent?: (event: DeletableEvent) => void;
+  /** Free-time bands drawn behind the events. */
+  gaps?: TimelineGap[];
+  /** Schedules a gap's suggested task as a real calendar event. Resolves
+   *  when the write lands; the timeline refetches from the parent. */
+  onScheduleGapTask?: (input: {
+    taskId: string;
+    title: string;
+    startMinute: number;
+    endMinute: number;
+  }) => Promise<void>;
 }
 
-const ROW_HEIGHT_REM = 3.5;
+// Tighter than it was (3.5rem): an 18-hour column at the old height was a
+// screenful of mostly-empty rows before the first event. The grid also
+// starts at 07:00 now, and DayView widens it only for events that fall
+// outside — so a normal day is compact and an early flight still shows.
+const ROW_HEIGHT_REM = 2.75;
 
 // Luxe, not glass: an opaque surface, hairline rules, and gold reserved for
 // the single thing that matters most on this screen — the user's peak-focus
@@ -57,10 +84,102 @@ function hourLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
+function minuteLabel(minute: number): string {
+  const h = Math.floor(minute / 60);
+  const m = minute % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function formatGapDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} דק׳`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (rest === 0) return hours === 1 ? "שעה" : `${hours} שע׳`;
+  return `${hours}:${String(rest).padStart(2, "0")} שע׳`;
+}
+
 function clockRange(start: string, end: string): string {
   const fmt = (iso: string) =>
     new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
   return `${fmt(start)}–${fmt(end)}`;
+}
+
+function GapBand({
+  gap,
+  topRem,
+  heightRem,
+  onSchedule,
+}: {
+  gap: TimelineGap;
+  topRem: number;
+  heightRem: number;
+  onSchedule?: VerticalTimelineProps["onScheduleGapTask"];
+}) {
+  const [state, setState] = useState<"idle" | "scheduling" | "done">("idle");
+  const accent = gap.accentVar ?? "--muted";
+  const roomy = heightRem >= 3;
+
+  function schedule() {
+    if (!gap.task || !onSchedule || state !== "idle") return;
+    setState("scheduling");
+    // Put it early in the gap, capped at 60 minutes.
+    const start = gap.startMinute;
+    const end = Math.min(gap.endMinute, start + 60);
+    onSchedule({ taskId: gap.task.id, title: gap.task.title, startMinute: start, endMinute: end })
+      .then(() => setState("done"))
+      .catch(() => setState("idle"));
+  }
+
+  return (
+    <div
+      className="absolute end-0 start-16 flex flex-col justify-center overflow-hidden rounded-xl border border-dashed px-3 py-1.5"
+      style={{
+        top: `${topRem + 0.15}rem`,
+        height: `${Math.max(heightRem - 0.3, 1.1)}rem`,
+        borderColor: `color-mix(in srgb, var(${accent}) 30%, transparent)`,
+        background: `color-mix(in srgb, var(${accent}) 5%, transparent)`,
+      }}
+    >
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span
+            className="truncate text-xs font-medium"
+            style={{ color: `color-mix(in srgb, var(${accent}) 85%, var(--foreground))` }}
+          >
+            {gap.label}
+          </span>
+          <span className="ltr shrink-0 text-[0.65rem] text-muted">
+            {minuteLabel(gap.startMinute)} · {formatGapDuration(gap.durationMinutes)}
+          </span>
+        </span>
+
+        {gap.task && onSchedule && state === "done" && (
+          <span className="flex shrink-0 items-center gap-1 text-[0.65rem] text-accent-health">
+            <Check size={11} aria-hidden />
+            נקבע
+          </span>
+        )}
+        {gap.task && onSchedule && state !== "done" && roomy && (
+          <button
+            onClick={schedule}
+            disabled={state === "scheduling"}
+            className="focus-ring flex shrink-0 items-center gap-1 rounded-lg bg-ink px-2 py-1 text-[0.65rem] font-medium text-[var(--background)] disabled:opacity-50"
+          >
+            {state === "scheduling" ? (
+              <Loader2 size={10} className="animate-spin" aria-hidden />
+            ) : (
+              <CalendarPlus size={10} aria-hidden />
+            )}
+            קבע כאן
+          </button>
+        )}
+      </div>
+
+      {gap.task && roomy && state !== "done" && (
+        <p className="mt-0.5 truncate text-[0.7rem] text-foreground/70">אפשר: {gap.task.title}</p>
+      )}
+    </div>
+  );
 }
 
 export function VerticalTimeline({
@@ -69,9 +188,11 @@ export function VerticalTimeline({
   chronotype,
   observedEnergy,
   now,
-  fromHour = 6,
-  toHour = 24,
+  fromHour = 7,
+  toHour = 23,
   onDeleteEvent,
+  gaps = [],
+  onScheduleGapTask,
 }: VerticalTimelineProps) {
   const reduce = useReducedMotion();
 
@@ -85,6 +206,9 @@ export function VerticalTimeline({
     () => Array.from({ length: toHour - fromHour }, (_, i) => fromHour + i),
     [fromHour, toHour]
   );
+
+  const gridStartMin = fromHour * 60;
+  const gridEndMin = toHour * 60;
 
   // Place each event by its offset from the grid's first hour, in rem, so an
   // event spanning 09:15-10:45 lands exactly across the 09 and 10 rows rather
@@ -109,6 +233,19 @@ export function VerticalTimeline({
       })
       .filter((v): v is NonNullable<typeof v> => v !== null);
   }, [events, dayStart, fromHour, toHour]);
+
+  const positionedGaps = useMemo(() => {
+    return gaps
+      .map((gap) => {
+        const start = Math.max(gap.startMinute, gridStartMin);
+        const end = Math.min(gap.endMinute, gridEndMin);
+        if (end - start < 30) return null;
+        const topRem = ((start - gridStartMin) / 60) * ROW_HEIGHT_REM;
+        const heightRem = ((end - start) / 60) * ROW_HEIGHT_REM;
+        return { gap, topRem, heightRem };
+      })
+      .filter((v): v is NonNullable<typeof v> => v !== null);
+  }, [gaps, gridStartMin, gridEndMin]);
 
   const nowOffsetRem = useMemo(() => {
     if (!now) return null;
@@ -171,6 +308,17 @@ export function VerticalTimeline({
             </div>
           );
         })}
+
+        {/* Free-time bands: behind the events, above the hour banding. */}
+        {positionedGaps.map(({ gap, topRem, heightRem }) => (
+          <GapBand
+            key={gap.id}
+            gap={gap}
+            topRem={topRem}
+            heightRem={heightRem}
+            onSchedule={onScheduleGapTask}
+          />
+        ))}
 
         {/* Events float above the banding, inset past the hour gutter. */}
         {positioned.map(({ event, topRem, heightRem }, i) => (

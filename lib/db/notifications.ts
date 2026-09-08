@@ -157,6 +157,23 @@ export const notificationsRepo = {
     return { rows: page, nextCursor: hasMore ? page[page.length - 1].created_at : null };
   },
 
+  /**
+   * Recent notifications with their per-channel delivery outcome, for the
+   * settings-page email diagnostics. Unlike listPage this keeps expired rows
+   * and exposes `channels`/`delivery`/`sent_at` raw — the point is to show
+   * why a message did or did not arrive.
+   */
+  async recentForDiagnostics(userId: string, limit = 8) {
+    const { data, error } = await getSupabaseClient()
+      .from("notifications")
+      .select("id, kind, title, created_at, scheduled_for, sent_at, status, channels, delivery")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(Math.min(Math.max(limit, 1), 25));
+    if (error) throw error;
+    return data ?? [];
+  },
+
   /** Badge count: everything queued or delivered that the user hasn't opened. */
   async countUnread(userId: string): Promise<number> {
     const { count, error } = await getSupabaseClient()
