@@ -28,7 +28,8 @@ import { Confetti, type ConfettiRef } from "@/components/magicui/confetti";
 import { KineticText } from "@/components/magicui/kinetic-text";
 import { Logo } from "@/components/ui/Logo";
 import { daysUntil } from "@/lib/utils";
-import { greetingForHour } from "@/lib/greeting";
+import { timeOfDayFromHour } from "@/lib/greeting";
+import { useT, type TranslationKey } from "@/lib/i18n/useT";
 import { useDashboardLayout } from "@/hooks/useDashboardLayout";
 import { hiddenWidgets, isCustomised, spanOf, visibleWidgets } from "@/lib/dashboard/layout";
 import type { ReactNode } from "react";
@@ -47,10 +48,19 @@ export default function Home() {
   const [editing, setEditing] = useState(false);
 
   // Real time-of-day, computed after mount from the user's own browser clock.
-  const [greeting, setGreeting] = useState<string | null>(null);
+  const t = useT();
+  const [greetingKey, setGreetingKey] = useState<TranslationKey | null>(null);
   useEffect(() => {
-    setGreeting(greetingForHour(new Date().getHours()));
+    const tod = timeOfDayFromHour(new Date().getHours());
+    const map: Record<string, TranslationKey> = {
+      morning: "dashboard.greetingMorning",
+      afternoon: "dashboard.greetingAfternoon",
+      evening: "dashboard.greetingEvening",
+      night: "dashboard.greetingNight",
+    };
+    setGreetingKey(map[tod]);
   }, []);
+  const greeting = greetingKey ? t(greetingKey) : null;
 
   const displayName = session?.user?.name ?? user.hebrewName;
 

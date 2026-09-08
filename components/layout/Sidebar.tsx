@@ -26,11 +26,12 @@ import { KineticText } from "@/components/magicui/kinetic-text";
 import { AnimatedThemeToggler } from "@/components/magicui/animated-theme-toggler";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { APP_NAME } from "@/lib/constants";
+import { useT, type TranslationKey } from "@/lib/i18n/useT";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
   href: string;
-  label: string;
+  labelKey: TranslationKey;
   icon: LucideIcon;
   colorVar: string;
 }
@@ -47,25 +48,26 @@ interface NavItem {
 // *not* the logo, so on mobile there was no way back to the dashboard at all.
 // HOME_ITEM is therefore prepended in MobileTabBar only.
 const NAV_ITEMS: NavItem[] = [
-  { href: "/calendar", label: "יומן חכם", icon: CalendarClock, colorVar: "--accent-career" },
-  { href: "/areas/learning", label: "למידה", icon: Lightbulb, colorVar: "--accent-learning" },
-  { href: "/areas/torah", label: "מרחב תורה", icon: BookOpen, colorVar: "--accent-faith" },
+  { href: "/calendar", labelKey: "nav.calendar", icon: CalendarClock, colorVar: "--accent-career" },
+  { href: "/areas/learning", labelKey: "nav.learning", icon: Lightbulb, colorVar: "--accent-learning" },
+  { href: "/areas/torah", labelKey: "nav.torah", icon: BookOpen, colorVar: "--accent-faith" },
   // Directly under Torah Space — the two most-used screens sit together.
-  { href: "/areas/time", label: "זמן ומשימות", icon: ListTodo, colorVar: "--accent-time" },
-  { href: "/areas/family", label: "משפחה וחברים", icon: HeartHandshake, colorVar: "--accent-family" },
-  { href: "/areas/health", label: "בריאות", icon: HeartPulse, colorVar: "--accent-health" },
-  { href: "/areas/finances", label: "כספים", icon: Wallet, colorVar: "--accent-finance" },
-  // Labelled "אישי", not by what it contains. The recovery space is locked
-  // precisely so a bystander learns nothing from the screen, and a nav item
-  // naming it would undo that before the lock ever gets a chance to work.
-  { href: "/areas/recovery", label: "אישי", icon: ShieldCheck, colorVar: "--muted" },
-  { href: "/timeline", label: "ציר זמן", icon: History, colorVar: "--muted" },
+  { href: "/areas/time", labelKey: "nav.time", icon: ListTodo, colorVar: "--accent-time" },
+  { href: "/areas/family", labelKey: "nav.family", icon: HeartHandshake, colorVar: "--accent-family" },
+  { href: "/areas/health", labelKey: "nav.health", icon: HeartPulse, colorVar: "--accent-health" },
+  { href: "/areas/finances", labelKey: "nav.finances", icon: Wallet, colorVar: "--accent-finance" },
+  // Labelled "Personal", not by what it contains. The recovery space is
+  // locked precisely so a bystander learns nothing from the screen.
+  { href: "/areas/recovery", labelKey: "nav.recovery", icon: ShieldCheck, colorVar: "--muted" },
+  { href: "/timeline", labelKey: "nav.timeline", icon: History, colorVar: "--muted" },
 ];
 
-const HOME_ITEM: NavItem = { href: "/", label: "היום", icon: Home, colorVar: "--gold" };
+const HOME_ITEM: NavItem = { href: "/", labelKey: "nav.today", icon: Home, colorVar: "--gold" };
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
+  const t = useT();
+  const label = t(item.labelKey);
   return (
     <Link
       href={item.href}
@@ -97,12 +99,13 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
         style={active ? { color: `var(${item.colorVar})` } : undefined}
         aria-hidden
       />
-      <span className="relative hidden lg:inline">{item.label}</span>
+      <span className="relative hidden lg:inline">{label}</span>
     </Link>
   );
 }
 
 export function Sidebar() {
+  const t = useT();
   const pathname = usePathname();
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
@@ -147,7 +150,7 @@ export function Sidebar() {
             <Link
               href="/settings"
               className="focus-ring glass-control-hover grid size-9 place-items-center rounded-lg text-muted transition-colors hover:text-foreground"
-              aria-label="הגדרות"
+              aria-label={t("nav.settings")}
             >
               <Settings size={17} aria-hidden />
             </Link>
@@ -168,7 +171,7 @@ export function Sidebar() {
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="focus-ring rounded-lg p-2 text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
-              aria-label="התנתק"
+              aria-label={t("nav.signOut")}
             >
               <LogOut size={16} />
             </button>
@@ -188,6 +191,7 @@ export function Sidebar() {
 // here — without it the dashboard was unreachable from any area page on a
 // phone except via the browser's back button.
 export function MobileTabBar() {
+  const t = useT();
   const pathname = usePathname();
   const items = [HOME_ITEM, ...NAV_ITEMS];
 
@@ -204,7 +208,7 @@ export function MobileTabBar() {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className="focus-ring flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-1.5"
-            aria-label={item.label}
+            aria-label={t(item.labelKey)}
           >
             <Icon size={18} style={active ? { color: `var(${item.colorVar})` } : undefined} className={!active ? "text-muted" : undefined} aria-hidden />
           </Link>

@@ -6,6 +6,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { EmailDiagnostics } from "@/components/features/settings/EmailDiagnostics";
 import { usePreferences, type AppLanguage } from "@/components/providers/PreferencesProvider";
+import { useT } from "@/lib/i18n/useT";
 import {
   getNotificationSettingsAction,
   updateNotificationSettingsAction,
@@ -48,6 +49,7 @@ export default function SettingsPage() {
   const [justSaved, setJustSaved] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const { preferences, setPreference } = usePreferences();
+  const t = useT();
 
   useEffect(() => {
     let cancelled = false;
@@ -110,10 +112,8 @@ export default function SettingsPage() {
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <BackToHome className="mb-6 -ms-2.5" />
-      <h1 className="mb-1 text-2xl font-medium tracking-tight">הגדרות</h1>
-      <p className="mb-8 text-sm text-muted">
-        מתי ואיך Life Plus פונה אליך. ההתראות תמיד מופיעות באפליקציה — כאן מחליטים מה גם נשלח במייל.
-      </p>
+      <h1 className="mb-1 text-2xl font-medium tracking-tight">{t("settings.title")}</h1>
+      <p className="mb-8 text-sm text-muted">{t("settings.subtitle")}</p>
 
       {loading ? (
         <GlassCard>
@@ -153,11 +153,9 @@ export default function SettingsPage() {
           <GlassCard>
             <p className="mb-1 flex items-center gap-2 text-sm font-medium text-muted">
               <Languages size={16} className="text-accent-learning" aria-hidden />
-              שפת האפליקציה
+              {t("settings.language")}
             </p>
-            <p className="mb-4 text-xs text-muted">
-              נשמר במכשיר הזה. תרגום מלא לאנגלית עדיין בעבודה — כרגע ההעדפה נשמרת ותיכנס לתוקף עם השחרור.
-            </p>
+            <p className="mb-4 text-xs text-muted">{t("settings.languageHelp")}</p>
             <div className="flex gap-1.5" role="group" aria-label="שפת האפליקציה">
               {(
                 [
@@ -185,7 +183,7 @@ export default function SettingsPage() {
           <GlassCard>
             <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted">
               <Mail size={16} className="text-accent-career" aria-hidden />
-              מיילים
+              {t("settings.emails")}
             </p>
             <label className="flex cursor-pointer items-start justify-between gap-4">
               <span>

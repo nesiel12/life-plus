@@ -4,6 +4,8 @@ import { useState, type DragEvent, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, EyeOff, GripVertical, Scaling } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WidgetDefinition, WidgetSpan } from "@/lib/dashboard/layout";
+import { useT, type TranslationKey } from "@/lib/i18n/useT";
+import { dictionaries } from "@/lib/i18n/dictionaries";
 
 interface WidgetFrameProps {
   widget: WidgetDefinition;
@@ -47,6 +49,11 @@ export function WidgetFrame({
   onResize,
   children,
 }: WidgetFrameProps) {
+  const t = useT();
+  // widget.<id> keys exist for the shipped widgets; fall back to the
+  // registry's Hebrew title for anything not in the dictionary.
+  const widgetKey = `widget.${widget.id}` as TranslationKey;
+  const title = widgetKey in dictionaries.he ? t(widgetKey) : widget.title;
   const [dragOver, setDragOver] = useState(false);
 
   function handleDragStart(event: DragEvent) {
@@ -89,13 +96,13 @@ export function WidgetFrame({
           >
             <GripVertical size={13} />
           </span>
-          <span className="min-w-0 flex-1 truncate text-[0.7rem] font-medium text-gold-ink">{widget.title}</span>
+          <span className="min-w-0 flex-1 truncate text-[0.7rem] font-medium text-gold-ink">{title}</span>
 
           {/* RTL: ChevronRight moves earlier, ChevronLeft moves later. */}
           <button
             onClick={() => onMove(-1)}
             disabled={isFirst}
-            aria-label={`הזז את ${widget.title} אחורה`}
+            aria-label={`הזז את ${title} אחורה`}
             className="focus-ring rounded p-0.5 text-muted transition-colors hover:text-foreground disabled:opacity-30"
           >
             <ChevronRight size={12} aria-hidden />
@@ -103,14 +110,14 @@ export function WidgetFrame({
           <button
             onClick={() => onMove(1)}
             disabled={isLast}
-            aria-label={`הזז את ${widget.title} קדימה`}
+            aria-label={`הזז את ${title} קדימה`}
             className="focus-ring rounded p-0.5 text-muted transition-colors hover:text-foreground disabled:opacity-30"
           >
             <ChevronLeft size={12} aria-hidden />
           </button>
           <button
             onClick={onResize}
-            aria-label={`שנה רוחב של ${widget.title} (כרגע ${span})`}
+            aria-label={`שנה רוחב של ${title} (כרגע ${span})`}
             className="focus-ring flex items-center gap-0.5 rounded p-0.5 text-muted transition-colors hover:text-foreground"
           >
             <Scaling size={12} aria-hidden />
@@ -118,7 +125,7 @@ export function WidgetFrame({
           </button>
           <button
             onClick={onHide}
-            aria-label={`הסתר את ${widget.title}`}
+            aria-label={`הסתר את ${title}`}
             className="focus-ring rounded p-0.5 text-muted transition-colors hover:text-accent-family"
           >
             <EyeOff size={12} aria-hidden />

@@ -59,12 +59,11 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     setPreferences(readStored());
   }, []);
 
-  // Keep the document in sync so CSS and assistive tech see the right
-  // language. `dir` stays rtl until the UI strings are actually translated —
-  // flipping layout direction while every label is still Hebrew is worse than
-  // not flipping it. The value is persisted and read by t()/future work.
+  // Keep the document in sync so CSS, layout direction and assistive tech all
+  // follow the chosen language.
   useEffect(() => {
     document.documentElement.lang = preferences.language;
+    document.documentElement.dir = preferences.language === "en" ? "ltr" : "rtl";
   }, [preferences.language]);
 
   const setPreference = useCallback<PreferencesContextValue["setPreference"]>((key, value) => {

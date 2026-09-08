@@ -166,6 +166,7 @@ interface AtlasState extends HydratedState {
     relation: string;
     birthday?: string;
     anniversary?: string;
+    phone?: string;
   }) => Promise<void>;
   logPersonInteraction: (personId: string, note?: string) => Promise<void>;
   setPersonBirthday: (personId: string, birthday: string) => Promise<void>;

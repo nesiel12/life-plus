@@ -1,0 +1,133 @@
+// UI string dictionaries. Keyed by a flat dotted string; `he` is the source
+// of truth and `en` mirrors it. A missing `en` key falls back to `he` (see
+// lib/i18n/useT), so a partially-translated screen degrades to Hebrew rather
+// than showing a raw key.
+//
+// This is wired into the chrome first — navigation, settings, the dashboard
+// header, shared buttons — and grows outward one t() call at a time.
+
+export type Locale = "he" | "en";
+
+export const dictionaries = {
+  he: {
+    "nav.calendar": "יומן חכם",
+    "nav.learning": "למידה",
+    "nav.torah": "מרחב תורה",
+    "nav.time": "זמן ומשימות",
+    "nav.family": "משפחה וחברים",
+    "nav.health": "בריאות",
+    "nav.finances": "כספים",
+    "nav.recovery": "אישי",
+    "nav.timeline": "ציר זמן",
+    "nav.today": "היום",
+    "nav.settings": "הגדרות",
+    "nav.signOut": "התנתק",
+    "nav.notifications": "התראות",
+
+    "common.save": "שמור",
+    "common.cancel": "ביטול",
+    "common.delete": "מחק",
+    "common.edit": "עריכה",
+    "common.add": "הוסף",
+    "common.close": "סגור",
+    "common.back": "חזור",
+    "common.next": "הבא",
+    "common.confirm": "אישור",
+    "common.retry": "נסה שוב",
+    "common.loading": "טוען…",
+    "common.saved": "נשמר",
+    "common.backHome": "חזרה לדף הבית",
+
+    "dashboard.greetingMorning": "בוקר טוב",
+    "dashboard.greetingAfternoon": "צהריים טובים",
+    "dashboard.greetingEvening": "ערב טוב",
+    "dashboard.greetingNight": "לילה טוב",
+    "dashboard.editLayout": "עריכת סידור",
+    "dashboard.doneEditing": "סיום",
+    "dashboard.resetLayout": "איפוס",
+
+    "widget.command-bar": "שורת פקודה",
+    "widget.now-next": "עכשיו והבא",
+    "widget.today-structure": "מבנה היום",
+    "widget.daily-checkin": "צ׳ק-אין יומי",
+    "widget.ai-briefing": "תדריך AI",
+    "widget.intention": "כוונת היום",
+    "widget.slot-suggestions": "מתי לעשות את זה",
+    "widget.relationship-autopilot": "כדאי ליצור קשר",
+    "widget.upcoming-moments": "רגעים משמעותיים",
+    "widget.recent-activity": "פעילות אחרונה",
+    "widget.memories": "זיכרונות",
+    "widget.goals": "מטרות",
+
+    "settings.title": "הגדרות",
+    "settings.subtitle": "מתי ואיך Life Plus פונה אליך. ההתראות תמיד מופיעות באפליקציה — כאן מחליטים מה גם נשלח במייל.",
+    "settings.language": "שפת האפליקציה",
+    "settings.languageHelp": "משנה את שפת הממשק. חלק מהמסכים עדיין בתרגום.",
+    "settings.emails": "מיילים",
+    "settings.quietHours": "שעות שקט",
+    "settings.timezone": "אזור זמן",
+    "settings.notificationKinds": "סוגי התראות",
+  },
+
+  en: {
+    "nav.calendar": "Smart Calendar",
+    "nav.learning": "Learning",
+    "nav.torah": "Torah Space",
+    "nav.time": "Time & Tasks",
+    "nav.family": "Family & Friends",
+    "nav.health": "Health",
+    "nav.finances": "Finances",
+    "nav.recovery": "Personal",
+    "nav.timeline": "Timeline",
+    "nav.today": "Today",
+    "nav.settings": "Settings",
+    "nav.signOut": "Sign out",
+    "nav.notifications": "Notifications",
+
+    "common.save": "Save",
+    "common.cancel": "Cancel",
+    "common.delete": "Delete",
+    "common.edit": "Edit",
+    "common.add": "Add",
+    "common.close": "Close",
+    "common.back": "Back",
+    "common.next": "Next",
+    "common.confirm": "Confirm",
+    "common.retry": "Try again",
+    "common.loading": "Loading…",
+    "common.saved": "Saved",
+    "common.backHome": "Back to dashboard",
+
+    "dashboard.greetingMorning": "Good morning",
+    "dashboard.greetingAfternoon": "Good afternoon",
+    "dashboard.greetingEvening": "Good evening",
+    "dashboard.greetingNight": "Good night",
+    "dashboard.editLayout": "Edit layout",
+    "dashboard.doneEditing": "Done",
+    "dashboard.resetLayout": "Reset",
+
+    "widget.command-bar": "Command bar",
+    "widget.now-next": "Now & Next",
+    "widget.today-structure": "Today's structure",
+    "widget.daily-checkin": "Daily check-in",
+    "widget.ai-briefing": "AI briefing",
+    "widget.intention": "Today's intention",
+    "widget.slot-suggestions": "When to do this",
+    "widget.relationship-autopilot": "Worth reaching out",
+    "widget.upcoming-moments": "Meaningful moments",
+    "widget.recent-activity": "Recent activity",
+    "widget.memories": "Memories",
+    "widget.goals": "Goals",
+
+    "settings.title": "Settings",
+    "settings.subtitle": "When and how Life Plus reaches you. Notifications always appear in the app — here you choose what is also emailed.",
+    "settings.language": "App language",
+    "settings.languageHelp": "Changes the interface language. Some screens are still being translated.",
+    "settings.emails": "Emails",
+    "settings.quietHours": "Quiet hours",
+    "settings.timezone": "Time zone",
+    "settings.notificationKinds": "Notification types",
+  },
+} as const;
+
+export type TranslationKey = keyof (typeof dictionaries)["he"];

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n/useT";
 
 /**
  * The way back to the dashboard from any area page.
@@ -15,7 +16,8 @@ import { cn } from "@/lib/utils";
  * ArrowRight, not ArrowLeft: the app is RTL, so "back" points right. Matches
  * the existing back affordance in components/features/torah/EntityHub.tsx.
  */
-export function BackToHome({ className, label = "חזרה לדף הבית" }: { className?: string; label?: string }) {
+export function BackToHome({ className, label }: { className?: string; label?: string }) {
+  const t = useT();
   return (
     <Link
       href="/"
@@ -26,7 +28,7 @@ export function BackToHome({ className, label = "חזרה לדף הבית" }: { 
       )}
     >
       <ArrowRight size={14} aria-hidden />
-      {label}
+      {label ?? t("common.backHome")}
     </Link>
   );
 }

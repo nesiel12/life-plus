@@ -14,6 +14,7 @@ export async function addPersonAction(input: {
   relation: string;
   birthday?: string;
   anniversary?: string;
+  phone?: string;
 }) {
   const userId = await getCurrentUserId();
   const row = await peopleRepo.insert({
@@ -23,6 +24,7 @@ export async function addPersonAction(input: {
     relation: input.relation,
     birthday: input.birthday ?? null,
     anniversary: input.anniversary ?? null,
+    phone: input.phone?.trim() || null,
   });
   return toPerson(row);
 }
