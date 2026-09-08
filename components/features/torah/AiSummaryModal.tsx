@@ -9,6 +9,7 @@ import {
   FileAudio,
   FileText,
   GraduationCap,
+  ImageIcon,
   Loader2,
   Plus,
   Sparkles,
@@ -88,12 +89,15 @@ interface AiSummaryModalProps {
 // same task, not a new one.
 export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
   const [step, setStep] = useState<"input" | "review">("input");
-  const [inputMode, setInputMode] = useState<"text" | "youtube" | "audio">("text");
+  const [inputMode, setInputMode] = useState<"text" | "youtube" | "audio" | "image">("text");
   const [rawText, setRawText] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
-  const [loadingPhase, setLoadingPhase] = useState<"transcript" | "audio" | "summarizing" | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [loadingPhase, setLoadingPhase] = useState<"transcript" | "audio" | "image" | "summarizing" | null>(null);
+  const [warn, setWarn] = useState<string | null>(null);
   const [draft, setDraft] = useState<AiSummaryDraft | null>(null);
 
   // Entity linking (Torah Library Experience v1's Books/Rabbis) — matched
@@ -159,7 +163,16 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
     error: summarizeError,
     run: summarize,
   } = useApiCall(async () => {
-    setLoadingPhase(inputMode === "youtube" ? "transcript" : inputMode === "audio" ? "audio" : "summarizing");
+    setWarn(null);
+    setLoadingPhase(
+      inputMode === "youtube"
+        ? "transcript"
+        : inputMode === "audio"
+          ? "audio"
+          : inputMode === "image"
+            ? "image"
+            : "summarizing"
+    );
 
     let textToSummarize = rawText;
 
@@ -171,7 +184,32 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
       });
       const transcriptData = await transcriptRes.json();
       if (!transcriptRes.ok) throw new Error(transcriptData.error ?? "שליפת התמלול מהסרטון נכשלה.");
-      textToSummarize = transcriptData.text;
+      if (typeof transcriptData.text === "string" && transcriptData.text.trim()) {
+        textToSummarize = transcriptData.text;
+      } else if (transcriptData.meta?.title) {
+        // No captions — summarise from the title/channel, honestly flagged.
+        setWarn("לסרטון אין תמלול. הסיכום יתבסס על כותרת הסרטון והנושא בלבד.");
+        textToSummarize = [
+          "אין תמלול לסרטון. המידע הזמין:",
+          `כותרת: ${transcriptData.meta.title}`,
+          transcriptData.meta.author ? `ערוץ: ${transcriptData.meta.author}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
+      } else {
+        throw new Error(transcriptData.transcriptError ?? "לא נמצא תמלול לסרטון.");
+      }
+      setLoadingPhase("summarizing");
+    } else if (inputMode === "image") {
+      if (imageFiles.length === 0) throw new Error("יש לצרף תמונה אחת לפחות.");
+      const fd = new FormData();
+      for (const f of imageFiles) fd.append("file", f);
+      const imgRes = await fetch("/api/ai/extract-image-text", { method: "POST", body: fd });
+      const imgData = await imgRes.json();
+      if (!imgRes.ok) throw new Error(imgData.error ?? "קריאת הטקסט מהתמונה נכשלה.");
+      if (!imgData.text || !imgData.text.trim()) throw new Error("לא זוהה טקסט בתמונה.");
+      if (imgData.legible === false) setWarn("חלק מהטקסט בתמונה לא קריא — ייתכן שהסיכום חלקי.");
+      textToSummarize = imgData.text;
       setLoadingPhase("summarizing");
     } else if (inputMode === "audio") {
       if (!audioFile) throw new Error("יש לבחור קובץ שמע.");
@@ -209,7 +247,9 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
     setRawText("");
     setYoutubeUrl("");
     setAudioFile(null);
+    setImageFiles([]);
     setLoadingPhase(null);
+    setWarn(null);
     setDraft(null);
     setLinkError(null);
     onClose();
@@ -226,7 +266,13 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
   }
 
   const canSummarize =
-    inputMode === "youtube" ? Boolean(youtubeUrl.trim()) : inputMode === "audio" ? Boolean(audioFile) : Boolean(rawText.trim());
+    inputMode === "youtube"
+      ? Boolean(youtubeUrl.trim())
+      : inputMode === "audio"
+        ? Boolean(audioFile)
+        : inputMode === "image"
+          ? imageFiles.length > 0
+          : Boolean(rawText.trim());
 
   function handleSummarize() {
     if (!canSummarize || summarizing) return;
@@ -288,6 +334,8 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
             <p className="text-sm text-muted">
               {loadingPhase === "transcript"
                 ? "שואב תמלול מהסרטון…"
+                : loadingPhase === "image"
+                ? "קורא את הטקסט מהתמונה…"
                 : loadingPhase === "audio"
                   ? "מעלה ומתמלל את קובץ השמע…"
                   : "מנתח את השיעור ומכין סיכום…"}
@@ -337,6 +385,19 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                 <FileAudio size={12} aria-hidden />
                 קובץ שמע
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={inputMode === "image"}
+                onClick={() => setInputMode("image")}
+                className={cn(
+                  "focus-ring flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors",
+                  inputMode === "image" ? "bg-accent-faith/20 text-accent-faith" : "text-muted hover:text-foreground"
+                )}
+              >
+                <ImageIcon size={12} aria-hidden />
+                תמונה / צילום
+              </button>
             </div>
 
             {inputMode === "text" ? (
@@ -366,7 +427,55 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
                   className="focus-ring ltr rounded-lg bg-fill-subtle px-3 py-2 text-start text-sm text-foreground placeholder:text-muted"
                 />
                 <p className="text-xs text-muted">
-                  התמלול/הכתוביות של הסרטון ייטענו אוטומטית ויועברו לסיכום. דורש שלסרטון יש כתוביות זמינות.
+                  התמלול/הכתוביות של הסרטון ייטענו אוטומטית ויועברו לסיכום. אם אין כתוביות — הסיכום יתבסס
+                  על כותרת הסרטון.
+                </p>
+              </>
+            ) : inputMode === "image" ? (
+              <>
+                <label className="text-xs text-muted">צילום או תמונה של הטקסט (אפשר כמה עמודים)</label>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    if (files.length) setImageFiles((prev) => [...prev, ...files].slice(0, 5));
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  className="focus-ring flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-glass-border py-8 text-muted transition-colors hover:text-foreground"
+                >
+                  <ImageIcon size={24} aria-hidden />
+                  <span className="text-sm">
+                    {imageFiles.length ? `${imageFiles.length} תמונות — הוסף עוד` : "צלם או בחר תמונה של הטקסט"}
+                  </span>
+                </button>
+                {imageFiles.length > 0 && (
+                  <ul className="flex flex-col gap-1.5">
+                    {imageFiles.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-foreground/90">
+                        <ImageIcon size={13} className="shrink-0 text-accent-faith" aria-hidden />
+                        <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setImageFiles((prev) => prev.filter((_, j) => j !== i))}
+                          aria-label={`הסר ${f.name}`}
+                          className="focus-ring shrink-0 text-muted hover:text-foreground"
+                        >
+                          <X size={12} aria-hidden />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-xs text-muted">
+                  הטקסט ייקרא מהתמונה באמצעות AI (Vision) ואז יסוכם — כמו כל מקור אחר.
                 </p>
               </>
             ) : (
@@ -405,6 +514,7 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
               </>
             )}
 
+            {warn && <p className="text-xs text-gold-ink">{warn}</p>}
             {summarizeError && <p className="text-xs text-accent-family">{summarizeError}</p>}
           </div>
         )}
