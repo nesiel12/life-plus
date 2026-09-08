@@ -5,6 +5,7 @@ import { Bell, CalendarRange, Check, Clock, Globe, Languages, Loader2, Mail } fr
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { EmailDiagnostics } from "@/components/features/settings/EmailDiagnostics";
+import { GoogleConnections } from "@/components/features/settings/GoogleConnections";
 import { usePreferences, type AppLanguage } from "@/components/providers/PreferencesProvider";
 import { useT } from "@/lib/i18n/useT";
 import {
@@ -202,6 +203,8 @@ export default function SettingsPage() {
           </GlassCard>
 
           <EmailDiagnostics />
+
+          <GoogleConnections />
 
           <GlassCard>
             <p className="mb-1 flex items-center gap-2 text-sm font-medium text-muted">
