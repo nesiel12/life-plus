@@ -91,7 +91,7 @@ export function buildDecisionStream({
       detail: overdueBy === 1 ? "באיחור של יום" : `באיחור של ${overdueBy} ימים`,
       // Deeper overdue ranks higher, but never escapes its tier.
       score: TIER.overdueTask + Math.min(overdueBy, 99),
-      href: "/areas/time",
+      href: "/calendar",
     });
   }
 
@@ -120,7 +120,7 @@ export function buildDecisionStream({
       title: task.title,
       detail: "מסומנת בעדיפות גבוהה",
       score: TIER.priorityTask,
-      href: "/areas/time",
+      href: "/calendar",
     });
   }
 

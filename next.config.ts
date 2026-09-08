@@ -30,6 +30,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // The Time & Tasks space was folded into the Smart Calendar. Old links and
+  // bookmarks land on the unified /calendar view.
+  async redirects() {
+    return [{ source: "/areas/time", destination: "/calendar", permanent: true }];
+  },
 };
 
 export default nextConfig;

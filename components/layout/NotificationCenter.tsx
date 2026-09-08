@@ -31,7 +31,7 @@ function actionTarget(action: AppNotification["action"]): { route: string; label
     case "create_calendar_event":
       return { route: "/calendar", label: "פתח את היומן" };
     case "reschedule_tasks":
-      return { route: "/areas/time", label: "פתח את המשימות" };
+      return { route: "/calendar", label: "פתח את היומן" };
     case "mark_contacted":
       return { route: "/areas/family", label: "פתח את אנשי הקשר" };
     case "review_material":

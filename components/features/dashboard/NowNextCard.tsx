@@ -62,7 +62,7 @@ export function NowNextCard() {
           מה הבא, ומתי אתה באמת פנוי.
         </p>
         <Link
-          href="/areas/time"
+          href="/calendar"
           className="focus-ring glass-control mt-1 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-foreground"
         >
           <CalendarPlus size={13} aria-hidden />
@@ -148,7 +148,7 @@ export function NowNextCard() {
       )}
 
       <Link
-        href="/areas/time"
+        href="/calendar"
         className={cn(
           "focus-ring flex items-center gap-1 self-start rounded-lg text-xs text-muted",
           "transition-colors hover:text-foreground"

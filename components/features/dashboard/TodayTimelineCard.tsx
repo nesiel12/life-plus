@@ -86,7 +86,7 @@ export function TodayTimelineCard() {
           <CalendarClock size={16} className="text-accent-time" aria-hidden />
           היום שלך
         </p>
-        <Link href="/areas/time" className="focus-ring rounded text-xs text-gold-ink transition-colors hover:opacity-80">
+        <Link href="/calendar" className="focus-ring rounded text-xs text-gold-ink transition-colors hover:opacity-80">
           לציר הזמן המלא
         </Link>
       </div>

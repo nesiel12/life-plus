@@ -47,7 +47,7 @@ function actionLink(action: NotificationAction | null | undefined): { url: strin
     case "create_calendar_event":
       return { url: `${base}/calendar`, label: "פתח את היומן" };
     case "reschedule_tasks":
-      return { url: `${base}/areas/time`, label: "פתח את המשימות" };
+      return { url: `${base}/calendar`, label: "פתח את היומן" };
     case "mark_contacted":
       return { url: `${base}/areas/family`, label: "פתח את אנשי הקשר" };
     case "review_material":

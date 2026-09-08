@@ -13,7 +13,6 @@ import {
   HeartPulse,
   History,
   Home,
-  ListTodo,
   LogOut,
   Settings,
   ShieldCheck,
@@ -51,8 +50,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/calendar", labelKey: "nav.calendar", icon: CalendarClock, colorVar: "--accent-career" },
   { href: "/areas/learning", labelKey: "nav.learning", icon: Lightbulb, colorVar: "--accent-learning" },
   { href: "/areas/torah", labelKey: "nav.torah", icon: BookOpen, colorVar: "--accent-faith" },
-  // Directly under Torah Space — the two most-used screens sit together.
-  { href: "/areas/time", labelKey: "nav.time", icon: ListTodo, colorVar: "--accent-time" },
   { href: "/areas/family", labelKey: "nav.family", icon: HeartHandshake, colorVar: "--accent-family" },
   { href: "/areas/health", labelKey: "nav.health", icon: HeartPulse, colorVar: "--accent-health" },
   { href: "/areas/finances", labelKey: "nav.finances", icon: Wallet, colorVar: "--accent-finance" },
