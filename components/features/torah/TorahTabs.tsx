@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { BookOpen, Check, GraduationCap, Headphones, NotebookPen, Pin, Plus, X, type LucideIcon } from "lucide-react";
+import { BookOpen, Check, GraduationCap, Headphones, NotebookPen, Pin, Plus, Sparkles, X, type LucideIcon } from "lucide-react";
 import type { SummarySection } from "@/types";
 import { buildSectionTree } from "@/lib/summaries/hierarchy";
 import { cn } from "@/lib/utils";
 
-export type TorahBuiltinTab = "books" | "rabbis" | "shiurim" | "summaries";
+export type TorahBuiltinTab = "books" | "rabbis" | "shiurim" | "summaries" | "rav";
 
 /** A custom section is addressed by its id; built-ins by their key. */
 export type TorahTab = TorahBuiltinTab | { sectionId: string };
@@ -22,6 +22,7 @@ export function sameTab(a: TorahTab, b: TorahTab): boolean {
 }
 
 const BUILTIN: { key: TorahBuiltinTab; label: string; icon: LucideIcon }[] = [
+  { key: "rav", label: "העוזר הרבני", icon: Sparkles },
   { key: "books", label: "ספרים", icon: BookOpen },
   { key: "rabbis", label: "רבנים", icon: GraduationCap },
   { key: "summaries", label: "סיכומים", icon: NotebookPen },

@@ -19,6 +19,7 @@ import { orderSummaries, sectionAndDescendants } from "@/lib/summaries/hierarchy
 import type { EntityRef, EntitySources } from "@/lib/summaries/entityRef";
 import { BookCard } from "@/components/features/torah/BookCard";
 import { RabbiCard } from "@/components/features/torah/RabbiCard";
+import { RabbiAssistant } from "@/components/features/torah/RabbiAssistant";
 import { SummaryCard } from "@/components/features/torah/SummaryCard";
 import { SummaryWorkspace } from "@/components/features/summaries/SummaryWorkspace";
 import { SectionManager } from "@/components/features/summaries/SectionManager";
@@ -462,6 +463,8 @@ export default function TorahSpacePage() {
           />
         </div>
       )}
+
+      {!openEntity && activeTab === "rav" && <RabbiAssistant />}
 
       {!openEntity && activeTab === "books" && (
         <div className="flex flex-col gap-6">
