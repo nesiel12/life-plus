@@ -3,6 +3,7 @@
 import { BackToHome } from "@/components/layout/BackToHome";
 import { RecoveryLockGate } from "@/components/features/recovery/RecoveryLockGate";
 import { RecoverySpace } from "@/components/features/recovery/RecoverySpace";
+import { Psychologist } from "@/components/features/recovery/Psychologist";
 import { useT } from "@/lib/i18n/useT";
 
 /**
@@ -23,10 +24,17 @@ export default function RecoveryPage() {
           lock is there to protect. The specifics appear only after unlock. */}
       <h1 className="mb-1 text-2xl font-medium tracking-tight">{t("page.recovery.title")}</h1>
       <p className="mb-8 max-w-xl text-sm text-muted">
-        נעול מאחורי אימות של המכשיר. שום דבר מכאן לא נטען לדף לפני שפותחים.
+        מרחב רגשי ומעקב אישי, נעולים מאחורי אימות של המכשיר. שום דבר מכאן לא נטען לדף לפני שפותחים.
       </p>
 
-      <RecoveryLockGate>{({ lock }) => <RecoverySpace onLock={lock} />}</RecoveryLockGate>
+      <RecoveryLockGate>
+        {({ lock }) => (
+          <div className="flex flex-col gap-6">
+            <Psychologist />
+            <RecoverySpace onLock={lock} />
+          </div>
+        )}
+      </RecoveryLockGate>
     </main>
   );
 }
