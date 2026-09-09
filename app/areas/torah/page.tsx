@@ -31,6 +31,7 @@ import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations
 import type { Book, KnowledgeEntry, Rabbi, Summary } from "@/types";
 import type { LearningInsights } from "@/lib/learning/types";
 import { BackToHome } from "@/components/layout/BackToHome";
+import { useT } from "@/lib/i18n/useT";
 
 interface ExtractedShiur {
   fileName: string;
@@ -51,6 +52,7 @@ function findRelatedSessions(topic: string, entries: KnowledgeEntry[]): Knowledg
 }
 
 export default function TorahSpacePage() {
+  const t = useT();
   const [activeTab, setActiveTab] = useState<TorahTab>("shiurim");
 
   const knowledgeEntries = useAtlasStore((s) => s.knowledgeEntries);
@@ -367,8 +369,8 @@ export default function TorahSpacePage() {
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <BackToHome className="mb-6 -ms-2.5" />
-      <h1 className="mb-1 text-2xl font-medium tracking-tight">מרחב תורה</h1>
-      <p className="mb-8 text-sm text-muted">הספרייה האישית שלך — ספרים, רבנים, שיעורים וסיכומים, במקום אחד.</p>
+      <h1 className="mb-1 text-2xl font-medium tracking-tight">{t("page.torah.title")}</h1>
+      <p className="mb-8 text-sm text-muted">{t("page.torah.subtitle")}</p>
 
       <TorahTabs
         active={activeTab}

@@ -32,6 +32,10 @@ const DEFAULTS: Preferences = {
 
 const STORAGE_KEY = "lifeplus.preferences.v1";
 
+// Runs before first paint (dangerouslySetInnerHTML in <head>) so an English
+// user never sees a frame of RTL layout, or vice versa.
+export const preferencesInitScript = `(function(){try{var raw=localStorage.getItem("${STORAGE_KEY}");var lang="he";if(raw){var p=JSON.parse(raw);if(p&&p.language==="en")lang="en"}document.documentElement.lang=lang;document.documentElement.dir=lang==="en"?"ltr":"rtl"}catch(e){}})();`;
+
 interface PreferencesContextValue {
   preferences: Preferences;
   setPreference: <K extends keyof Preferences>(key: K, value: Preferences[K]) => void;

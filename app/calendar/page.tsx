@@ -22,6 +22,7 @@ import { isWithinRange, rangeLabel, stepAnchor, type CalendarRange } from "@/lib
 import type { GoogleCalendarEvent } from "@/lib/googleCalendar/fetchEvents";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n/useT";
 
 interface UpcomingResponse {
   connected: boolean;
@@ -36,6 +37,7 @@ const FALLBACK: UpcomingResponse = { connected: false, events: [] };
 // its own /areas/time page. The weekly-skeleton editor lives in a
 // collapsible at the bottom.
 export default function CalendarPage() {
+  const t = useT();
   const chronotype = useAtlasStore((s) => s.personalDNA.chronotype);
   const [weeklyOpen, setWeeklyOpen] = useState(false);
   const { data, refresh } = useInsights<UpcomingResponse>("/api/calendar/upcoming", FALLBACK);
@@ -94,8 +96,8 @@ export default function CalendarPage() {
           <CalendarClock size={16} className="text-accent-career" aria-hidden />
           יומן חכם
         </p>
-        <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">יומן ומשימות</h1>
-        <p className="mt-2 text-muted">היום שלך במקום אחד — אירועים, שלד הלו״ז, משימות והרגלים.</p>
+        <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">{t("page.calendar.title")}</h1>
+        <p className="mt-2 text-muted">{t("page.calendar.subtitle")}</p>
       </motion.div>
 
       <div className="flex flex-col gap-6">

@@ -5,7 +5,7 @@ import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { ThemeProvider, themeInitScript } from "@/components/providers/ThemeProvider";
-import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
+import { PreferencesProvider, preferencesInitScript } from "@/components/providers/PreferencesProvider";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -36,6 +36,7 @@ export default function RootLayout({
       <head>
         {/* Sets <html data-theme> before first paint — no flash of wrong theme. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: preferencesInitScript }} />
       </head>
       <body className={`${heebo.variable} antialiased`}>
         {/* Respects the OS-level "reduce motion" setting for every

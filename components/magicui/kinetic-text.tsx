@@ -17,6 +17,7 @@ import React from "react"
 import { motion, useReducedMotion, type Variants } from "framer-motion"
 
 import { cn } from "@/lib/utils"
+import { textDirection } from "@/lib/textDirection"
 
 type As = "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p" | "span"
 
@@ -121,6 +122,10 @@ export function KineticText({
     : text.split("").map((letter, i) => renderLetter(letter, String(i)))
 
   const shared = {
+    // A flex row lays its children out in the row's direction, so without an
+    // explicit dir an English string in an RTL page renders letter-reversed
+    // ("thgin doog"). Derive it from the text unless the caller set one.
+    dir: (rest.dir as "rtl" | "ltr" | undefined) ?? textDirection(text),
     ...rest,
     className: cn("flex flex-wrap font-[300]", className),
     style: mergedStyle,

@@ -12,6 +12,7 @@ import type { PersonInsight } from "@/lib/family/types";
 import type { Person } from "@/types";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { ContactsPickerButton } from "@/components/features/family/ContactsPickerButton";
+import { useT } from "@/lib/i18n/useT";
 
 // Family Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §10): a
 // relationship workspace, not a contacts list. Score/note/birthday still
@@ -22,6 +23,7 @@ import { ContactsPickerButton } from "@/components/features/family/ContactsPicke
 // the order the route already ranked them (a real per-person Intelligence
 // Engine signal, see the route), not a fixed list order.
 export default function FamilyCarePage() {
+  const t = useT();
   const people = useAtlasStore((s) => s.people);
   const addPerson = useAtlasStore((s) => s.addPerson);
   const logPersonInteraction = useAtlasStore((s) => s.logPersonInteraction);
@@ -121,8 +123,8 @@ export default function FamilyCarePage() {
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <BackToHome className="mb-6 -ms-2.5" />
-      <h1 className="mb-1 text-2xl font-medium tracking-tight">לוח הקשבה משפחתי</h1>
-      <p className="mb-10 text-sm text-muted">לא CRM — פשוט מקום לזכור את מי שחשוב.</p>
+      <h1 className="mb-1 text-2xl font-medium tracking-tight">{t("page.family.title")}</h1>
+      <p className="mb-10 text-sm text-muted">{t("page.family.subtitle")}</p>
 
       <div className="mb-10 flex max-w-xl flex-col gap-2">
         <ContactsPickerButton

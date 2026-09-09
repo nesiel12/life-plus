@@ -3,6 +3,7 @@
 import { BackToHome } from "@/components/layout/BackToHome";
 import { RecoveryLockGate } from "@/components/features/recovery/RecoveryLockGate";
 import { RecoverySpace } from "@/components/features/recovery/RecoverySpace";
+import { useT } from "@/lib/i18n/useT";
 
 /**
  * The recovery space.
@@ -12,6 +13,7 @@ import { RecoverySpace } from "@/components/features/recovery/RecoverySpace";
  * device biometric has been presented.
  */
 export default function RecoveryPage() {
+  const t = useT();
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <BackToHome className="mb-6 -ms-2.5" />
@@ -19,7 +21,7 @@ export default function RecoveryPage() {
           someone glancing at the screen learns nothing — a title reading
           "גמילה" above a lock screen would give away exactly the thing the
           lock is there to protect. The specifics appear only after unlock. */}
-      <h1 className="mb-1 text-2xl font-medium tracking-tight">מרחב אישי</h1>
+      <h1 className="mb-1 text-2xl font-medium tracking-tight">{t("page.recovery.title")}</h1>
       <p className="mb-8 max-w-xl text-sm text-muted">
         נעול מאחורי אימות של המכשיר. שום דבר מכאן לא נטען לדף לפני שפותחים.
       </p>

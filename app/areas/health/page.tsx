@@ -12,6 +12,7 @@ import { InstantHealthCoach } from "@/components/features/health/InstantHealthCo
 import { FoodTracker } from "@/components/features/health/FoodTracker";
 import type { MealType } from "@/types";
 import { BackToHome } from "@/components/layout/BackToHome";
+import { useT } from "@/lib/i18n/useT";
 
 const MEAL_TYPE_LABEL: Record<MealType, string> = {
   breakfast: "ארוחת בוקר",
@@ -50,6 +51,7 @@ function formatTime(iso: string): string {
 // activity. Same "quick-add row + GlassCard list" convention every other
 // space (Torah Library, Learning Space) already established.
 export default function HealthSpacePage() {
+  const t = useT();
   const meals = useAtlasStore((s) => s.meals);
   const workouts = useAtlasStore((s) => s.workouts);
   const addMeal = useAtlasStore((s) => s.addMeal);
@@ -94,8 +96,8 @@ export default function HealthSpacePage() {
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <BackToHome className="mb-6 -ms-2.5" />
-      <h1 className="mb-1 text-2xl font-medium tracking-tight">בריאות</h1>
-      <p className="mb-8 text-sm text-muted">ארוחות, אימונים, והדרכה תזונתית מבוססת AI — הכל במקום אחד.</p>
+      <h1 className="mb-1 text-2xl font-medium tracking-tight">{t("page.health.title")}</h1>
+      <p className="mb-8 text-sm text-muted">{t("page.health.subtitle")}</p>
 
       {/* The AI coach leads and loads immediately — no button. */}
       <GlassCard className="mb-6">

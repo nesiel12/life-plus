@@ -13,6 +13,7 @@ import { StatementImport } from "@/components/features/finances/StatementImport"
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/types";
 import { BackToHome } from "@/components/layout/BackToHome";
+import { useT } from "@/lib/i18n/useT";
 
 function formatDateHeading(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("he-IL", {
@@ -38,6 +39,7 @@ function currentMonthKey(): string {
 // derived from the store, never a separate stored total), a date-grouped
 // transaction list, and an add-transaction modal.
 export default function FinancesSpacePage() {
+  const t = useT();
   const transactions = useAtlasStore((s) => s.transactions);
   const addTransaction = useAtlasStore((s) => s.addTransaction);
   const deleteTransaction = useAtlasStore((s) => s.deleteTransaction);
@@ -95,8 +97,8 @@ export default function FinancesSpacePage() {
 
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="mb-1 text-2xl font-medium tracking-tight">כספים</h1>
-          <p className="text-sm text-muted">מעקב אחר הכנסות והוצאות שלך.</p>
+          <h1 className="mb-1 text-2xl font-medium tracking-tight">{t("page.finances.title")}</h1>
+          <p className="text-sm text-muted">{t("page.finances.subtitle")}</p>
         </div>
         <button
           onClick={() => setModalOpen(true)}

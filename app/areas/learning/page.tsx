@@ -10,6 +10,7 @@ import { VideoStudyPanel } from "@/components/features/learning/VideoStudyPanel"
 import { LearningSplitView } from "@/components/features/learning/LearningSplitView";
 import { ContinueLearning } from "@/components/features/learning/ContinueLearning";
 import { BackToHome } from "@/components/layout/BackToHome";
+import { useT } from "@/lib/i18n/useT";
 
 // Learning & Knowledge Space (Phase 7): replaces the previous generic
 // AreaMomentsView placeholder (which just logged free-text "knowledge"
@@ -18,6 +19,7 @@ import { BackToHome } from "@/components/layout/BackToHome";
 // list" convention every other space (Torah Library, Time & Tasks) already
 // established.
 export default function LearningSpacePage() {
+  const t = useT();
   const learningTopics = useAtlasStore((s) => s.learningTopics);
   const learningResources = useAtlasStore((s) => s.learningResources);
   const addLearningTopic = useAtlasStore((s) => s.addLearningTopic);
@@ -51,7 +53,7 @@ export default function LearningSpacePage() {
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <BackToHome className="mb-6 -ms-2.5" />
-      <h1 className="mb-1 text-2xl font-medium tracking-tight">למידה</h1>
+      <h1 className="mb-1 text-2xl font-medium tracking-tight">{t("page.learning.title")}</h1>
       <p className="mb-8 text-sm text-muted">
         מרחב הלמידה האישי שלך — נושאים, מקורות והדרכה מבוססת AI, כל נושא עם מסלול משלו.
       </p>

@@ -12,6 +12,7 @@ import { LIFE_AREA_ICONS } from "@/lib/lifeAreaIcons";
 import { cn } from "@/lib/utils";
 import type { MomentCategory } from "@/types";
 import { BackToHome } from "@/components/layout/BackToHome";
+import { useT } from "@/lib/i18n/useT";
 
 type FilterValue = MomentCategory | "all";
 
@@ -51,6 +52,7 @@ function FilterChip({ active, label, colorVar, onClick }: FilterChipProps) {
 }
 
 export default function TimelinePage() {
+  const t = useT();
   const moments = useAtlasStore((s) => s.moments);
   const goals = useAtlasStore((s) => s.goals);
   const knowledgeEntries = useAtlasStore((s) => s.knowledgeEntries);
@@ -77,7 +79,7 @@ export default function TimelinePage() {
   return (
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <BackToHome className="mb-6 -ms-2.5" />
-      <h1 className="mb-1 text-2xl font-medium tracking-tight">ציר הזמן</h1>
+      <h1 className="mb-1 text-2xl font-medium tracking-tight">{t("page.timeline.title")}</h1>
       <p className="mb-6 text-sm text-muted">
         הסיפור של החיים שלך — רגעים, יעדים והישגים במקום אחד. ⌘K בכל מקום כדי להוסיף רגע חדש.
       </p>
