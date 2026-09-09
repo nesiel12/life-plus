@@ -55,6 +55,7 @@ export const dictionaries = {
     "widget.intention": "כוונת היום",
     "widget.upcoming-moments": "רגעים משמעותיים",
     "widget.recent-activity": "פעילות אחרונה",
+    "widget.photos": "תמונות",
     "widget.memories": "זיכרונות",
     "widget.goals": "מטרות",
 
@@ -164,6 +165,7 @@ export const dictionaries = {
     "widget.intention": "Today's intention",
     "widget.upcoming-moments": "Meaningful moments",
     "widget.recent-activity": "Recent activity",
+    "widget.photos": "Photos",
     "widget.memories": "Memories",
     "widget.goals": "Goals",
 

@@ -23,6 +23,8 @@ interface UsePhotoPickerResult {
   /** Set when Google Photos has not been connected yet. */
   needsConnect: boolean;
   result: { imported: number; skipped: number } | null;
+  /** Set once a session exists — a fallback link if the popup was blocked. */
+  pickerUri: string | null;
   start: (purpose: "memories" | "avatar", personId?: string) => Promise<void>;
   reset: () => void;
 }
@@ -40,6 +42,7 @@ export function usePhotoPicker(onComplete?: () => void): UsePhotoPickerResult {
   const [error, setError] = useState<string | null>(null);
   const [needsConnect, setNeedsConnect] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
+  const [pickerUri, setPickerUri] = useState<string | null>(null);
   const cancelled = useRef(false);
 
   const reset = useCallback(() => {
@@ -48,6 +51,7 @@ export function usePhotoPicker(onComplete?: () => void): UsePhotoPickerResult {
     setError(null);
     setNeedsConnect(false);
     setResult(null);
+    setPickerUri(null);
   }, []);
 
   const start = useCallback(
@@ -57,6 +61,7 @@ export function usePhotoPicker(onComplete?: () => void): UsePhotoPickerResult {
       setError(null);
       setNeedsConnect(false);
       setResult(null);
+      setPickerUri(null);
 
       try {
         const res = await fetch("/api/photos/session", {
@@ -77,8 +82,15 @@ export function usePhotoPicker(onComplete?: () => void): UsePhotoPickerResult {
           return;
         }
 
-        // Must be a new tab — Google refuses to render the picker in an iframe.
-        window.open(data.pickerUri, "_blank", "noopener,noreferrer");
+        // Must be a new tab — Google refuses to render the picker in an
+        // iframe. If the browser blocks the popup (this runs after an await,
+        // outside the direct gesture stack in some browsers), keep the URI so
+        // the UI can offer a manual link instead of silently hanging.
+        setPickerUri(data.pickerUri);
+        const win = window.open(data.pickerUri, "_blank", "noopener,noreferrer");
+        if (!win) {
+          setError("הדפדפן חסם את החלון הקופץ של בורר התמונות. אשר חלונות קופצים לאתר הזה, או פתח דרך הקישור.");
+        }
         setState("waiting");
 
         const startedAt = Date.now();
@@ -134,5 +146,5 @@ export function usePhotoPicker(onComplete?: () => void): UsePhotoPickerResult {
     [onComplete]
   );
 
-  return { state, error, needsConnect, result, start, reset };
+  return { state, error, needsConnect, result, pickerUri, start, reset };
 }

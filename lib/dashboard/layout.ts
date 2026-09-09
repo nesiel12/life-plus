@@ -47,6 +47,7 @@ export const WIDGETS: WidgetDefinition[] = [
   { id: "intention", title: "כוונת היום", defaultSpan: 1, minSpan: 1 },
   { id: "upcoming-moments", title: "רגעים משמעותיים", defaultSpan: 2, minSpan: 1 },
   { id: "recent-activity", title: "פעילות אחרונה", defaultSpan: 1, minSpan: 1 },
+  { id: "photos", title: "תמונות", defaultSpan: 1, minSpan: 1 },
   { id: "memories", title: "זיכרונות", defaultSpan: 3, minSpan: 2 },
   { id: "goals", title: "מטרות", defaultSpan: 3, minSpan: 2 },
 ];

@@ -17,6 +17,7 @@ import { NowNextCard } from "@/components/features/dashboard/NowNextCard";
 import { TodayStructureCard } from "@/components/features/dashboard/TodayStructureCard";
 import { HebrewCalendarCard } from "@/components/features/dashboard/HebrewCalendarCard";
 import { MotivationCard } from "@/components/features/dashboard/MotivationCard";
+import { PhotosWidget } from "@/components/features/dashboard/PhotosWidget";
 import { UniversalInputBar } from "@/components/features/dashboard/UniversalInputBar";
 import { IntentionComposer } from "@/components/features/dashboard/IntentionComposer";
 import { WidgetFrame } from "@/components/features/dashboard/WidgetFrame";
@@ -209,6 +210,7 @@ export default function Home() {
             "today-structure": { node: <TodayStructureCard /> },
             "hebrew-calendar": { node: <HebrewCalendarCard /> },
             "motivation": { node: <MotivationCard /> },
+            "photos": { node: <PhotosWidget />, tilt: false },
             "ai-briefing": { node: <AIBriefing bare /> },
             intention: { node: <IntentionComposer />, tilt: false },
             "upcoming-moments": {

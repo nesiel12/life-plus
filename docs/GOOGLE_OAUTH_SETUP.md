@@ -68,3 +68,22 @@ The Photos connect flow requests
 OAuth consent screen is in *Testing*, the signing-in account must be listed
 under **Test users**, or consent fails after the redirect URI is already
 correct — a different error (`access_denied`), not `redirect_uri_mismatch`.
+
+## 6. Google Photos picker — "לא הצלחנו לפתוח בורר תמונות"
+
+The picker is a separate flow (`/api/photos/connect` → `/api/photos/callback`,
+scope `photospicker.mediaitems.readonly`). If it fails after the redirect URI
+is correct:
+
+1. **Enable the API.** Google Cloud Console → APIs & Services → Library →
+   search "Photos Picker API" → Enable, on the same project as the OAuth
+   client. A 403 with `code: "picker_denied"` in the response is almost
+   always this.
+2. **Re-consent.** If the account connected Photos before the picker scope
+   existed, the stored token lacks it. Settings → חיבורי Google → *חבר את
+   Google Photos* forces a fresh consent (`prompt=consent`).
+3. **Popups.** The picker opens in a new tab; a popup blocker stops it
+   silently. The UI now shows a "פתח את בורר התמונות" link as a fallback —
+   or allow popups for the app's origin.
+4. The server logs the exact Google message at `[photos/session] Picker API
+   error: <status> <message>`.

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { ImagePlus, Loader2, Sparkles } from "lucide-react";
+import { ExternalLink, ImagePlus, Loader2, Sparkles } from "lucide-react";
 import { useInsights } from "@/hooks/useInsights";
 import { usePhotoPicker } from "@/hooks/usePhotoPicker";
 import { yearsAgoLabel } from "@/lib/memories/anniversary";
@@ -77,6 +77,18 @@ export function MemoryCards() {
         <p role="alert" className="text-xs text-accent-family">
           {picker.error}
         </p>
+      )}
+
+      {picker.pickerUri && picker.state === "waiting" && (
+        <a
+          href={picker.pickerUri}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="focus-ring inline-flex items-center gap-1 self-start text-xs text-gold-ink hover:opacity-80"
+        >
+          פתח את בורר התמונות
+          <ExternalLink size={11} aria-hidden />
+        </a>
       )}
 
       {picker.result && picker.state === "done" && (

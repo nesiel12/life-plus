@@ -6,7 +6,7 @@ import { getCurrentUserId } from "@/lib/currentUser";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { getPhotosAccessToken, PhotosNotConnectedError } from "@/lib/photos/auth";
-import { createPickingSession } from "@/lib/photos/pickerClient";
+import { createPickingSession, PickerApiError } from "@/lib/photos/pickerClient";
 import { pickerSessionsRepo } from "@/lib/db/googlePhotos";
 
 export const runtime = "nodejs";
@@ -60,6 +60,29 @@ export async function POST(request: Request) {
     if (err instanceof PhotosNotConnectedError) {
       return NextResponse.json({ error: "Google Photos לא מחובר.", code: "not_connected" }, { status: 409 });
     }
+    if (err instanceof PickerApiError) {
+      // 403 here is almost always one of: the Photos Picker API not enabled
+      // on the project, or a token that predates the picker scope. Both are
+      // fixed by an admin/re-consent, not a retry — say so, and keep Google's
+      // own message for the details.
+      console.error("[photos/session] Picker API error:", err.status, err.message);
+      if (err.status === 401 || err.status === 403) {
+        return NextResponse.json(
+          {
+            error:
+              "Google דחה את הבקשה לבורר התמונות. נסה לחבר מחדש את Google Photos; אם זה נמשך — צריך להפעיל את Photos Picker API בקונסולת Google Cloud.",
+            code: "picker_denied",
+            detail: err.message,
+          },
+          { status: 502 }
+        );
+      }
+      return NextResponse.json(
+        { error: `בורר התמונות החזיר שגיאה: ${err.message}`, code: "picker_error", detail: err.message },
+        { status: 502 }
+      );
+    }
+    console.error("[photos/session] unexpected error:", err);
     return NextResponse.json({ error: "לא הצלחנו לפתוח בורר תמונות." }, { status: 502 });
   }
 }
