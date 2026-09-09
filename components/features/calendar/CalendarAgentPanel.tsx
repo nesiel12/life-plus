@@ -108,10 +108,10 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
           chronotype,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
         setError(
-          typeof data.error === "string"
+          typeof data?.error === "string"
             ? data.error
             : "לא הצלחנו לפרש את הבקשה. נסה לכתוב מה, מתי ובאיזו שעה — למשל: פגישה מחר ב-14:30."
         );

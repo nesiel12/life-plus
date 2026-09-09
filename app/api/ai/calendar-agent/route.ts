@@ -1,17 +1,18 @@
 import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { isProviderConfigured } from "@/lib/ai";
 import { resolveCalendarIntent } from "@/lib/ai/agents/calendarAgent";
-import { parseHebrewEvent } from "@/lib/calendar/parseHebrewEvent";
 import { zonedWallClockToInstant } from "@/lib/calendar/timezone";
-import { sanitizeEventTitle } from "@/lib/calendar/sanitizeEventTitle";
-import { hasConflict, type Interval } from "@/lib/calendar/findFocusSlots";
-import { isDayPart } from "@/lib/onboarding/chronotype";
-import type { ChronotypeSettings, DayPart } from "@/types";
+import {
+  calendarAgentRequestSchema,
+  deterministicProposal,
+  keepBusy,
+  resolveNowLocal,
+  toChronotype,
+} from "@/lib/calendar/agentRequest";
 import { currentUserActor } from "@/lib/ai/actor";
 import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
@@ -23,50 +24,15 @@ import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 // creates the event. An agent that both interprets and mutates in one step
 // makes a misparse ("next Sunday" -> wrong week) unrecoverable.
 //
-// The actual interpretation (classify -> resolve -> conflict-check ->
-// alternatives) lives in lib/ai/agents/calendarAgent.ts's resolveCalendarIntent
-// — this route owns only the HTTP contract (auth, rate limit, request
-// validation), so the Section AI Router (Sprint 6: the same kind of request
-// typed into the main chat) resolves through the identical tested pipeline
-// rather than a second, potentially-diverging copy of it.
+// The interpretation pipeline lives in lib/ai/agents/calendarAgent.ts; the
+// request shape and the deterministic fallback live in lib/calendar/
+// agentRequest.ts (unit-tested). This route owns only the HTTP contract:
+// auth, rate limit, and wiring those two together.
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 };
-const MAX_BUSY = 60;
-
-const intervalSchema = z.object({
-  start: z.string(),
-  end: z.string(),
-  title: z.string().optional(),
-});
-
-const requestSchema = z.object({
-  message: z.string().trim().min(1).max(500),
-  /** Client's local wall clock, "YYYY-MM-DDTHH:MM" — the anchor for "tomorrow". */
-  nowLocal: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
-  timeZone: z.string().trim().min(1).max(60).default("Asia/Jerusalem"),
-  busy: z.array(intervalSchema).max(MAX_BUSY).default([]),
-  chronotype: z
-    .object({
-      wakeTime: z.string().optional(),
-      sleepTime: z.string().optional(),
-      peakFocusHours: z.array(z.string()).optional(),
-      lowEnergyHours: z.array(z.string()).optional(),
-    })
-    .default({}),
-});
-
-function toChronotype(raw: z.infer<typeof requestSchema>["chronotype"]): ChronotypeSettings {
-  const keep = (values: string[] | undefined): DayPart[] | undefined => values?.filter(isDayPart);
-  return {
-    wakeTime: raw.wakeTime,
-    sleepTime: raw.sleepTime,
-    peakFocusHours: keep(raw.peakFocusHours),
-    lowEnergyHours: keep(raw.lowEnergyHours),
-  };
-}
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -84,68 +50,60 @@ export async function POST(request: Request) {
   // Resolved from the session, never from the request body.
   const actor = await currentUserActor();
 
-  const parsed = await parseJsonBody(request, requestSchema);
+  const parsed = await parseJsonBody(request, calendarAgentRequestSchema);
   if (parsed.error) return parsed.error;
 
-  if (!isProviderConfigured()) {
-    return NextResponse.json(
-      { error: "סוכן היומן דורש מפתח OpenAI או Gemini מחובר. פנה למנהל המערכת." },
-      { status: 503 }
-    );
-  }
-
-  const { message, nowLocal, timeZone, busy } = parsed.data;
+  const { message } = parsed.data;
+  const timeZone = parsed.data.timeZone;
+  const busy = keepBusy(parsed.data.busy);
+  const nowLocal = resolveNowLocal(parsed.data.nowLocal, timeZone);
   const chronotype = toChronotype(parsed.data.chronotype);
+  // "tomorrow" for the regex fallback is measured from the same wall clock
+  // the AI path anchors on, parsed back to a Date.
+  const anchor = zonedWallClockToInstant(nowLocal, timeZone) ?? new Date();
+
+  // No AI provider configured: go straight to the deterministic parser rather
+  // than a 503. "פגישה מחר ב-14:30" does not need a language model.
+  if (!isProviderConfigured()) {
+    const local = deterministicProposal(message, timeZone, busy, anchor);
+    if (local) return NextResponse.json(local);
+    return NextResponse.json({
+      status: "unclear" as const,
+      clarification:
+        "לא הצלחתי לפענח את הבקשה. אפשר לכתוב מה, מתי ובאיזו שעה — למשל: פגישה מחר ב-14:30.",
+    });
+  }
 
   try {
     const result = await resolveCalendarIntent({
-      actor, message, nowLocal, timeZone, busy, chronotype });
+      actor,
+      message,
+      nowLocal,
+      timeZone,
+      busy,
+      chronotype,
+    });
+
+    // The model shrugged. Before handing back its clarifying question, see if
+    // the deterministic parser can resolve it — a flaky "unclear" on a
+    // perfectly explicit "מחר ב-14:30" should not block the user.
+    if (result.status === "unclear") {
+      const local = deterministicProposal(message, timeZone, busy, anchor);
+      if (local) return NextResponse.json(local);
+    }
+
     return NextResponse.json(result);
   } catch (err) {
     const quota = aiQuotaResponse(err);
     if (quota) return quota;
-    // Every model in the failover chain is down. Rather than tell the user
-    // the calendar is unavailable, try the deterministic local parser: an AI
-    // outage should not stop someone putting "מחר פגישה ב-13:00" in their
-    // calendar. It returns null unless it finds a real, explicit time, so
-    // this never invents an event — see lib/calendar/parseHebrewEvent.ts.
+    // Every model in the failover chain is down. An AI outage should not stop
+    // someone putting "מחר פגישה ב-13:00" in their calendar — the local
+    // parser returns null unless it finds a real, explicit time, so this
+    // never invents an event.
     console.error("[calendar-agent] all models failed, trying local parser:", err);
 
-    const parsed = parseHebrewEvent(message, new Date());
-    if (parsed) {
-      // parsed.start is a wall clock — resolve it in the user's zone, never
-      // the server's, so the fallback lands at the time they said too.
-      const start = zonedWallClockToInstant(parsed.start, timeZone) ?? new Date(`${parsed.start}:00`);
-      const end = new Date(start.getTime() + parsed.durationMinutes * 60_000);
-      const endLocalMs = start.getTime() + parsed.durationMinutes * 60_000;
-      const toWall = (ms: number) => {
-        const p = new Intl.DateTimeFormat("en-CA", {
-          timeZone,
-          year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
-        }).formatToParts(new Date(ms));
-        const g = (t: string) => p.find((x) => x.type === t)?.value ?? "00";
-        return `${g("year")}-${g("month")}-${g("day")}T${g("hour") === "24" ? "00" : g("hour")}:${g("minute")}`;
-      };
-      const intervals: Interval[] = busy.map((b) => ({ start: b.start, end: b.end }));
-      return NextResponse.json({
-        status: "proposed" as const,
-        event: {
-          title: sanitizeEventTitle(parsed.title),
-          start: start.toISOString(),
-          end: end.toISOString(),
-          startLocal: toWall(start.getTime()),
-          endLocal: toWall(endLocalMs),
-          timeZone,
-          durationMinutes: parsed.durationMinutes,
-        },
-        conflict: hasConflict(start.toISOString(), end.toISOString(), intervals),
-        // Alternatives come from ranking free slots, which is fine to skip
-        // here — the proposal itself is what matters when the AI is down.
-        alternatives: [],
-        // So the UI can say the reading was local, not the agent's.
-        degraded: true,
-      });
-    }
+    const local = deterministicProposal(message, timeZone, busy, anchor);
+    if (local) return NextResponse.json(local);
 
     return NextResponse.json({
       status: "unclear" as const,
