@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { ScheduleImportPanel } from "@/components/features/schedule/ScheduleImportPanel";
+import { BackboneSyncButton } from "@/components/features/schedule/BackboneSyncButton";
 import {
   ROUTINE_KIND_COLOR_VAR,
   ROUTINE_KIND_LABELS,
@@ -143,6 +144,7 @@ export function WeeklySchedule() {
   return (
     <div className="flex flex-col gap-5">
       <ScheduleImportPanel />
+      <BackboneSyncButton />
 
       {/* Day picker */}
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="ימי השבוע">
