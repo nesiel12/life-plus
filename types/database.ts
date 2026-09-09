@@ -1360,6 +1360,40 @@ export interface Database {
           expire_time?: string | null;
         }
       >;
+      fitness_goals: TableDef<
+        {
+          user_id: string;
+          start_weight_kg: number | null;
+          current_weight_kg: number | null;
+          target_weight_kg: number | null;
+          body_composition_goal: string | null;
+          weekly_workout_target: number | null;
+          daily_calorie_target: number | null;
+          daily_protein_target: number | null;
+          updated_at: string;
+        },
+        {
+          user_id: string;
+          start_weight_kg?: number | null;
+          current_weight_kg?: number | null;
+          target_weight_kg?: number | null;
+          body_composition_goal?: string | null;
+          weekly_workout_target?: number | null;
+          daily_calorie_target?: number | null;
+          daily_protein_target?: number | null;
+          updated_at?: string;
+        },
+        {
+          start_weight_kg?: number | null;
+          current_weight_kg?: number | null;
+          target_weight_kg?: number | null;
+          body_composition_goal?: string | null;
+          weekly_workout_target?: number | null;
+          daily_calorie_target?: number | null;
+          daily_protein_target?: number | null;
+          updated_at?: string;
+        }
+      >;
     };
     Views: Record<string, never>;
     Functions: {

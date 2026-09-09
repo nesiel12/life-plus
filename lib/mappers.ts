@@ -35,6 +35,7 @@ import type {
   UserContext,
   Workout,
   CheckIn,
+  FitnessGoals,
 } from "@/types";
 import type { GoalWithMilestones } from "@/lib/db/goals";
 
@@ -77,6 +78,8 @@ type MealRow = Database["public"]["Tables"]["meals"]["Row"];
 type MealUpdate = Database["public"]["Tables"]["meals"]["Update"];
 type WorkoutRow = Database["public"]["Tables"]["workouts"]["Row"];
 type WorkoutUpdate = Database["public"]["Tables"]["workouts"]["Update"];
+type FitnessGoalsRow = Database["public"]["Tables"]["fitness_goals"]["Row"];
+type FitnessGoalsUpdate = Database["public"]["Tables"]["fitness_goals"]["Update"];
 
 export function toUserContext(row: UserRow): UserContext {
   return {
@@ -530,6 +533,35 @@ export function toWorkoutPatch(patch: Partial<Workout>): WorkoutUpdate {
   if (patch.endTime !== undefined) row.end_time = patch.endTime ?? null;
   if (patch.routineDetails !== undefined) row.routine_details = patch.routineDetails || null;
   return row;
+}
+
+export function toFitnessGoals(row: FitnessGoalsRow | null): FitnessGoals {
+  if (!row) return {};
+  return {
+    startWeightKg: row.start_weight_kg ?? undefined,
+    currentWeightKg: row.current_weight_kg ?? undefined,
+    targetWeightKg: row.target_weight_kg ?? undefined,
+    bodyCompositionGoal: row.body_composition_goal ?? undefined,
+    weeklyWorkoutTarget: row.weekly_workout_target ?? undefined,
+    dailyCalorieTarget: row.daily_calorie_target ?? undefined,
+    dailyProteinTarget: row.daily_protein_target ?? undefined,
+  };
+}
+
+// A full replace, not a sparse patch: the editor always submits every field,
+// and a cleared input means "stop tracking this" (→ null), which a
+// `!== undefined` guard would silently ignore.
+export function toFitnessGoalsPatch(goals: FitnessGoals): FitnessGoalsUpdate {
+  const n = (v: number | undefined) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return {
+    start_weight_kg: n(goals.startWeightKg),
+    current_weight_kg: n(goals.currentWeightKg),
+    target_weight_kg: n(goals.targetWeightKg),
+    body_composition_goal: goals.bodyCompositionGoal?.trim() || null,
+    weekly_workout_target: n(goals.weeklyWorkoutTarget),
+    daily_calorie_target: n(goals.dailyCalorieTarget),
+    daily_protein_target: n(goals.dailyProteinTarget),
+  };
 }
 
 export function toGoal(row: GoalWithMilestones): Goal {

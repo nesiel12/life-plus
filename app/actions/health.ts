@@ -2,8 +2,16 @@
 
 import { getCurrentUserId } from "@/lib/currentUser";
 import { mealsRepo, workoutsRepo } from "@/lib/db/health";
-import { toMeal, toMealPatch, toWorkout, toWorkoutPatch } from "@/lib/mappers";
-import type { Meal, MealType, Workout } from "@/types";
+import { fitnessGoalsRepo } from "@/lib/db/fitnessGoals";
+import {
+  toFitnessGoals,
+  toFitnessGoalsPatch,
+  toMeal,
+  toMealPatch,
+  toWorkout,
+  toWorkoutPatch,
+} from "@/lib/mappers";
+import type { FitnessGoals, Meal, MealType, Workout } from "@/types";
 
 export async function addMealAction(input: {
   description: string;
@@ -65,4 +73,15 @@ export async function updateWorkoutAction(workoutId: string, patch: Partial<Work
 export async function deleteWorkoutAction(workoutId: string) {
   const userId = await getCurrentUserId();
   await workoutsRepo.remove(userId, workoutId);
+}
+
+export async function getFitnessGoalsAction(): Promise<FitnessGoals> {
+  const userId = await getCurrentUserId();
+  return toFitnessGoals(await fitnessGoalsRepo.get(userId));
+}
+
+export async function saveFitnessGoalsAction(goals: FitnessGoals): Promise<FitnessGoals> {
+  const userId = await getCurrentUserId();
+  const row = await fitnessGoalsRepo.upsert(userId, toFitnessGoalsPatch(goals));
+  return toFitnessGoals(row);
 }

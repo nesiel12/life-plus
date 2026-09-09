@@ -337,6 +337,22 @@ export interface Workout {
 }
 
 /**
+ * Personal Fitness & Body Goals (Health module). Every field is optional —
+ * an unset target means "not tracking this", never zero. The "current" side
+ * of each progress bar is computed client-side from `workouts` / `meals`,
+ * except weight, which nothing else in the app knows.
+ */
+export interface FitnessGoals {
+  startWeightKg?: number;
+  currentWeightKg?: number;
+  targetWeightKg?: number;
+  bodyCompositionGoal?: string;
+  weeklyWorkoutTarget?: number;
+  dailyCalorieTarget?: number;
+  dailyProteinTarget?: number;
+}
+
+/**
  * A proactive notification, as the client renders it.
  *
  * Named AppNotification rather than Notification because the DOM already has

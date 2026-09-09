@@ -10,6 +10,7 @@ import { NewMealModal } from "@/components/features/health/NewMealModal";
 import { NewWorkoutModal } from "@/components/features/health/NewWorkoutModal";
 import { InstantHealthCoach } from "@/components/features/health/InstantHealthCoach";
 import { FoodTracker } from "@/components/features/health/FoodTracker";
+import { FitnessGoals } from "@/components/features/health/FitnessGoals";
 import type { MealType } from "@/types";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { useT } from "@/lib/i18n/useT";
@@ -106,6 +107,10 @@ export default function HealthSpacePage() {
 
       <GlassCard className="mb-6">
         <FoodTracker />
+      </GlassCard>
+
+      <GlassCard className="mb-6">
+        <FitnessGoals todayCalories={dayMacros.calories} todayProtein={dayMacros.protein} />
       </GlassCard>
 
       <GlassCard className="mb-6">
