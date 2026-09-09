@@ -492,6 +492,10 @@ export function toMeal(row: MealRow): Meal {
     description: row.description,
     eatenAt: row.eaten_at,
     type: row.type,
+    calories: row.calories ?? undefined,
+    protein: row.protein_g ?? undefined,
+    carbs: row.carbs_g ?? undefined,
+    fats: row.fats_g ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -501,6 +505,10 @@ export function toMealPatch(patch: Partial<Meal>): MealUpdate {
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.eatenAt !== undefined) row.eaten_at = patch.eatenAt;
   if (patch.type !== undefined) row.type = patch.type;
+  if (patch.calories !== undefined) row.calories = patch.calories ?? null;
+  if (patch.protein !== undefined) row.protein_g = patch.protein ?? null;
+  if (patch.carbs !== undefined) row.carbs_g = patch.carbs ?? null;
+  if (patch.fats !== undefined) row.fats_g = patch.fats ?? null;
   return row;
 }
 

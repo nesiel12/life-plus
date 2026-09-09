@@ -5,13 +5,25 @@ import { mealsRepo, workoutsRepo } from "@/lib/db/health";
 import { toMeal, toMealPatch, toWorkout, toWorkoutPatch } from "@/lib/mappers";
 import type { Meal, MealType, Workout } from "@/types";
 
-export async function addMealAction(input: { description: string; type: MealType; eatenAt?: string }) {
+export async function addMealAction(input: {
+  description: string;
+  type: MealType;
+  eatenAt?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fats?: number;
+}) {
   const userId = await getCurrentUserId();
   const row = await mealsRepo.insert({
     user_id: userId,
     description: input.description,
     type: input.type,
     eaten_at: input.eatenAt,
+    calories: input.calories ?? null,
+    protein_g: input.protein ?? null,
+    carbs_g: input.carbs ?? null,
+    fats_g: input.fats ?? null,
   });
   return toMeal(row);
 }

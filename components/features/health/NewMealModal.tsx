@@ -9,7 +9,15 @@ import type { MealType } from "@/types";
 interface NewMealModalProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (meal: { description: string; type: MealType; eatenAt?: string }) => Promise<void>;
+  onCreate: (meal: {
+    description: string;
+    type: MealType;
+    eatenAt?: string;
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fats?: number;
+  }) => Promise<void>;
 }
 
 const MEAL_TYPE_OPTIONS: { value: MealType; label: string }[] = [

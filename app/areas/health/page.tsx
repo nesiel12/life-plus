@@ -8,7 +8,8 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { WellnessCopilot } from "@/components/features/health/WellnessCopilot";
 import { NewMealModal } from "@/components/features/health/NewMealModal";
 import { NewWorkoutModal } from "@/components/features/health/NewWorkoutModal";
-import { NutritionCoach } from "@/components/features/health/NutritionCoach";
+import { InstantHealthCoach } from "@/components/features/health/InstantHealthCoach";
+import { FoodTracker } from "@/components/features/health/FoodTracker";
 import type { MealType } from "@/types";
 import { BackToHome } from "@/components/layout/BackToHome";
 
@@ -37,16 +38,6 @@ function isToday(iso: string, todayKey: string): boolean {
   return iso.slice(0, 10) === todayKey;
 }
 
-interface SuggestedMenuItem {
-  item: string;
-  benefit: string;
-}
-
-interface NutritionRecommendation {
-  recommendation: string;
-  suggested_menu: SuggestedMenuItem[];
-}
-
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
 }
@@ -68,7 +59,6 @@ export default function HealthSpacePage() {
 
   const [mealModalOpen, setMealModalOpen] = useState(false);
   const [workoutModalOpen, setWorkoutModalOpen] = useState(false);
-  const [recommendation, setRecommendation] = useState<NutritionRecommendation | null>(null);
 
   const { error: deleteMealError, run: removeMeal } = useApiCall(deleteMeal);
   const { error: deleteWorkoutError, run: removeWorkout } = useApiCall(deleteWorkout);
@@ -76,10 +66,18 @@ export default function HealthSpacePage() {
   const todayKey = useMemo(() => toDateKey(new Date()), []);
 
   const todaysMeals = useMemo(() => meals.filter((m) => isToday(m.eatenAt, todayKey)), [todayKey, meals]);
-  const todaysWorkouts = useMemo(
-    () => workouts.filter((w) => isToday(w.startTime, todayKey)),
-    [todayKey, workouts]
-  );
+
+  const dayMacros = useMemo(() => {
+    return todaysMeals.reduce(
+      (acc, m) => ({
+        calories: acc.calories + (m.calories ?? 0),
+        protein: acc.protein + (m.protein ?? 0),
+        carbs: acc.carbs + (m.carbs ?? 0),
+        fats: acc.fats + (m.fats ?? 0),
+      }),
+      { calories: 0, protein: 0, carbs: 0, fats: 0 }
+    );
+  }, [todaysMeals]);
 
   function handleDeleteMeal(mealId: string) {
     removeMeal(mealId).catch(() => {
@@ -99,20 +97,18 @@ export default function HealthSpacePage() {
       <h1 className="mb-1 text-2xl font-medium tracking-tight">בריאות</h1>
       <p className="mb-8 text-sm text-muted">ארוחות, אימונים, והדרכה תזונתית מבוססת AI — הכל במקום אחד.</p>
 
-      {/* The copilot leads: it is the proactive layer, and it renders from
-          store data with no fetch, so it paints before anything below it. */}
+      {/* The AI coach leads and loads immediately — no button. */}
+      <GlassCard className="mb-6">
+        <InstantHealthCoach />
+      </GlassCard>
+
+      <GlassCard className="mb-6">
+        <FoodTracker />
+      </GlassCard>
+
       <GlassCard className="mb-6">
         <WellnessCopilot />
       </GlassCard>
-
-      <div className="mb-6">
-        <NutritionCoach
-          workouts={todaysWorkouts}
-          meals={todaysMeals}
-          recommendation={recommendation}
-          onRecommendation={setRecommendation}
-        />
-      </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         <section>
@@ -126,6 +122,17 @@ export default function HealthSpacePage() {
               רשום ארוחה
             </button>
           </div>
+
+          {dayMacros.calories > 0 && (
+            <div className="mb-3 flex flex-wrap gap-3 rounded-xl bg-fill-subtle px-3 py-2 text-xs">
+              <span className="font-medium text-foreground">
+                <span className="ltr tabular-nums">{Math.round(dayMacros.calories)}</span> קלוריות
+              </span>
+              <span className="text-muted">חלבון <span className="ltr tabular-nums">{Math.round(dayMacros.protein)}</span>ג׳</span>
+              <span className="text-muted">פחמימות <span className="ltr tabular-nums">{Math.round(dayMacros.carbs)}</span>ג׳</span>
+              <span className="text-muted">שומן <span className="ltr tabular-nums">{Math.round(dayMacros.fats)}</span>ג׳</span>
+            </div>
+          )}
 
           {deleteMealError && <p className="mb-2 text-xs text-accent-family">{deleteMealError}</p>}
 
@@ -145,6 +152,11 @@ export default function HealthSpacePage() {
                       <span className="ltr rounded-full bg-fill-subtle px-2 py-0.5 text-[10px] text-muted">
                         {formatTime(meal.eatenAt)}
                       </span>
+                      {meal.calories != null && (
+                        <span className="ltr rounded-full bg-fill-subtle px-2 py-0.5 text-[10px] text-muted">
+                          {Math.round(meal.calories)} קק״ל
+                        </span>
+                      )}
                     </div>
                   </div>
                   <button

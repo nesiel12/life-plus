@@ -306,11 +306,24 @@ export interface LearningResource {
 
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack" | "post-workout";
 
+export interface MealMacros {
+  /** kcal */
+  calories?: number;
+  /** grams */
+  protein?: number;
+  carbs?: number;
+  fats?: number;
+}
+
 export interface Meal {
   id: string;
   description: string;
   eatenAt: string; // ISO datetime
   type: MealType;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fats?: number;
   createdAt: string;
 }
 

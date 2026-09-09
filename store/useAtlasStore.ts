@@ -269,7 +269,15 @@ interface AtlasState extends HydratedState {
   deleteLearningResource: (resourceId: string) => Promise<void>;
   generateLearningPath: (topicId: string, topicTitle: string) => Promise<void>;
 
-  addMeal: (meal: { description: string; type: MealType; eatenAt?: string }) => Promise<void>;
+  addMeal: (meal: {
+    description: string;
+    type: MealType;
+    eatenAt?: string;
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fats?: number;
+  }) => Promise<void>;
   updateMeal: (mealId: string, patch: Partial<Meal>) => Promise<void>;
   deleteMeal: (mealId: string) => Promise<void>;
 

@@ -864,6 +864,10 @@ export interface Database {
           description: string;
           eaten_at: string;
           type: MealTypeDb;
+          calories: number | null;
+          protein_g: number | null;
+          carbs_g: number | null;
+          fats_g: number | null;
           created_at: string;
           updated_at: string;
         },
@@ -873,6 +877,10 @@ export interface Database {
           description: string;
           eaten_at?: string;
           type: MealTypeDb;
+          calories?: number | null;
+          protein_g?: number | null;
+          carbs_g?: number | null;
+          fats_g?: number | null;
         },
         {
           id?: string;
@@ -880,6 +888,10 @@ export interface Database {
           description?: string;
           eaten_at?: string;
           type?: MealTypeDb;
+          calories?: number | null;
+          protein_g?: number | null;
+          carbs_g?: number | null;
+          fats_g?: number | null;
         }
       >;
       workouts: TableDef<
