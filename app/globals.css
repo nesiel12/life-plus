@@ -125,8 +125,25 @@
   --font-sans: var(--font-heebo);
 }
 
-html {
+/* Direction follows the `dir` attribute on <html> — set at build time in
+   app/layout.tsx, corrected before first paint by preferencesInitScript, and
+   kept in sync after hydration by PreferencesProvider. It must NOT be pinned
+   here: a hard `direction: rtl` overrides `<html dir="ltr">` in English mode,
+   so logical properties (margin-inline, inset-inline, flex row order) resolve
+   RTL while Tailwind's `dir="ltr"` attribute variants resolve LTR — the two
+   fight and content is pushed off-screen. The `dir` attribute is the single
+   source of truth; default it to rtl only if the attribute is somehow absent. */
+html:not([dir]) {
   direction: rtl;
+}
+
+/* No horizontal scrollbar, ever. Individual wide children (the week grid, a
+   code block) opt into their own `overflow-x: auto`; the page itself never
+   scrolls sideways, whatever the writing direction. */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 body {
