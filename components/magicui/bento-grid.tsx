@@ -49,12 +49,14 @@ export function BentoGrid({ children, className }: BentoGridProps) {
       variants={GRID_VARIANTS}
       initial="hidden"
       animate="show"
-      // Tight, deliberately: the dashboard reads as one panel of grouped
-      // widgets, not a scatter of distant cards. Just enough of a seam
-      // (0.75rem, a touch more at width) to keep each card's own border and
-      // shadow legible.
+      // Fills the full content width (no max-width, no centering — that was
+      // the "dead space on the left" bug). Capped at 3 tracks: a 4th column
+      // left holes wherever a span-2 widget could not follow a span-1 one,
+      // and the SPAN_CLASS map only scales to 3. `grid-flow-dense` backfills
+      // any gap a reordered span-2 would otherwise leave, so the grid stays
+      // solid whatever order the user drags widgets into.
       className={cn(
-        "grid w-full grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4 2xl:grid-cols-4",
+        "grid w-full grid-flow-dense grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4",
         className
       )}
     >
