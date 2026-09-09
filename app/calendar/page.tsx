@@ -15,6 +15,7 @@ import { MonthView } from "@/components/features/calendar/MonthView";
 import { ScheduleCopilotBar } from "@/components/features/calendar/ScheduleCopilotBar";
 import { CalendarTasksSection } from "@/components/features/calendar/CalendarTasksSection";
 import { DayBackbone } from "@/components/features/calendar/DayBackbone";
+import { ClearCalendarButton } from "@/components/features/calendar/ClearCalendarButton";
 import { WeeklySchedule } from "@/components/features/schedule/WeeklySchedule";
 import type { WeekCalendarEvent } from "@/lib/time/buildDailyTimeline";
 import { useInsights } from "@/hooks/useInsights";
@@ -160,6 +161,7 @@ export default function CalendarPage() {
               </div>
 
               <div className="flex items-center gap-2">
+                <ClearCalendarButton anchor={anchor} onCleared={refresh} />
                 {range === "day" && (
                   <button
                     onClick={() => setEditMode((v) => !v)}
