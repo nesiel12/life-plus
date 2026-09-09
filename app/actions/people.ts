@@ -13,6 +13,7 @@ export async function addPersonAction(input: {
   hebrewName?: string;
   relation: string;
   birthday?: string;
+  birthYear?: number;
   anniversary?: string;
   phone?: string;
 }) {
@@ -23,6 +24,7 @@ export async function addPersonAction(input: {
     hebrew_name: input.hebrewName ?? null,
     relation: input.relation,
     birthday: input.birthday ?? null,
+    birth_year: input.birthYear ?? null,
     anniversary: input.anniversary ?? null,
     phone: input.phone?.trim() || null,
   });

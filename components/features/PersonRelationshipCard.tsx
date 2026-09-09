@@ -231,6 +231,9 @@ export function PersonRelationshipCard({
         <p className="mb-2 flex items-center gap-1 text-xs text-accent-family">
           <Cake size={12} aria-hidden />
           יום הולדת בעוד {untilBirthday} ימים
+          {person.birthYear && (
+            <span className="ltr text-muted"> · {new Date().getFullYear() - person.birthYear}</span>
+          )}
         </p>
       )}
 

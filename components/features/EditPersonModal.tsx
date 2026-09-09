@@ -19,6 +19,7 @@ interface PersonDraft {
   relation: string;
   phone: string;
   birthday: string;
+  birthYear: number | null;
   anniversary: string;
   note: string;
   avatarUrl: string | undefined;
@@ -30,6 +31,7 @@ function draftFor(person: Person): PersonDraft {
     relation: person.relation,
     phone: person.phone ?? "",
     birthday: person.birthday ?? "",
+    birthYear: person.birthYear ?? null,
     anniversary: person.anniversary ?? "",
     note: person.note ?? "",
     avatarUrl: person.avatarUrl,
@@ -102,6 +104,7 @@ export function EditPersonModal({ person, onClose }: { person: Person | null; on
       relation: draft.relation.trim(),
       phone: draft.phone.trim() || undefined,
       birthday: draft.birthday.trim() || undefined,
+      birthYear: draft.birthday.trim() ? draft.birthYear ?? undefined : undefined,
       anniversary: draft.anniversary.trim() || undefined,
       note: draft.note.trim() || undefined,
       avatarUrl: draft.avatarUrl,
@@ -218,6 +221,8 @@ export function EditPersonModal({ person, onClose }: { person: Person | null; on
           <MonthDayPicker
             value={draft.birthday}
             onChange={(value) => updateDraft({ birthday: value })}
+            year={draft.birthYear}
+            onYearChange={(year) => updateDraft({ birthYear: year })}
             idPrefix="edit-person-birthday"
             ariaLabel="יום הולדת"
           />

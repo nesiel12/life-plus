@@ -26,7 +26,9 @@ export interface Person {
   /** The user's own wording for this contact's default message. */
   messageTemplate?: string;
   lastMeaningfulInteraction?: string; // ISO date
-  birthday?: string; // "MM-DD"
+  birthday?: string; // "MM-DD" — recurrence source of truth
+  /** Optional birth year, for age. Never used for recurrence. */
+  birthYear?: number;
   anniversary?: string; // "MM-DD"
   note?: string;
   phone?: string;

@@ -109,6 +109,7 @@ export function toPerson(row: PersonRow): Person {
     relation: row.relation,
     lastMeaningfulInteraction: row.last_meaningful_interaction ?? undefined,
     birthday: row.birthday ?? undefined,
+    birthYear: row.birth_year ?? undefined,
     anniversary: row.anniversary ?? undefined,
     note: row.note ?? undefined,
     phone: row.phone ?? undefined,
@@ -129,6 +130,7 @@ export function toPersonPatch(patch: Partial<Person>): PersonUpdate {
   if (patch.hebrewName !== undefined) row.hebrew_name = patch.hebrewName || null;
   if (patch.relation !== undefined) row.relation = patch.relation;
   if (patch.birthday !== undefined) row.birthday = patch.birthday || null;
+  if (patch.birthYear !== undefined) row.birth_year = patch.birthYear ?? null;
   if (patch.anniversary !== undefined) row.anniversary = patch.anniversary || null;
   if (patch.note !== undefined) row.note = patch.note || null;
   if (patch.phone !== undefined) row.phone = patch.phone || null;

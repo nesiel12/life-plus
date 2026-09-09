@@ -108,6 +108,7 @@ export interface Database {
           relation: string;
           last_meaningful_interaction: string | null;
           birthday: string | null;
+          birth_year: number | null;
           anniversary: string | null;
           note: string | null;
           phone: string | null;
@@ -126,6 +127,7 @@ export interface Database {
           relation: string;
           last_meaningful_interaction?: string | null;
           birthday?: string | null;
+          birth_year?: number | null;
           anniversary?: string | null;
           note?: string | null;
           phone?: string | null;
@@ -142,6 +144,7 @@ export interface Database {
           relation?: string;
           last_meaningful_interaction?: string | null;
           birthday?: string | null;
+          birth_year?: number | null;
           anniversary?: string | null;
           note?: string | null;
           phone?: string | null;
@@ -1358,6 +1361,34 @@ export interface Database {
         {
           media_items_set?: boolean;
           expire_time?: string | null;
+        }
+      >;
+      push_subscriptions: TableDef<
+        {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent: string | null;
+          created_at: string;
+          last_used_at: string | null;
+        },
+        {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent?: string | null;
+          last_used_at?: string | null;
+        },
+        {
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          user_agent?: string | null;
+          last_used_at?: string | null;
         }
       >;
       fitness_goals: TableDef<

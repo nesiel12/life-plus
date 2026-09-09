@@ -165,6 +165,7 @@ interface AtlasState extends HydratedState {
     hebrewName?: string;
     relation: string;
     birthday?: string;
+    birthYear?: number;
     anniversary?: string;
     phone?: string;
   }) => Promise<void>;
