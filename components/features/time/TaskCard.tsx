@@ -49,7 +49,7 @@ export function TaskCard({ task, delay, onToggleDone, onDelete, pinned, onToggle
   return (
     <GlassCard
       delay={delay}
-      className={cn("group/task p-4", task.isHighPriority && !onTogglePin && "ring-1 ring-accent-time/50")}
+      className={cn("group/task p-3.5", task.isHighPriority && !onTogglePin && "ring-1 ring-accent-time/40")}
     >
       <div className="flex items-start gap-3">
         <button
@@ -68,14 +68,9 @@ export function TaskCard({ task, delay, onToggleDone, onDelete, pinned, onToggle
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             {task.isHighPriority && !onTogglePin && (
-              <motion.span
-                animate={{ opacity: [0.55, 1, 0.55] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                className="inline-flex shrink-0 text-accent-time"
-                aria-hidden
-              >
+              <span className="inline-flex shrink-0 text-accent-time" aria-hidden>
                 <Star size={13} className="fill-accent-time" />
-              </motion.span>
+              </span>
             )}
             <p className={cn("font-medium", isDone ? "text-muted line-through" : "text-foreground")}>{task.title}</p>
             {task.isHighPriority && <span className="sr-only">משימה בעדיפות גבוהה</span>}
@@ -153,7 +148,7 @@ export function TaskCard({ task, delay, onToggleDone, onDelete, pinned, onToggle
           <button
             onClick={handleDeleteClick}
             aria-label={`מחק את ${task.title}`}
-            className="focus-ring shrink-0 rounded-lg p-1 text-muted transition-colors hover:text-accent-family"
+            className="focus-ring z-20 grid size-7 shrink-0 place-items-center rounded-lg text-muted opacity-0 transition-all duration-200 hover:bg-fill-subtle hover:text-accent-family focus-visible:opacity-100 group-hover/task:opacity-100"
           >
             <Trash2 size={14} aria-hidden />
           </button>
