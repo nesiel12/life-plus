@@ -11,8 +11,30 @@ interface LockStatus {
   devices: { credentialId: string; label: string | null; createdAt: string; lastUsedAt: string | null }[];
 }
 
+interface LockCopy {
+  /** Heading on the "not set up yet" screen. */
+  enrollTitle: string;
+  enrollBody: string;
+  /** Heading on the "locked, unlock me" screen. */
+  lockedTitle: string;
+  lockedBody: string;
+}
+
+const RECOVERY_COPY: LockCopy = {
+  enrollTitle: "מרחב פרטי",
+  enrollBody:
+    "המרחב הזה נעול מאחורי טביעת אצבע או זיהוי פנים של המכשיר. שום דבר ממנו לא נטען לדף עד שפותחים — כך שגם מי שמחזיק את המכשיר לא רואה כלום.",
+  lockedTitle: "המרחב נעול",
+  lockedBody:
+    "אמת עם טביעת אצבע או זיהוי פנים כדי להיכנס. המרחב ננעל שוב אוטומטית כשעוברים לאפליקציה אחרת.",
+};
+
 interface RecoveryLockGateProps {
   children: (context: { lock: () => Promise<void>; status: LockStatus }) => ReactNode;
+  /** Override the lock-screen copy — the WebAuthn credential and the unlock
+   *  session are the same device-security context regardless of which
+   *  section is asking (recovery space, finances). */
+  copy?: LockCopy;
 }
 
 /**
@@ -23,7 +45,7 @@ interface RecoveryLockGateProps {
  * is what makes this real rather than a blur: there is nothing hidden in the
  * page to reveal, because nothing was ever sent.
  */
-export function RecoveryLockGate({ children }: RecoveryLockGateProps) {
+export function RecoveryLockGate({ children, copy = RECOVERY_COPY }: RecoveryLockGateProps) {
   const [status, setStatus] = useState<LockStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -148,11 +170,8 @@ export function RecoveryLockGate({ children }: RecoveryLockGateProps) {
       {status?.enrolled ? (
         <>
           <div>
-            <p className="text-base font-medium text-foreground">המרחב נעול</p>
-            <p className="mt-1 max-w-sm text-sm text-muted">
-              אמת עם טביעת אצבע או זיהוי פנים כדי להיכנס. המרחב ננעל שוב אוטומטית כשעוברים לאפליקציה
-              אחרת.
-            </p>
+            <p className="text-base font-medium text-foreground">{copy.lockedTitle}</p>
+            <p className="mt-1 max-w-sm text-sm text-muted">{copy.lockedBody}</p>
           </div>
           <button
             onClick={unlock}
@@ -170,11 +189,8 @@ export function RecoveryLockGate({ children }: RecoveryLockGateProps) {
       ) : (
         <>
           <div>
-            <p className="text-base font-medium text-foreground">מרחב פרטי</p>
-            <p className="mt-1 max-w-md text-sm text-muted">
-              המרחב הזה נעול מאחורי טביעת אצבע או זיהוי פנים של המכשיר. שום דבר ממנו לא נטען לדף עד
-              שפותחים — כך שגם מי שמחזיק את המכשיר לא רואה כלום.
-            </p>
+            <p className="text-base font-medium text-foreground">{copy.enrollTitle}</p>
+            <p className="mt-1 max-w-md text-sm text-muted">{copy.enrollBody}</p>
           </div>
           <button
             onClick={enroll}

@@ -10,10 +10,20 @@ import { NewTransactionModal } from "@/components/features/finances/NewTransacti
 import { CfoPanel } from "@/components/features/finances/CfoPanel";
 import { FinanceAssistant } from "@/components/features/finances/FinanceAssistant";
 import { StatementImport } from "@/components/features/finances/StatementImport";
+import { RecoveryLockGate } from "@/components/features/recovery/RecoveryLockGate";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/types";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { useT } from "@/lib/i18n/useT";
+
+const FINANCE_LOCK_COPY = {
+  enrollTitle: "מודול פיננסי מאובטח",
+  enrollBody:
+    "נעל את מסך הכספים מאחורי טביעת אצבע, זיהוי פנים או קוד המכשיר. יתרות ותנועות לא יוצגו עד שתאמת — כך שמבט חטוף במסך לא חושף כלום. המפתח נשאר במכשיר.",
+  lockedTitle: "הכספים נעולים",
+  lockedBody:
+    "אמת כדי לפתוח את מסך הכספים. הוא ננעל שוב אוטומטית כשעוברים לאפליקציה אחרת.",
+};
 
 function formatDateHeading(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("he-IL", {
@@ -39,6 +49,18 @@ function currentMonthKey(): string {
 // derived from the store, never a separate stored total), a date-grouped
 // transaction list, and an add-transaction modal.
 export default function FinancesSpacePage() {
+  return (
+    <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
+      <BackToHome className="mb-6 -ms-2.5" />
+      {/* Same device-security context as the personal space — one WebAuthn
+          credential, one unlock session. Gating the render keeps balances off
+          a glanced-at screen; re-locks itself when the tab is hidden. */}
+      <RecoveryLockGate copy={FINANCE_LOCK_COPY}>{() => <FinancesSpaceInner />}</RecoveryLockGate>
+    </main>
+  );
+}
+
+function FinancesSpaceInner() {
   const t = useT();
   const transactions = useAtlasStore((s) => s.transactions);
   const addTransaction = useAtlasStore((s) => s.addTransaction);
@@ -81,8 +103,7 @@ export default function FinancesSpacePage() {
   }
 
   return (
-    <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
-      <BackToHome className="mb-6 -ms-2.5" />
+    <>
       <GlassCard className="mb-6">
         <CfoPanel />
       </GlassCard>
@@ -155,6 +176,6 @@ export default function FinancesSpacePage() {
       )}
 
       <NewTransactionModal open={modalOpen} onClose={() => setModalOpen(false)} onCreate={addTransaction} />
-    </main>
+    </>
   );
 }
