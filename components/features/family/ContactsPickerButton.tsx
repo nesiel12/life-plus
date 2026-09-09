@@ -8,8 +8,10 @@ import { Contact, Loader2 } from "lucide-react";
 // hands back exactly the fields asked for, for exactly the contacts the user
 // tapped. Nothing is read without that explicit pick.
 //
-// Feature-detected: the button simply does not render where the API is
-// missing (desktop, iOS Safari, Firefox), so it never sits there dead.
+// Feature-detected. Where the API is missing (desktop, iOS Safari, Firefox)
+// the component shows a one-line hint instead of a dead button, unless
+// `hideWhenUnsupported` is set — so on a phone it's a real shortcut and on a
+// desktop it explains why you have to type the number.
 
 interface ContactPick {
   name?: string;
@@ -30,8 +32,15 @@ function contactsApi(): NavigatorContacts | null {
   return api && typeof api.select === "function" ? api : null;
 }
 
-export function ContactsPickerButton({ onPick }: { onPick: (pick: ContactPick) => void }) {
-  const [supported, setSupported] = useState(false);
+export function ContactsPickerButton({
+  onPick,
+  hideWhenUnsupported = false,
+}: {
+  onPick: (pick: ContactPick) => void;
+  hideWhenUnsupported?: boolean;
+}) {
+  // null = not yet checked (server / first paint), so nothing flashes.
+  const [supported, setSupported] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,7 +48,17 @@ export function ContactsPickerButton({ onPick }: { onPick: (pick: ContactPick) =
     setSupported(Boolean(contactsApi()));
   }, []);
 
-  if (!supported) return null;
+  if (supported === null) return null;
+
+  if (!supported) {
+    if (hideWhenUnsupported) return null;
+    return (
+      <p className="flex items-center gap-1.5 text-xs text-muted">
+        <Contact size={12} aria-hidden />
+        בחירה מאנשי הקשר של המכשיר זמינה בדפדפן הנייד (Chrome ב-Android).
+      </p>
+    );
+  }
 
   async function pick() {
     const api = contactsApi();
