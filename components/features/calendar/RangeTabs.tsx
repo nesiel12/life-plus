@@ -1,7 +1,9 @@
 "use client";
 
-import { Fragment, useId } from "react";
+import { useId } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { CALENDAR_RANGES, RANGE_LABELS, type CalendarRange } from "@/lib/calendar/ranges";
+import { cn } from "@/lib/utils";
 
 interface RangeTabsProps {
   value: CalendarRange;
@@ -10,65 +12,63 @@ interface RangeTabsProps {
   label?: string;
 }
 
-// The cir-tabs range selector — Day / Week / Month / Year.
+// Day / Week / Month / Year range selector.
 //
-// The specified markup is kept as given: a .cir-tabs container holding a
-// .cir-tabs__r radio and a .cir-tabs__t label per range, with the label's
-// `for` pointing at its radio. That structure is what the CSS in globals.css
-// hangs off, and it is what makes the control work: the checked radio styles
-// its own label through a sibling selector, and clicking a label activates
-// its radio natively.
-//
-// Two deliberate departures from the snippet:
-//
-//  1. `role="tablist"` / `role="tab"` are dropped. A <label> is not a tab —
-//     giving it that role overrides its real semantics, and a tab is
-//     expected to be focusable and to carry aria-selected, which a label is
-//     not and does not. Meanwhile the radios underneath already form exactly
-//     the right thing: a radiogroup, with arrow-key navigation and
-//     checked-state announcement that browsers implement for free. The
-//     container is marked role="radiogroup" so that grouping is announced;
-//     the visual result is identical.
-//
-//  2. Ids and the group name come from useId rather than the literal
-//     "cir-range" / "cir-r-day". Two of these on one page — a header and a
-//     mobile bar, say — would otherwise share a radio group and fight over
-//     which is checked, and duplicate ids would send every label to the
-//     first instance's inputs.
-//
-// The active index is published as a custom property rather than derived in
-// CSS with :has(), so the sliding indicator needs no selector support and
-// stays exactly in step with the React state that actually owns the value.
+// A button group, not a CSS radio hack: the sliding highlight is a
+// framer-motion layout animation keyed to `value`, so it always lands on the
+// button that React state actually says is active — the previous
+// custom-property version could drift out of step and leave the pill stuck
+// on "Day" after clicking "Year". role="radiogroup" + aria-checked keeps the
+// grouping and state announced; arrow-key handling is added explicitly.
 export function RangeTabs({ value, onChange, label = "טווח תצוגה" }: RangeTabsProps) {
   const groupId = useId();
+  const reduce = useReducedMotion();
   const activeIndex = CALENDAR_RANGES.indexOf(value);
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    e.preventDefault();
+    // RTL: ArrowLeft advances, ArrowRight goes back.
+    const dir = e.key === "ArrowLeft" ? 1 : -1;
+    const next = (activeIndex + dir + CALENDAR_RANGES.length) % CALENDAR_RANGES.length;
+    onChange(CALENDAR_RANGES[next]);
+  }
 
   return (
     <div
-      className="cir-tabs"
       role="radiogroup"
       aria-label={label}
-      style={{ "--cir-index": activeIndex } as React.CSSProperties}
+      onKeyDown={onKeyDown}
+      className="relative isolate flex rounded-full border border-hairline bg-surface-sunken p-1"
     >
       {CALENDAR_RANGES.map((range) => {
-        const id = `${groupId}-${range}`;
-        // Flat, exactly as specified: the input and its label are direct
-        // siblings of the container, which is what lets the checked radio
-        // style its own label with a plain `+` selector and no wrapper.
+        const active = value === range;
         return (
-          <Fragment key={range}>
-            <input
-              className="cir-tabs__r"
-              type="radio"
-              name={`cir-range-${groupId}`}
-              id={id}
-              checked={value === range}
-              onChange={() => onChange(range)}
-            />
-            <label className="cir-tabs__t" htmlFor={id}>
-              {RANGE_LABELS[range]}
-            </label>
-          </Fragment>
+          <button
+            key={range}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onChange(range)}
+            className={cn(
+              "focus-ring relative z-10 min-w-[3.25rem] flex-1 rounded-full px-3 py-1.5 text-[0.8125rem] font-medium transition-colors",
+              active ? "text-gold-ink" : "text-muted hover:text-foreground"
+            )}
+          >
+            {active && (
+              <motion.span
+                layoutId={`range-tabs-pill-${groupId}`}
+                transition={
+                  reduce
+                    ? { duration: 0 }
+                    : { type: "spring", stiffness: 500, damping: 40, mass: 0.6 }
+                }
+                className="absolute inset-0 -z-10 rounded-full border border-gold-line bg-surface shadow-[0_1px_2px_rgba(16,16,20,0.08),0_0_18px_-10px_var(--gold)]"
+              />
+            )}
+            <span className="relative">{RANGE_LABELS[range]}</span>
+          </button>
         );
       })}
     </div>

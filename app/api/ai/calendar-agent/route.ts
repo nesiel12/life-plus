@@ -7,6 +7,7 @@ import { rateLimitResponse } from "@/lib/api/rateLimit";
 import { isProviderConfigured } from "@/lib/ai";
 import { resolveCalendarIntent } from "@/lib/ai/agents/calendarAgent";
 import { parseHebrewEvent } from "@/lib/calendar/parseHebrewEvent";
+import { zonedWallClockToInstant } from "@/lib/calendar/timezone";
 import { sanitizeEventTitle } from "@/lib/calendar/sanitizeEventTitle";
 import { hasConflict, type Interval } from "@/lib/calendar/findFocusSlots";
 import { isDayPart } from "@/lib/onboarding/chronotype";
@@ -112,8 +113,19 @@ export async function POST(request: Request) {
 
     const parsed = parseHebrewEvent(message, new Date());
     if (parsed) {
-      const start = new Date(`${parsed.start}:00`);
+      // parsed.start is a wall clock — resolve it in the user's zone, never
+      // the server's, so the fallback lands at the time they said too.
+      const start = zonedWallClockToInstant(parsed.start, timeZone) ?? new Date(`${parsed.start}:00`);
       const end = new Date(start.getTime() + parsed.durationMinutes * 60_000);
+      const endLocalMs = start.getTime() + parsed.durationMinutes * 60_000;
+      const toWall = (ms: number) => {
+        const p = new Intl.DateTimeFormat("en-CA", {
+          timeZone,
+          year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+        }).formatToParts(new Date(ms));
+        const g = (t: string) => p.find((x) => x.type === t)?.value ?? "00";
+        return `${g("year")}-${g("month")}-${g("day")}T${g("hour") === "24" ? "00" : g("hour")}:${g("minute")}`;
+      };
       const intervals: Interval[] = busy.map((b) => ({ start: b.start, end: b.end }));
       return NextResponse.json({
         status: "proposed" as const,
@@ -121,6 +133,9 @@ export async function POST(request: Request) {
           title: sanitizeEventTitle(parsed.title),
           start: start.toISOString(),
           end: end.toISOString(),
+          startLocal: toWall(start.getTime()),
+          endLocal: toWall(endLocalMs),
+          timeZone,
           durationMinutes: parsed.durationMinutes,
         },
         conflict: hasConflict(start.toISOString(), end.toISOString(), intervals),

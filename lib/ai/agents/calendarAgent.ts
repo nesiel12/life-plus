@@ -4,6 +4,7 @@ import { generateStructuredData } from "@/lib/ai";
 import { findFocusSlots, hasConflict, type Interval } from "@/lib/calendar/findFocusSlots";
 import { sanitizeEventTitle } from "@/lib/calendar/sanitizeEventTitle";
 import { buildRRule, describeRecurrence, type Recurrence } from "@/lib/calendar/recurrence";
+import { zonedWallClockToInstant } from "@/lib/calendar/timezone";
 import type { ChronotypeSettings } from "@/types";
 import type { AiActor } from "@/lib/ai/quota";
 
@@ -72,8 +73,9 @@ export const CALENDAR_AGENT_SYSTEM = [
   "- 'היום' = התאריך של הזמן הנוכחי שנמסר לך. 'מחר' = יום אחריו. 'מחרתיים' = יומיים.",
   "- 'יום שלישי' / 'ביום שלישי' = ההופעה הבאה של אותו יום (אם היום שלישי — השבוע הבא).",
   "- 'בשעה 22:00', 'ב-22:00', 'ב10 בערב', 'ב-3 אחה\"צ' — חלץ שעה מדויקת. שעה קטנה + 'בערב'/'אחה\"צ' => הוסף 12.",
-  "- start תמיד בפורמט המדויק YYYY-MM-DDTHH:MM (זמן מקומי, בלי שניות, בלי אזור זמן).",
+  "- start תמיד בפורמט המדויק YYYY-MM-DDTHH:MM. זו השעה בשעון המקומי של המשתמש בדיוק כפי שנאמרה — אל תמיר אזורי זמן, אל תוסיף ואל תחסיר שעות. 'ב-12:30' פירושו start שנגמר ב-12:30.",
   "- אם אין משך — 60 דקות.",
+  "- ודא שהתאריך של start הוא היום/מחר/היום-בשבוע הנכון ביחס לזמן הנוכחי שנמסר. 'מחר' = התאריך של הזמן הנוכחי + יום אחד.",
   "",
   "כותרת:",
   "- קצרה ותיאורית, בעברית, בלי תאריך/שעה בתוכה. הסר מילות פעולה כמו 'תוסיף'/'קבע'/'ליומן'.",
@@ -152,11 +154,32 @@ export function parseLocalDateTime(value: string): Date | null {
 
 export interface ResolvedCalendarEvent {
   title: string;
-  start: string; // ISO
-  end: string; // ISO
+  start: string; // ISO instant, correct for the user's timezone
+  end: string; // ISO instant
+  /** Wall-clock "YYYY-MM-DDTHH:MM" in `timeZone` — what the user actually
+   *  asked for. The create call sends this + timeZone to Google so DST and
+   *  server-timezone drift can't move the event. */
+  startLocal: string;
+  endLocal: string;
+  timeZone: string;
   durationMinutes: number;
   /** Present for a repeating request. `rrule` is the Google Calendar line. */
   recurrence?: { rrule: string; description: string };
+}
+
+/** "YYYY-MM-DDTHH:MM" for a Date read in `timeZone`. */
+function toWallClock(instant: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(instant);
+  const v = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  return `${v("year")}-${v("month")}-${v("day")}T${(v("hour") === "24" ? "00" : v("hour"))}:${v("minute")}`;
 }
 
 export type ResolveCalendarIntentResult =
@@ -210,7 +233,10 @@ export async function resolveCalendarIntent(params: {
     return { status: "unclear", clarification: intent.clarification ?? "באיזו שעה לקבוע את זה?" };
   }
 
-  const start = parseLocalDateTime(intent.start);
+  // The model resolved the request into a wall clock in the user's own zone.
+  // Turn it into a real instant WITH that zone — never the server's — so the
+  // event lands at the time the user said, not offset by the Vercel/UTC gap.
+  const start = zonedWallClockToInstant(intent.start, params.timeZone);
   if (!start) {
     return {
       status: "unclear",
@@ -250,6 +276,9 @@ export async function resolveCalendarIntent(params: {
       title: sanitizeEventTitle(intent.title),
       start: start.toISOString(),
       end: end.toISOString(),
+      startLocal: toWallClock(start, params.timeZone),
+      endLocal: toWallClock(end, params.timeZone),
+      timeZone: params.timeZone,
       durationMinutes,
       ...(recurrence ? { recurrence } : {}),
     },

@@ -10,19 +10,30 @@ export const runtime = "nodejs";
 
 const RATE_LIMIT = { limit: 30, windowMs: 5 * 60 * 1000 }; // 30 requests / 5 min
 
-const createEventSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  start: z.string().datetime({ offset: true }),
-  end: z.string().datetime({ offset: true }),
-  /** A single "RRULE:FREQ=…" line for a repeating event. Built server-side
-   *  from a structured shape (lib/calendar/recurrence.ts), never free text. */
-  recurrence: z
-    .string()
-    .trim()
-    .regex(/^RRULE:[A-Z0-9=;,:+-]+$/)
-    .max(300)
-    .optional(),
-});
+const createEventSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    start: z.string().datetime({ offset: true }),
+    end: z.string().datetime({ offset: true }),
+    /** Preferred: wall-clock in `timeZone`. Sent to Google as
+     *  `{ dateTime, timeZone }` so the event can't drift by the server's
+     *  UTC offset or across a DST boundary. `start`/`end` stay for the
+     *  overlap check and are ignored for the write when these are present. */
+    startLocal: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).optional(),
+    endLocal: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).optional(),
+    timeZone: z.string().trim().min(1).max(60).optional(),
+    /** A single "RRULE:FREQ=…" line for a repeating event. Built server-side
+     *  from a structured shape (lib/calendar/recurrence.ts), never free text. */
+    recurrence: z
+      .string()
+      .trim()
+      .regex(/^RRULE:[A-Z0-9=;,:+-]+$/)
+      .max(300)
+      .optional(),
+  })
+  .refine((v) => !((v.startLocal || v.endLocal || v.timeZone) && !(v.startLocal && v.endLocal && v.timeZone)), {
+    message: "startLocal, endLocal and timeZone must be provided together.",
+  });
 
 const deleteEventSchema = z.object({
   googleEventId: z.string().trim().min(1),
@@ -84,7 +95,7 @@ export async function POST(request: NextRequest) {
 
   const parsed = await parseJsonBody(request, createEventSchema);
   if (parsed.error) return parsed.error;
-  const { title, start, end, recurrence } = parsed.data;
+  const { title, start, end, startLocal, endLocal, timeZone, recurrence } = parsed.data;
 
   if (new Date(end).getTime() <= new Date(start).getTime()) {
     return NextResponse.json({ error: "End must be after start." }, { status: 400 });
@@ -99,8 +110,9 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         summary: title,
-        start: { dateTime: start },
-        end: { dateTime: end },
+        start:
+          startLocal && timeZone ? { dateTime: `${startLocal}:00`, timeZone } : { dateTime: start },
+        end: endLocal && timeZone ? { dateTime: `${endLocal}:00`, timeZone } : { dateTime: end },
         ...(recurrence ? { recurrence: [recurrence] } : {}),
       }),
     });

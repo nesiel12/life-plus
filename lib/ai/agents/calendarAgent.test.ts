@@ -95,6 +95,9 @@ describe("formatCalendarReply", () => {
         title: "פגישה עם דנה",
         start: "2026-09-15T14:00:00",
         end: "2026-09-15T15:00:00",
+        startLocal: "2026-09-15T14:00",
+        endLocal: "2026-09-15T15:00",
+        timeZone: "Asia/Jerusalem",
         durationMinutes: 60,
       },
       conflict: false,
@@ -111,7 +114,7 @@ describe("formatCalendarReply", () => {
   it("never claims the event was actually created", () => {
     const result: ResolveCalendarIntentResult = {
       status: "proposed",
-      event: { title: "X", start: "2026-09-15T14:00:00", end: "2026-09-15T15:00:00", durationMinutes: 60 },
+      event: { title: "X", start: "2026-09-15T14:00:00", end: "2026-09-15T15:00:00", startLocal: "2026-09-15T14:00", endLocal: "2026-09-15T15:00", timeZone: "Asia/Jerusalem", durationMinutes: 60 },
       conflict: false,
       alternatives: [],
     };
@@ -123,7 +126,7 @@ describe("formatCalendarReply", () => {
   it("surfaces a real conflict and lists real alternatives", () => {
     const result: ResolveCalendarIntentResult = {
       status: "proposed",
-      event: { title: "פגישה", start: "2026-09-15T14:00:00", end: "2026-09-15T15:00:00", durationMinutes: 60 },
+      event: { title: "פגישה", start: "2026-09-15T14:00:00", end: "2026-09-15T15:00:00", startLocal: "2026-09-15T14:00", endLocal: "2026-09-15T15:00", timeZone: "Asia/Jerusalem", durationMinutes: 60 },
       conflict: true,
       alternatives: [
         { start: "2026-09-15T16:00:00", end: "2026-09-15T17:00:00", durationMinutes: 60, energy: "peak", score: 1060 },
@@ -138,7 +141,7 @@ describe("formatCalendarReply", () => {
   it("still names the conflict honestly when there is nothing else to offer", () => {
     const result: ResolveCalendarIntentResult = {
       status: "proposed",
-      event: { title: "פגישה", start: "2026-09-15T14:00:00", end: "2026-09-15T15:00:00", durationMinutes: 60 },
+      event: { title: "פגישה", start: "2026-09-15T14:00:00", end: "2026-09-15T15:00:00", startLocal: "2026-09-15T14:00", endLocal: "2026-09-15T15:00", timeZone: "Asia/Jerusalem", durationMinutes: 60 },
       conflict: true,
       alternatives: [],
     };

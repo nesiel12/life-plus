@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { CalendarPlus, Check, ChevronDown, ChevronUp, Loader2, Moon, Sparkles, TrendingDown } from "lucide-react";
 import { energyForHour, type HourEnergy, type ObservedEnergy } from "@/lib/calendar/energy";
 import { DeleteEventButton, type DeletableEvent } from "@/components/features/calendar/DeleteEventDialog";
+import { layoutDayEvents, minutesIntoDay } from "@/lib/calendar/layoutDayEvents";
 import { cn } from "@/lib/utils";
 import type { ChronotypeSettings } from "@/types";
 
@@ -63,99 +64,20 @@ interface VerticalTimelineProps {
   onShiftEvent?: (event: TimelineEvent, deltaMinutes: number) => Promise<void>;
 }
 
-const SHIFT_STEP_MINUTES = 15;
-
-// One event block. A component so Edit Mode's shift buttons can carry their
-// own pending/error state without lifting it into the timeline.
-function EventBlock({
-  event,
-  topRem,
-  heightRem,
-  reduce,
-  index,
-  onDeleteEvent,
-  editMode,
-  onShiftEvent,
-}: {
-  event: TimelineEvent;
-  topRem: number;
-  heightRem: number;
-  reduce: boolean | null;
-  index: number;
-  onDeleteEvent?: (event: DeletableEvent) => void;
-  editMode?: boolean;
-  onShiftEvent?: (event: TimelineEvent, deltaMinutes: number) => Promise<void>;
-}) {
-  const [shifting, setShifting] = useState<"up" | "down" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const canShift = editMode && event.canEdit !== false && Boolean(onShiftEvent);
-
-  function shift(delta: number) {
-    if (!onShiftEvent || shifting) return;
-    setShifting(delta < 0 ? "up" : "down");
-    setError(null);
-    onShiftEvent(event, delta)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "לא הצלחנו להזיז את האירוע."))
-      .finally(() => setShifting(null));
-  }
-
-  return (
-    <motion.div
-      initial={reduce ? false : { opacity: 0, x: 8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.3), ease: [0.16, 1, 0.3, 1] }}
-      className={cn(
-        "group absolute end-0 start-16 flex items-start gap-2 overflow-hidden rounded-xl border bg-surface px-3 py-2",
-        canShift
-          ? "border-gold-line shadow-[0_0_0_1px_var(--gold-line)]"
-          : "border-hairline-card shadow-[0_1px_2px_rgba(16,16,20,0.04),0_10px_24px_-18px_rgba(16,16,20,0.25)]"
-      )}
-      style={{ top: `${topRem + 0.15}rem`, minHeight: `${heightRem - 0.3}rem` }}
-    >
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">{event.title}</p>
-        <p className="ltr text-xs text-muted">{clockRange(event.start, event.end)}</p>
-        {error && <p className="mt-0.5 text-[0.65rem] text-red-500">{error}</p>}
-      </div>
-
-      {canShift && (
-        <div className="flex shrink-0 flex-col gap-0.5">
-          <button
-            onClick={() => shift(-SHIFT_STEP_MINUTES)}
-            disabled={Boolean(shifting)}
-            aria-label={`הקדם את ${event.title} ברבע שעה`}
-            className="focus-ring grid size-6 place-items-center rounded-md bg-fill-subtle text-muted transition-colors hover:text-foreground disabled:opacity-40"
-          >
-            {shifting === "up" ? <Loader2 size={11} className="animate-spin" aria-hidden /> : <ChevronUp size={12} aria-hidden />}
-          </button>
-          <button
-            onClick={() => shift(SHIFT_STEP_MINUTES)}
-            disabled={Boolean(shifting)}
-            aria-label={`דחה את ${event.title} ברבע שעה`}
-            className="focus-ring grid size-6 place-items-center rounded-md bg-fill-subtle text-muted transition-colors hover:text-foreground disabled:opacity-40"
-          >
-            {shifting === "down" ? <Loader2 size={11} className="animate-spin" aria-hidden /> : <ChevronDown size={12} aria-hidden />}
-          </button>
-        </div>
-      )}
-
-      {!editMode && onDeleteEvent && (
-        <DeleteEventButton event={event} onRequest={onDeleteEvent} className="-me-1 mt-0.5" />
-      )}
-    </motion.div>
-  );
-}
-
-// Tighter than it was (3.5rem): an 18-hour column at the old height was a
-// screenful of mostly-empty rows before the first event. The grid also
-// starts at 07:00 now, and DayView widens it only for events that fall
-// outside — so a normal day is compact and an early flight still shows.
+// Tighter than it once was: an 18-hour column at 3.5rem/row was a screenful
+// of mostly-empty rows before the first event.
 const ROW_HEIGHT_REM = 2.75;
 
+// The hour-label column. Events live strictly to the inline-end of this, so a
+// meeting can never sit on top of the time it starts at — the old layout put
+// events at `start-16` while the labels also drifted, and on a narrow screen
+// they overlapped and hid the hours.
+const GUTTER_REM = 3.25;
+// A hair of room on the far edge so a card isn't jammed against the border.
+const EDGE_GAP_REM = 0.25;
+
 // Luxe, not glass: an opaque surface, hairline rules, and gold reserved for
-// the single thing that matters most on this screen — the user's peak-focus
-// band. Low-energy hours are recessed rather than coloured, so the eye is
-// pulled to when they should be working, not when they shouldn't.
+// the single thing that matters most — the user's peak-focus band.
 const ENERGY_STYLE: Record<HourEnergy, { row: string; rail: string; badge?: string }> = {
   peak: {
     row: "bg-[color-mix(in_srgb,var(--gold)_7%,transparent)]",
@@ -191,6 +113,118 @@ function clockRange(start: string, end: string): string {
   return `${fmt(start)}–${fmt(end)}`;
 }
 
+const SHIFT_STEP_MINUTES = 15;
+
+// The inline-start / inline-end insets for a card in column `column` of
+// `columns`, keeping every card inside the content lane (past the gutter).
+function laneInsets(column: number, columns: number): { insetInlineStart: string; insetInlineEnd: string } {
+  // Lane width = 100% - GUTTER - EDGE_GAP. Each column takes an equal slice
+  // of that lane; express the slice with calc() so it stays responsive.
+  const startFrac = column / columns;
+  const endFrac = (columns - 1 - column) / columns;
+  return {
+    insetInlineStart: `calc(${GUTTER_REM}rem + (100% - ${GUTTER_REM}rem - ${EDGE_GAP_REM}rem) * ${startFrac} + ${
+      column > 0 ? "1px" : "0px"
+    })`,
+    insetInlineEnd: `calc(${EDGE_GAP_REM}rem + (100% - ${GUTTER_REM}rem - ${EDGE_GAP_REM}rem) * ${endFrac} + ${
+      column < columns - 1 ? "1px" : "0px"
+    })`,
+  };
+}
+
+// One event card, positioned inside the content lane and split into a
+// side-by-side column when it overlaps a neighbour.
+function EventBlock({
+  event,
+  top,
+  height,
+  column,
+  columns,
+  reduce,
+  index,
+  onDeleteEvent,
+  editMode,
+  onShiftEvent,
+}: {
+  event: TimelineEvent;
+  /** rem from the top of the grid */
+  top: number;
+  /** rem */
+  height: number;
+  column: number;
+  columns: number;
+  reduce: boolean | null;
+  index: number;
+  onDeleteEvent?: (event: DeletableEvent) => void;
+  editMode?: boolean;
+  onShiftEvent?: (event: TimelineEvent, deltaMinutes: number) => Promise<void>;
+}) {
+  const [shifting, setShifting] = useState<"up" | "down" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const canShift = editMode && event.canEdit !== false && Boolean(onShiftEvent);
+
+  function shift(delta: number) {
+    if (!onShiftEvent || shifting) return;
+    setShifting(delta < 0 ? "up" : "down");
+    setError(null);
+    onShiftEvent(event, delta)
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "לא הצלחנו להזיז את האירוע."))
+      .finally(() => setShifting(null));
+  }
+
+  const short = height < 2;
+  const insets = laneInsets(column, columns);
+
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.24), ease: [0.16, 1, 0.3, 1] }}
+      className={cn(
+        "group absolute flex flex-col overflow-hidden rounded-lg border bg-surface px-2.5 py-1.5",
+        canShift
+          ? "border-gold-line shadow-[0_0_0_1px_var(--gold-line)]"
+          : "border-hairline-card shadow-[0_1px_2px_rgba(16,16,20,0.04),0_8px_20px_-16px_rgba(16,16,20,0.22)]"
+      )}
+      style={{
+        top: `${top + 0.1}rem`,
+        height: `${Math.max(height - 0.2, 1.4)}rem`,
+        ...insets,
+      }}
+    >
+      <div className="flex min-w-0 items-start gap-1.5">
+        <p className={cn("min-w-0 flex-1 truncate font-medium text-foreground", short ? "text-xs" : "text-sm")}>
+          {event.title}
+        </p>
+        {canShift ? (
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button
+              onClick={() => shift(-SHIFT_STEP_MINUTES)}
+              disabled={Boolean(shifting)}
+              aria-label={`הקדם את ${event.title} ברבע שעה`}
+              className="focus-ring grid size-5 place-items-center rounded bg-fill-subtle text-muted transition-colors hover:text-foreground disabled:opacity-40"
+            >
+              {shifting === "up" ? <Loader2 size={10} className="animate-spin" aria-hidden /> : <ChevronUp size={11} aria-hidden />}
+            </button>
+            <button
+              onClick={() => shift(SHIFT_STEP_MINUTES)}
+              disabled={Boolean(shifting)}
+              aria-label={`דחה את ${event.title} ברבע שעה`}
+              className="focus-ring grid size-5 place-items-center rounded bg-fill-subtle text-muted transition-colors hover:text-foreground disabled:opacity-40"
+            >
+              {shifting === "down" ? <Loader2 size={10} className="animate-spin" aria-hidden /> : <ChevronDown size={11} aria-hidden />}
+            </button>
+          </div>
+        ) : (
+          onDeleteEvent && <DeleteEventButton event={event} onRequest={onDeleteEvent} className="-me-1" />
+        )}
+      </div>
+      {!short && <p className="ltr mt-0.5 text-[0.7rem] text-muted">{clockRange(event.start, event.end)}</p>}
+      {error && <p className="mt-0.5 text-[0.62rem] text-red-500">{error}</p>}
+    </motion.div>
+  );
+}
+
 function GapLine({
   gap,
   topRem,
@@ -206,7 +240,6 @@ function GapLine({
   const [error, setError] = useState<string | null>(null);
   const accent = gap.accentVar ?? "--muted";
 
-  // Where the task would land: the first hour of the gap, capped to its end.
   const slotStart = gap.startMinute;
   const slotEnd = Math.min(gap.endMinute, slotStart + 60);
 
@@ -224,19 +257,22 @@ function GapLine({
 
   return (
     <div
-      className="pointer-events-none absolute end-2 start-16"
-      style={{ top: `${topRem}rem`, height: `${heightRem}rem` }}
+      className="pointer-events-none absolute"
+      style={{
+        top: `${topRem}rem`,
+        height: `${heightRem}rem`,
+        insetInlineStart: `${GUTTER_REM}rem`,
+        insetInlineEnd: `${EDGE_GAP_REM}rem`,
+      }}
     >
       {/* The extent of the free stretch: one faint dashed hairline down the
-          inline-start edge. No fill, no box — the events stay the only solid
-          things on the column. */}
+          inline-start edge. No fill — the events stay the only solid things. */}
       <span
         className="absolute inset-y-1 start-0 w-px border-s border-dashed"
         style={{ borderColor: `color-mix(in srgb, var(${accent}) 45%, transparent)` }}
         aria-hidden
       />
 
-      {/* A single label at the top of the stretch. */}
       <div className="pointer-events-auto absolute -top-2 start-2 flex items-center gap-1.5">
         <span
           className="rounded-full bg-background px-1.5 text-[0.65rem] font-medium"
@@ -264,8 +300,6 @@ function GapLine({
         )}
       </div>
 
-      {/* Inline confirmation — the app never writes to the real calendar
-          without a distinct confirm step. */}
       {gap.task && (phase === "confirm" || phase === "scheduling") && (
         <div className="pointer-events-auto absolute start-2 top-3 z-20 flex w-max max-w-[16rem] flex-col gap-1.5 rounded-lg border border-hairline-card bg-surface p-2 shadow-md">
           <p className="text-[0.7rem] text-foreground">
@@ -322,12 +356,6 @@ export function VerticalTimeline({
 }: VerticalTimelineProps) {
   const reduce = useReducedMotion();
 
-  const dayStart = useMemo(() => {
-    const d = new Date(day);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, [day]);
-
   const hours = useMemo(
     () => Array.from({ length: toHour - fromHour }, (_, i) => fromHour + i),
     [fromHour, toHour]
@@ -335,30 +363,29 @@ export function VerticalTimeline({
 
   const gridStartMin = fromHour * 60;
   const gridEndMin = toHour * 60;
+  const gridHeightRem = hours.length * ROW_HEIGHT_REM;
 
-  // Place each event by its offset from the grid's first hour, in rem, so an
-  // event spanning 09:15-10:45 lands exactly across the 09 and 10 rows rather
-  // than being snapped to whole hours.
-  const positioned = useMemo(() => {
-    const gridStartMs = dayStart.getTime() + fromHour * 3_600_000;
-    const gridEndMs = dayStart.getTime() + toHour * 3_600_000;
-    return events
-      .map((event) => {
-        const start = new Date(event.start).getTime();
-        const end = new Date(event.end).getTime();
-        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
-        if (end <= gridStartMs || start >= gridEndMs) return null;
-        const clampedStart = Math.max(start, gridStartMs);
-        const clampedEnd = Math.min(end, gridEndMs);
-        const topRem = ((clampedStart - gridStartMs) / 3_600_000) * ROW_HEIGHT_REM;
-        const heightRem = Math.max(
-          ((clampedEnd - clampedStart) / 3_600_000) * ROW_HEIGHT_REM,
-          1.5
-        );
-        return { event, topRem, heightRem };
-      })
-      .filter((v): v is NonNullable<typeof v> => v !== null);
-  }, [events, dayStart, fromHour, toHour]);
+  // Column layout: overlapping events split side by side rather than stacking
+  // on top of each other. `layoutDayEvents` returns top/height as fractions
+  // of the whole grid, which we scale to rem.
+  const placed = useMemo(() => {
+    const spans = layoutDayEvents(
+      events,
+      (event) => ({
+        startMinute: minutesIntoDay(new Date(event.start)),
+        endMinute: minutesIntoDay(new Date(event.end)),
+      }),
+      gridStartMin,
+      gridEndMin
+    );
+    return spans.map((p) => ({
+      event: p.event,
+      top: p.top * gridHeightRem,
+      height: p.height * gridHeightRem,
+      column: p.column,
+      columns: p.columns,
+    }));
+  }, [events, gridStartMin, gridEndMin, gridHeightRem]);
 
   const positionedGaps = useMemo(() => {
     return gaps
@@ -375,103 +402,100 @@ export function VerticalTimeline({
 
   const nowOffsetRem = useMemo(() => {
     if (!now) return null;
-    const gridStartMs = dayStart.getTime() + fromHour * 3_600_000;
-    const gridEndMs = dayStart.getTime() + toHour * 3_600_000;
-    const t = now.getTime();
-    if (t < gridStartMs || t > gridEndMs) return null;
-    return ((t - gridStartMs) / 3_600_000) * ROW_HEIGHT_REM;
-  }, [now, dayStart, fromHour, toHour]);
+    const minute = now.getHours() * 60 + now.getMinutes();
+    if (minute < gridStartMin || minute > gridEndMin) return null;
+    return ((minute - gridStartMin) / 60) * ROW_HEIGHT_REM;
+  }, [now, gridStartMin, gridEndMin]);
+
+  void day;
 
   return (
-    <div className="relative">
-      <div className="relative" style={{ height: `${hours.length * ROW_HEIGHT_REM}rem` }}>
-        {/* Hour rows: the energy banding lives here, behind the events. */}
-        {hours.map((hour, i) => {
-          const energy = energyForHour(hour, chronotype, observedEnergy);
-          const style = ENERGY_STYLE[energy];
-          const isBandStart =
-            i === 0 || energyForHour(hours[i - 1], chronotype, observedEnergy) !== energy;
-          return (
+    <div className="relative" style={{ height: `${gridHeightRem}rem` }}>
+      {/* Hour rows. The label sits in the fixed gutter; the hairline + energy
+          tint span only the content lane, so nothing draws over the hours. */}
+      {hours.map((hour, i) => {
+        const energy = energyForHour(hour, chronotype, observedEnergy);
+        const style = ENERGY_STYLE[energy];
+        const isBandStart =
+          i === 0 || energyForHour(hours[i - 1], chronotype, observedEnergy) !== energy;
+        return (
+          <div
+            key={hour}
+            className="absolute inset-x-0"
+            style={{ top: `${i * ROW_HEIGHT_REM}rem`, height: `${ROW_HEIGHT_REM}rem` }}
+          >
+            <span className="ltr absolute inset-y-0 start-0 flex w-12 items-start pt-1 text-xs tabular-nums text-muted">
+              {hourLabel(hour)}
+            </span>
             <div
-              key={hour}
-              className={cn(
-                "absolute inset-x-0 flex items-start gap-3 border-t border-hairline-card",
-                style.row
-              )}
-              style={{ top: `${i * ROW_HEIGHT_REM}rem`, height: `${ROW_HEIGHT_REM}rem` }}
+              className={cn("absolute inset-y-0 border-t border-hairline-card", style.row)}
+              style={{ insetInlineStart: `${GUTTER_REM}rem`, insetInlineEnd: 0 }}
             >
-              <span className="ltr w-12 shrink-0 pt-1 text-start text-xs tabular-nums text-muted">
-                {hourLabel(hour)}
-              </span>
-              <span className={cn("mt-0 h-full w-px shrink-0", style.rail)} aria-hidden />
+              <span className={cn("absolute inset-y-0 start-0 w-px", style.rail)} aria-hidden />
               {isBandStart && energy !== "neutral" && (
                 <span
                   className={cn(
-                    "pointer-events-none pt-1 text-[0.65rem] font-medium",
+                    "pointer-events-none absolute start-1.5 top-1 inline-flex items-center gap-1 rounded-full bg-background/80 px-1 text-[0.62rem] font-medium",
                     style.badge ?? "text-muted"
                   )}
                 >
                   {energy === "peak" && (
-                    <span className="inline-flex items-center gap-1">
-                      <Sparkles size={11} aria-hidden />
+                    <>
+                      <Sparkles size={10} aria-hidden />
                       שעות שיא
-                    </span>
+                    </>
                   )}
                   {energy === "low" && (
-                    <span className="inline-flex items-center gap-1">
-                      <TrendingDown size={11} aria-hidden />
+                    <>
+                      <TrendingDown size={10} aria-hidden />
                       אנרגיה נמוכה
-                    </span>
+                    </>
                   )}
                   {energy === "asleep" && (
-                    <span className="inline-flex items-center gap-1">
-                      <Moon size={11} aria-hidden />
+                    <>
+                      <Moon size={10} aria-hidden />
                       שינה
-                    </span>
+                    </>
                   )}
                 </span>
               )}
             </div>
-          );
-        })}
-
-        {/* Free-time bands: behind the events, above the hour banding. */}
-        {positionedGaps.map(({ gap, topRem, heightRem }) => (
-          <GapLine
-            key={gap.id}
-            gap={gap}
-            topRem={topRem}
-            heightRem={heightRem}
-            onSchedule={onScheduleGapTask}
-          />
-        ))}
-
-        {/* Events float above the banding, inset past the hour gutter. */}
-        {positioned.map(({ event, topRem, heightRem }, i) => (
-          <EventBlock
-            key={event.id}
-            event={event}
-            topRem={topRem}
-            heightRem={heightRem}
-            reduce={reduce}
-            index={i}
-            onDeleteEvent={onDeleteEvent}
-            editMode={editMode}
-            onShiftEvent={onShiftEvent}
-          />
-        ))}
-
-        {nowOffsetRem !== null && (
-          <div
-            className="pointer-events-none absolute inset-x-0 z-10 flex items-center gap-1"
-            style={{ top: `${nowOffsetRem}rem` }}
-            aria-hidden
-          >
-            <span className="size-1.5 shrink-0 rounded-full bg-[var(--gold)]" />
-            <span className="h-px flex-1 bg-[var(--gold)]/50" />
           </div>
-        )}
-      </div>
+        );
+      })}
+
+      {/* Free-time bands, behind the events. */}
+      {positionedGaps.map(({ gap, topRem, heightRem }) => (
+        <GapLine key={gap.id} gap={gap} topRem={topRem} heightRem={heightRem} onSchedule={onScheduleGapTask} />
+      ))}
+
+      {/* Events — column-laid-out, never over the gutter. */}
+      {placed.map(({ event, top, height, column, columns }, i) => (
+        <EventBlock
+          key={event.id}
+          event={event}
+          top={top}
+          height={height}
+          column={column}
+          columns={columns}
+          reduce={reduce}
+          index={i}
+          onDeleteEvent={onDeleteEvent}
+          editMode={editMode}
+          onShiftEvent={onShiftEvent}
+        />
+      ))}
+
+      {nowOffsetRem !== null && (
+        <div
+          className="pointer-events-none absolute inset-x-0 z-10 flex items-center gap-1"
+          style={{ top: `${nowOffsetRem}rem` }}
+          aria-hidden
+        >
+          <span className="ms-11 size-1.5 shrink-0 rounded-full bg-[var(--gold)]" />
+          <span className="h-px flex-1 bg-[var(--gold)]/50" />
+        </div>
+      )}
     </div>
   );
 }

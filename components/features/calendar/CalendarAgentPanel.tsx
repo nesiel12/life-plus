@@ -12,6 +12,10 @@ interface ProposedEvent {
   title: string;
   start: string;
   end: string;
+  /** Wall-clock in the user's zone — the offset-proof way to create it. */
+  startLocal: string;
+  endLocal: string;
+  timeZone: string;
   durationMinutes: number;
   recurrence?: { rrule: string; description: string };
 }
@@ -121,15 +125,31 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
     }
   }
 
-  async function confirm(start: string, end: string, title: string, recurrence?: string) {
+  async function confirm(input: {
+    start: string;
+    end: string;
+    title: string;
+    startLocal?: string;
+    endLocal?: string;
+    timeZone?: string;
+    recurrence?: string;
+  }) {
     setCreating(true);
     setError(null);
-    setCreatedRecurring(Boolean(recurrence));
+    setCreatedRecurring(Boolean(input.recurrence));
     try {
       const res = await fetch("/api/calendar/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, start, end, ...(recurrence ? { recurrence } : {}) }),
+        body: JSON.stringify({
+          title: input.title,
+          start: input.start,
+          end: input.end,
+          ...(input.startLocal && input.endLocal && input.timeZone
+            ? { startLocal: input.startLocal, endLocal: input.endLocal, timeZone: input.timeZone }
+            : {}),
+          ...(input.recurrence ? { recurrence: input.recurrence } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -264,12 +284,15 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() =>
-                  confirm(
-                    response.event.start,
-                    response.event.end,
-                    response.event.title,
-                    response.event.recurrence?.rrule
-                  )
+                  confirm({
+                    start: response.event.start,
+                    end: response.event.end,
+                    title: response.event.title,
+                    startLocal: response.event.startLocal,
+                    endLocal: response.event.endLocal,
+                    timeZone: response.event.timeZone,
+                    recurrence: response.event.recurrence?.rrule,
+                  })
                 }
                 disabled={creating}
                 className="focus-ring flex items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-xs font-medium text-[var(--background)] transition-opacity disabled:opacity-40"
@@ -296,7 +319,7 @@ export function CalendarAgentPanel({ busy, onCreated }: CalendarAgentPanelProps)
                         const end = new Date(
                           new Date(slot.start).getTime() + response.event.durationMinutes * 60_000
                         ).toISOString();
-                        confirm(slot.start, end, response.event.title);
+                        confirm({ start: slot.start, end, title: response.event.title });
                       }}
                       disabled={creating}
                       className={cn(
