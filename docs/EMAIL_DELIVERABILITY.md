@@ -20,6 +20,15 @@ Variables) and in `.env.local` for local runs:
 | `RESEND_API_KEY` | From the Resend dashboard → API Keys. |
 | `EMAIL_FROM` | A sender **on a domain you have verified in Resend**, e.g. `Life Plus <noreply@mail.yourdomain.com>`. The display name is optional but improves deliverability. |
 | `EMAIL_APP_URL` | The public app URL, no trailing slash, e.g. `https://yourdomain.com`. Used for deep links and the unsubscribe link. Falls back to `NEXTAUTH_URL`; if that is `localhost`, mail is flagged as spam and `sendEmail` logs a warning. |
+| `EMAIL_REPLY_TO` | *Optional.* A monitored address replies go to, e.g. `hello@yourdomain.com`. Improves deliverability and trust — a domain whose mail is never replied to looks more like a spam source. Defaults to the `EMAIL_FROM` address. |
+
+**Headers set on every send** (`lib/notify/channels/email.ts`): RFC 8058
+`List-Unsubscribe` + `List-Unsubscribe-Post: One-Click`, a `reply_to`, a
+Resend `kind` tag (so bounces/complaints/opens can be traced to a specific
+notification type in the Resend dashboard), and `X-Entity-Ref-ID` set to the
+notification row id for idempotency — a retry after a network wobble is
+de-duplicated rather than delivered twice. Both `text/plain` and `text/html`
+parts are always included.
 
 Without `RESEND_API_KEY` **or** `EMAIL_FROM`, `sendEmail` is a no-op that
 reports `{ ok: true, skipped: true }` — jobs still run, in-app notifications

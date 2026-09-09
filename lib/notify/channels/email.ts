@@ -15,6 +15,10 @@ export interface EmailSendInput {
   body: string;
   reason?: string;
   action?: NotificationAction | null;
+  /** The notification row id, when this send has one. Used as an idempotency
+   *  key so a retry after a network wobble can't deliver the same email
+   *  twice. */
+  notificationId?: string;
 }
 
 export type EmailSendResult = { ok: true; skipped?: boolean } | { ok: false; error: string };
@@ -129,6 +133,13 @@ export async function sendEmail(input: EmailSendInput): Promise<EmailSendResult>
         subject,
         html,
         text,
+        // A monitored reply-to beats a bare no-reply@ for both deliverability
+        // and trust: a domain whose mail is never replied to looks more like
+        // a spam source. Falls back to the From address.
+        reply_to: process.env.EMAIL_REPLY_TO || from,
+        // Resend groups bounces, complaints and opens by tag — the signal
+        // that tells you a specific notification kind is landing in spam.
+        tags: [{ name: "kind", value: input.kind.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64) }],
         headers: {
           // RFC 8058: lets Gmail and friends render a native Unsubscribe
           // control. Without it a recurring email is far likelier to be
@@ -136,6 +147,9 @@ export async function sendEmail(input: EmailSendInput): Promise<EmailSendResult>
           // domain its reputation.
           "List-Unsubscribe": `<${unsubscribeUrl}>`,
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          // Idempotency: a retry of the same notification is de-duplicated by
+          // Resend instead of double-delivered.
+          ...(input.notificationId ? { "X-Entity-Ref-ID": input.notificationId } : {}),
         },
       }),
       // A hung provider must not hold a cron invocation open to its limit.
