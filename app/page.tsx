@@ -125,7 +125,7 @@ export default function Home() {
           className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(120%_90%_at_50%_-10%,color-mix(in_srgb,var(--gold)_13%,transparent),transparent_62%)]"
         />
 
-        <div className="relative mx-auto max-w-6xl">
+        <div className="relative w-full">
           {/* Brand kicker — the isolated mark with the wordmark beside it. */}
           <motion.div
             initial={{ opacity: 0, y: -8 }}
@@ -199,7 +199,7 @@ export default function Home() {
       </header>
 
       {/* ─── Bento dashboard ──────────────────────────────────────────────── */}
-      <div className="mx-auto max-w-6xl px-6 pb-16 sm:px-10 lg:px-16">
+      <div className="w-full px-6 pb-16 sm:px-10 lg:px-16">
         {/* Widget bodies, keyed by registry id. The grid below renders
             whichever of these the user's layout asks for, in their order —
             the arrangement lives in data, not in this JSX. */}

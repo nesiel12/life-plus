@@ -189,7 +189,7 @@ export function DayView({ anchor, chronotype, editMode = false }: DayViewProps) 
       startMinute,
       endMinute,
     }: {
-      taskId: string;
+      taskId?: string;
       title: string;
       startMinute: number;
       endMinute: number;

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { CalendarPlus, Check, ChevronDown, ChevronUp, Loader2, Moon, Sparkles, TrendingDown } from "lucide-react";
+import { CalendarPlus, Check, ChevronDown, ChevronUp, Loader2, Moon, Plus, Sparkles, TrendingDown, X } from "lucide-react";
 import { energyForHour, type HourEnergy, type ObservedEnergy } from "@/lib/calendar/energy";
 import { DeleteEventButton, type DeletableEvent } from "@/components/features/calendar/DeleteEventDialog";
 import { layoutDayEvents, minutesIntoDay } from "@/lib/calendar/layoutDayEvents";
@@ -50,10 +50,12 @@ interface VerticalTimelineProps {
   onDeleteEvent?: (event: DeletableEvent) => void;
   /** Free-time bands drawn behind the events. */
   gaps?: TimelineGap[];
-  /** Schedules a gap's suggested task as a real calendar event. Resolves
-   *  when the write lands; the timeline refetches from the parent. */
+  /** Schedules something into a free slot — the gap's suggested task, or a
+   *  title the user typed straight into the slot. `taskId` is present only
+   *  for the former. Resolves when the write lands; the timeline refetches
+   *  from the parent. */
   onScheduleGapTask?: (input: {
-    taskId: string;
+    taskId?: string;
     title: string;
     startMinute: number;
     endMinute: number;
@@ -64,9 +66,11 @@ interface VerticalTimelineProps {
   onShiftEvent?: (event: TimelineEvent, deltaMinutes: number) => Promise<void>;
 }
 
-// Tighter than it once was: an 18-hour column at 3.5rem/row was a screenful
-// of mostly-empty rows before the first event.
-const ROW_HEIGHT_REM = 2.75;
+// Compact View: a uniform, tight hour row (was 2.75rem). Every vertical
+// measurement in the grid is derived from this one constant, so the timeline
+// stays a true mathematical projection of the day — top and height are pure
+// functions of clock time, never hand-tuned per event.
+const ROW_HEIGHT_REM = 2.5;
 
 // The hour-label column, on the inline-start (right, in this RTL app) edge.
 // Everything else — hour rules, energy tints, events, gap bands, the now
@@ -75,10 +79,9 @@ const ROW_HEIGHT_REM = 2.75;
 // because they are not in the same box.
 const GUTTER_REM = 3.25;
 
-// Gap between two side-by-side event columns, as a fraction of one column.
-// A small fixed fraction reads cleanly at any lane width without the
-// brittle nested calc() the previous layout used.
-const COLUMN_GAP_FRACTION = 0.04;
+// The seam between two side-by-side event columns, as a % of the lane. Small
+// and fixed so it reads cleanly at any width.
+const COLUMN_GAP_PCT = 1.4;
 
 // Luxe, not glass: an opaque surface, hairline rules, and gold reserved for
 // the single thing that matters most — the user's peak-focus band.
@@ -98,8 +101,8 @@ function hourLabel(hour: number): string {
 }
 
 function minuteLabel(minute: number): string {
-  const h = Math.floor(minute / 60);
-  const m = minute % 60;
+  const h = Math.floor(minute / 60) % 24;
+  const m = Math.round(minute % 60);
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
@@ -119,16 +122,16 @@ function clockRange(start: string, end: string): string {
 
 const SHIFT_STEP_MINUTES = 15;
 
-// Horizontal placement of a card within the content lane, expressed purely
-// in percentages of the lane so it stays correct at any width and in either
-// writing direction (insetInlineStart / width are logical).
+// Exact horizontal placement of a card within its overlap cluster: N equal
+// columns, each `(100 - gaps)/N` wide, offset by its column index. Non-
+// overlapping events (columns === 1) take the full lane.
 function columnPlacement(column: number, columns: number): { insetInlineStart: string; width: string } {
   if (columns <= 1) return { insetInlineStart: "0%", width: "100%" };
-  const slice = 100 / columns;
-  const gap = slice * COLUMN_GAP_FRACTION;
+  const totalGap = COLUMN_GAP_PCT * (columns - 1);
+  const col = (100 - totalGap) / columns;
   return {
-    insetInlineStart: `${column * slice + (column === 0 ? 0 : gap / 2)}%`,
-    width: `${slice - (column === 0 || column === columns - 1 ? gap / 2 : gap)}%`,
+    insetInlineStart: `${column * (col + COLUMN_GAP_PCT)}%`,
+    width: `${col}%`,
   };
 }
 
@@ -136,8 +139,9 @@ function columnPlacement(column: number, columns: number): { insetInlineStart: s
 // split into side-by-side columns by layoutDayEvents.
 function EventBlock({
   event,
-  top,
-  height,
+  topPct,
+  heightPct,
+  heightRem,
   column,
   columns,
   reduce,
@@ -147,10 +151,11 @@ function EventBlock({
   onShiftEvent,
 }: {
   event: TimelineEvent;
-  /** rem from the top of the grid */
-  top: number;
-  /** rem */
-  height: number;
+  /** % of the grid height */
+  topPct: number;
+  heightPct: number;
+  /** the same height in rem, for the text-budget math */
+  heightRem: number;
   column: number;
   columns: number;
   reduce: boolean | null;
@@ -172,20 +177,15 @@ function EventBlock({
       .finally(() => setShifting(null));
   }
 
-  const cardHeight = Math.max(height - 0.15, 1.55);
-  // Only ever render what actually fits: allocate the card's height to
-  // padding, then whole title lines, then (if there is still room) the time
-  // row. This is what stops the old layout clipping the last line mid-glyph
-  // — the "חצאי מילים" — when it tried to show a time row plus two lines in
-  // a one-line slot.
-  const compact = cardHeight < 2.2;
+  // Render only what fits: allocate the card's height to padding, then whole
+  // title lines, then a time row only when there is still room. This is what
+  // stops the last line being sheared through the middle of the glyphs.
+  const usableRem = Math.max(heightRem - 0.15, 1.4);
+  const compact = usableRem < 2.2;
   const LINE_REM = 1.02;
-  const usable = cardHeight - (compact ? 0.35 : 0.85);
-  let titleLines = Math.max(1, Math.floor(usable / LINE_REM));
-  // The time row is worth its line only on a card wide enough to read it and
-  // tall enough to spare the room — otherwise the position on the grid
-  // already says when, and the space is better spent on the title.
-  const showTime = !compact && columns <= 2 && cardHeight >= 3.4 && titleLines > 1;
+  const budget = usableRem - (compact ? 0.35 : 0.85);
+  let titleLines = Math.max(1, Math.floor(budget / LINE_REM));
+  const showTime = !compact && columns <= 2 && usableRem >= 3.4 && titleLines > 1;
   if (showTime) titleLines -= 1;
   titleLines = Math.min(titleLines, 4);
   const clampClass = ["line-clamp-1", "line-clamp-1", "line-clamp-2", "line-clamp-3", "line-clamp-4"][titleLines];
@@ -197,15 +197,16 @@ function EventBlock({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: Math.min(index * 0.03, 0.24), ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "group absolute flex flex-col overflow-hidden rounded-lg border bg-surface",
+        "group absolute z-[2] flex flex-col overflow-hidden rounded-lg border bg-surface",
         compact ? "px-2 py-0.5" : "px-2.5 py-1.5",
         canShift
           ? "border-gold-line shadow-[0_0_0_1px_var(--gold-line)]"
           : "border-hairline-card shadow-[0_1px_2px_rgba(16,16,20,0.04),0_8px_20px_-16px_rgba(16,16,20,0.22)]"
       )}
       style={{
-        top: `${top + 0.1}rem`,
-        height: `${cardHeight}rem`,
+        top: `${topPct}%`,
+        height: `calc(${heightPct}% - 2px)`,
+        minHeight: "1.4rem",
         ...place,
       }}
     >
@@ -264,110 +265,145 @@ function EventBlock({
   );
 }
 
-function GapLine({
+// A free window in the day. Renders a faint band you can act inside: a
+// "קבע כאן" pill that expands to either the app's own suggestion for the
+// slot or a one-line title field, and writes a real calendar event.
+function GapBand({
   gap,
-  topRem,
-  heightRem,
+  topPct,
+  heightPct,
   onSchedule,
 }: {
   gap: TimelineGap;
-  topRem: number;
-  heightRem: number;
+  topPct: number;
+  heightPct: number;
   onSchedule?: VerticalTimelineProps["onScheduleGapTask"];
 }) {
-  const [phase, setPhase] = useState<"rest" | "confirm" | "scheduling" | "done">("rest");
+  const [phase, setPhase] = useState<"rest" | "open" | "saving" | "done">("rest");
+  const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const accent = gap.accentVar ?? "--muted";
 
+  // Cap the slot at 60 minutes — a suggestion drops a focused block into the
+  // window, it doesn't claim the whole afternoon.
   const slotStart = gap.startMinute;
   const slotEnd = Math.min(gap.endMinute, slotStart + 60);
 
-  function confirm() {
-    if (!gap.task || !onSchedule) return;
-    setPhase("scheduling");
+  function schedule(withTitle: string, taskId?: string) {
+    const t = withTitle.trim();
+    if (!t || !onSchedule) return;
+    setPhase("saving");
     setError(null);
-    onSchedule({ taskId: gap.task.id, title: gap.task.title, startMinute: slotStart, endMinute: slotEnd })
+    onSchedule({ taskId, title: t, startMinute: slotStart, endMinute: slotEnd })
       .then(() => setPhase("done"))
       .catch((err: unknown) => {
-        setPhase("confirm");
+        setPhase("open");
         setError(err instanceof Error ? err.message : "לא הצלחנו להוסיף ליומן.");
       });
   }
 
+  const tall = heightPct > 6;
+
   return (
     <div
-      className="pointer-events-none absolute inset-x-0"
-      style={{ top: `${topRem}rem`, height: `${heightRem}rem` }}
+      className="absolute inset-x-0 z-[1]"
+      style={{ top: `${topPct}%`, height: `${heightPct}%` }}
     >
-      {/* The extent of the free stretch: one faint dashed hairline down the
-          inline-start edge. No fill — the events stay the only solid things. */}
-      <span
-        className="absolute inset-y-1 start-0 w-px border-s border-dashed"
-        style={{ borderColor: `color-mix(in srgb, var(${accent}) 45%, transparent)` }}
+      {/* The window itself — a barely-there tint, dashed on the leading edge,
+          so free time reads as usable space without competing with events. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 inset-y-0.5 rounded-md border border-dashed"
+        style={{
+          borderColor: `color-mix(in srgb, var(${accent}) 30%, transparent)`,
+          background: `color-mix(in srgb, var(${accent}) 4%, transparent)`,
+        }}
         aria-hidden
       />
 
-      <div className="pointer-events-auto absolute -top-2 start-1.5 flex items-center gap-1.5">
+      <div className={cn("absolute start-2 flex flex-wrap items-center gap-1.5", tall ? "top-1.5" : "top-1/2 -translate-y-1/2")}>
         <span
-          className="rounded-full bg-background px-1.5 text-[0.65rem] font-medium"
+          className="rounded-full bg-background/90 px-1.5 text-[0.65rem] font-medium"
           style={{ color: `color-mix(in srgb, var(${accent}) 80%, var(--foreground))` }}
         >
           {gap.label}
         </span>
-        <span className="ltr rounded-full bg-background px-1 text-[0.6rem] tabular-nums text-muted">
+        <span className="ltr rounded-full bg-background/90 px-1 text-[0.6rem] tabular-nums text-muted">
           {formatGapDuration(gap.durationMinutes)}
         </span>
 
-        {gap.task && onSchedule && phase === "done" && (
-          <span className="flex items-center gap-0.5 rounded-full bg-background px-1 text-[0.6rem] text-accent-health">
+        {phase === "done" && (
+          <span className="flex items-center gap-0.5 rounded-full bg-background/90 px-1 text-[0.6rem] text-accent-health">
             <Check size={9} aria-hidden />
             נקבע
           </span>
         )}
-        {gap.task && onSchedule && phase === "rest" && (
+
+        {phase === "rest" && onSchedule && (
           <button
-            onClick={() => setPhase("confirm")}
-            className="focus-ring rounded-full bg-background px-1 text-[0.6rem] font-medium text-gold-ink underline decoration-dotted underline-offset-2"
+            onClick={() => setPhase("open")}
+            className="focus-ring flex items-center gap-0.5 rounded-full border border-hairline-card bg-background/90 px-1.5 py-0.5 text-[0.6rem] font-medium text-gold-ink transition-colors hover:bg-fill-subtle"
           >
-            קבע כאן
+            <Plus size={9} aria-hidden />
+            הצע פעילות
           </button>
         )}
       </div>
 
-      {gap.task && (phase === "confirm" || phase === "scheduling") && (
-        <div className="pointer-events-auto absolute start-2 top-3 z-20 flex w-max max-w-[15rem] flex-col gap-1.5 rounded-lg border border-hairline-card bg-surface p-2 shadow-md">
-          <p className="text-[0.7rem] text-foreground">
-            לקבוע את <span className="font-medium">{gap.task.title}</span>{" "}
-            <span className="ltr tabular-nums text-muted">
+      {(phase === "open" || phase === "saving") && onSchedule && (
+        <div className="absolute start-2 top-7 z-20 flex w-max max-w-[15rem] flex-col gap-1.5 rounded-lg border border-hairline-card bg-surface p-2 shadow-md">
+          <div className="flex items-center justify-between gap-2">
+            <span className="ltr text-[0.65rem] tabular-nums text-muted">
               {minuteLabel(slotStart)}–{minuteLabel(slotEnd)}
             </span>
-            ?
-          </p>
-          {error && <p className="text-[0.65rem] text-red-500">{error}</p>}
-          <div className="flex gap-1.5">
-            <button
-              onClick={confirm}
-              disabled={phase === "scheduling"}
-              className="focus-ring flex items-center gap-1 rounded-md bg-ink px-2 py-1 text-[0.65rem] font-medium text-[var(--background)] disabled:opacity-50"
-            >
-              {phase === "scheduling" ? (
-                <Loader2 size={10} className="animate-spin" aria-hidden />
-              ) : (
-                <CalendarPlus size={10} aria-hidden />
-              )}
-              קבע ביומן
-            </button>
             <button
               onClick={() => {
                 setPhase("rest");
                 setError(null);
               }}
-              disabled={phase === "scheduling"}
-              className="focus-ring rounded-md px-2 py-1 text-[0.65rem] text-muted hover:text-foreground disabled:opacity-50"
+              aria-label="בטל"
+              className="focus-ring text-muted hover:text-foreground"
             >
-              ביטול
+              <X size={11} aria-hidden />
             </button>
           </div>
+
+          {gap.task && (
+            <button
+              onClick={() => schedule(gap.task!.title, gap.task!.id)}
+              disabled={phase === "saving"}
+              className="focus-ring flex items-center gap-1 rounded-md bg-gold-soft px-2 py-1 text-start text-[0.65rem] font-medium text-gold-ink disabled:opacity-50"
+            >
+              <Sparkles size={9} className="shrink-0" aria-hidden />
+              <span className="truncate">{gap.task.title}</span>
+            </button>
+          )}
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              schedule(title);
+            }}
+            className="flex gap-1"
+          >
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="מה לקבוע כאן?"
+              aria-label="שם הפעילות"
+              autoFocus
+              className="focus-ring w-36 rounded-md border border-hairline-card bg-surface-sunken px-2 py-1 text-[0.7rem] text-foreground placeholder:text-muted"
+            />
+            <button
+              type="submit"
+              disabled={phase === "saving" || !title.trim()}
+              className="focus-ring grid size-6 shrink-0 place-items-center rounded-md bg-ink text-[var(--background)] disabled:opacity-50"
+              aria-label="קבע ביומן"
+            >
+              {phase === "saving" ? <Loader2 size={10} className="animate-spin" aria-hidden /> : <CalendarPlus size={10} aria-hidden />}
+            </button>
+          </form>
+
+          {error && <p className="text-[0.62rem] text-red-500">{error}</p>}
         </div>
       )}
     </div>
@@ -397,11 +433,15 @@ export function VerticalTimeline({
 
   const gridStartMin = fromHour * 60;
   const gridEndMin = toHour * 60;
+  const totalMin = gridEndMin - gridStartMin;
   const gridHeightRem = hours.length * ROW_HEIGHT_REM;
 
-  // Column layout: overlapping events split side by side rather than stacking
-  // on top of each other. `layoutDayEvents` returns top/height as fractions
-  // of the whole grid, which we scale to rem.
+  // Strict mathematical projection: an event's vertical geometry is a pure
+  // function of its clock time.
+  //   topPct    = (start - dayStart) / totalDayMinutes * 100
+  //   heightPct = duration           / totalDayMinutes * 100
+  // layoutDayEvents does exactly this (as 0–1 fractions) and additionally
+  // resolves overlaps into columns via an interval-graph greedy pack.
   const placed = useMemo(() => {
     const spans = layoutDayEvents(
       events,
@@ -414,8 +454,9 @@ export function VerticalTimeline({
     );
     return spans.map((p) => ({
       event: p.event,
-      top: p.top * gridHeightRem,
-      height: p.height * gridHeightRem,
+      topPct: p.top * 100,
+      heightPct: p.height * 100,
+      heightRem: p.height * gridHeightRem,
       column: p.column,
       columns: p.columns,
     }));
@@ -426,20 +467,22 @@ export function VerticalTimeline({
       .map((gap) => {
         const start = Math.max(gap.startMinute, gridStartMin);
         const end = Math.min(gap.endMinute, gridEndMin);
-        if (end - start < 25) return null;
-        const topRem = ((start - gridStartMin) / 60) * ROW_HEIGHT_REM;
-        const heightRem = ((end - start) / 60) * ROW_HEIGHT_REM;
-        return { gap, topRem, heightRem };
+        if (end - start < 30) return null;
+        return {
+          gap,
+          topPct: ((start - gridStartMin) / totalMin) * 100,
+          heightPct: ((end - start) / totalMin) * 100,
+        };
       })
       .filter((v): v is NonNullable<typeof v> => v !== null);
-  }, [gaps, gridStartMin, gridEndMin]);
+  }, [gaps, gridStartMin, gridEndMin, totalMin]);
 
-  const nowOffsetRem = useMemo(() => {
+  const nowPct = useMemo(() => {
     if (!now) return null;
     const minute = now.getHours() * 60 + now.getMinutes();
     if (minute < gridStartMin || minute > gridEndMin) return null;
-    return ((minute - gridStartMin) / 60) * ROW_HEIGHT_REM;
-  }, [now, gridStartMin, gridEndMin]);
+    return ((minute - gridStartMin) / totalMin) * 100;
+  }, [now, gridStartMin, gridEndMin, totalMin]);
 
   void day;
 
@@ -450,8 +493,8 @@ export function VerticalTimeline({
       {hours.map((hour, i) => (
         <span
           key={`label-${hour}`}
-          className="ltr absolute start-0 flex w-12 items-start justify-start pt-1 text-xs tabular-nums text-muted"
-          style={{ top: `${i * ROW_HEIGHT_REM}rem` }}
+          className="ltr absolute start-0 flex w-12 items-start justify-start pt-0.5 text-[0.7rem] tabular-nums text-muted"
+          style={{ top: `${(i / hours.length) * 100}%` }}
         >
           {hourLabel(hour)}
         </span>
@@ -460,10 +503,7 @@ export function VerticalTimeline({
       {/* The content lane: begins where the gutter ends and runs to the far
           edge. It is the positioning context for everything below, so every
           child's 0%–100% is measured across the lane, not the whole grid. */}
-      <div
-        className="absolute inset-y-0 end-0"
-        style={{ insetInlineStart: `${GUTTER_REM}rem` }}
-      >
+      <div className="absolute inset-y-0 end-0" style={{ insetInlineStart: `${GUTTER_REM}rem` }}>
         {/* Hour rules + energy tint. */}
         {hours.map((hour, i) => {
           const energy = energyForHour(hour, chronotype, observedEnergy);
@@ -474,31 +514,31 @@ export function VerticalTimeline({
             <div
               key={hour}
               className={cn("absolute inset-x-0 border-t border-hairline-card", style.row)}
-              style={{ top: `${i * ROW_HEIGHT_REM}rem`, height: `${ROW_HEIGHT_REM}rem` }}
+              style={{ top: `${(i / hours.length) * 100}%`, height: `${(1 / hours.length) * 100}%` }}
             >
               <span className={cn("absolute inset-y-0 start-0 w-px", style.rail)} aria-hidden />
               {isBandStart && energy !== "neutral" && (
                 <span
                   className={cn(
-                    "pointer-events-none absolute start-1.5 top-1 inline-flex items-center gap-1 rounded-full bg-background/80 px-1 text-[0.62rem] font-medium",
+                    "pointer-events-none absolute start-1.5 top-0.5 inline-flex items-center gap-1 rounded-full bg-background/80 px-1 text-[0.6rem] font-medium",
                     style.badge ?? "text-muted"
                   )}
                 >
                   {energy === "peak" && (
                     <>
-                      <Sparkles size={10} aria-hidden />
+                      <Sparkles size={9} aria-hidden />
                       שעות שיא
                     </>
                   )}
                   {energy === "low" && (
                     <>
-                      <TrendingDown size={10} aria-hidden />
+                      <TrendingDown size={9} aria-hidden />
                       אנרגיה נמוכה
                     </>
                   )}
                   {energy === "asleep" && (
                     <>
-                      <Moon size={10} aria-hidden />
+                      <Moon size={9} aria-hidden />
                       שינה
                     </>
                   )}
@@ -508,18 +548,25 @@ export function VerticalTimeline({
           );
         })}
 
-        {/* Free-time bands, behind the events. */}
-        {positionedGaps.map(({ gap, topRem, heightRem }) => (
-          <GapLine key={gap.id} gap={gap} topRem={topRem} heightRem={heightRem} onSchedule={onScheduleGapTask} />
+        {/* Free-time windows, behind the events. */}
+        {positionedGaps.map(({ gap, topPct, heightPct }) => (
+          <GapBand
+            key={gap.id}
+            gap={gap}
+            topPct={topPct}
+            heightPct={heightPct}
+            onSchedule={onScheduleGapTask}
+          />
         ))}
 
         {/* Events — column-laid-out inside the lane. */}
-        {placed.map(({ event, top, height, column, columns }, i) => (
+        {placed.map(({ event, topPct, heightPct, heightRem, column, columns }, i) => (
           <EventBlock
             key={event.id}
             event={event}
-            top={top}
-            height={height}
+            topPct={topPct}
+            heightPct={heightPct}
+            heightRem={heightRem}
             column={column}
             columns={columns}
             reduce={reduce}
@@ -530,10 +577,10 @@ export function VerticalTimeline({
           />
         ))}
 
-        {nowOffsetRem !== null && (
+        {nowPct !== null && (
           <div
-            className="pointer-events-none absolute inset-x-0 z-10 flex items-center gap-1"
-            style={{ top: `${nowOffsetRem}rem` }}
+            className="pointer-events-none absolute inset-x-0 z-[3] flex items-center gap-1"
+            style={{ top: `${nowPct}%` }}
             aria-hidden
           >
             <span className="size-1.5 shrink-0 rounded-full bg-[var(--gold)]" />

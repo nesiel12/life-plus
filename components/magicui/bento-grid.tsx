@@ -54,7 +54,7 @@ export function BentoGrid({ children, className }: BentoGridProps) {
       // (0.75rem, a touch more at width) to keep each card's own border and
       // shadow legible.
       className={cn(
-        "grid w-full grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4",
+        "grid w-full grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4 2xl:grid-cols-4",
         className
       )}
     >
