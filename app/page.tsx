@@ -150,7 +150,7 @@ export default function Home() {
               and respond to the pointer. wordSafe keeps Hebrew words whole
               when the line wraps. Keyed on the greeting so the letters
               re-stage once the real time-of-day resolves after mount. */}
-          <h1 className="flex max-w-4xl flex-wrap items-baseline gap-x-[0.3em] text-5xl font-bold leading-[1.06] tracking-tight sm:text-6xl lg:text-7xl xl:text-8xl">
+          <h1 className="flex flex-wrap items-baseline gap-x-[0.3em] text-5xl font-bold leading-[1.06] tracking-tight sm:text-6xl lg:text-7xl xl:text-8xl">
             <KineticText
               key={greeting ?? "pending"}
               as="span"
