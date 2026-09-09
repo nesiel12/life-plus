@@ -2,12 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, CalendarClock, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
+import { ArrowLeft, CalendarClock, Compass, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "lifeplus.welcome.v1";
+const REPLAY_EVENT = "lifeplus:replay-welcome";
+
+/** Re-open the welcome tour (Settings → "צפה בסיור שוב"). Clears the
+ *  first-run flag and tells the mounted <WelcomeSlides> to show itself. */
+export function replayWelcomeTour(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new Event(REPLAY_EVENT));
+}
 
 interface Slide {
   icon: LucideIcon;
@@ -30,10 +42,16 @@ const SLIDES: Slide[] = [
     body: "יומן, משימות, לוז יומי והרגלים במקום אחד. כל בוקר תדע מה מחכה לך, מתי אתה פנוי, ומה הדבר הבא — בלי לחפש.",
   },
   {
+    icon: Compass,
+    colorVar: "--accent-learning",
+    title: "איך מנווטים",
+    body: "בצד המסך יש סרגל עם תחומי החיים — יומן, לימודים, תורה, משפחה, בריאות, כספים, מרחב אישי וציר הזמן. הלוגו למעלה תמיד מחזיר למסך הבית, וכפתור ⌘K בכל מקום פותח לכידה מהירה של רגע או משימה.",
+  },
+  {
     icon: ShieldCheck,
     colorVar: "--accent-family",
     title: "והכול פרטי ובשליטתך",
-    body: "כלום לא נשלח בלי שתאשר. מדורים אישיים ננעלים מאחורי טביעת אצבע, וההתראות באות אליך רק מתי שביקשת.",
+    body: "כלום לא נשלח בלי שתאשר. מדורים אישיים והכספים ננעלים מאחורי טביעת אצבע, וההתראות באות אליך רק מתי שביקשת.",
   },
 ];
 
@@ -48,6 +66,12 @@ export function WelcomeSlides() {
       // Private mode / blocked storage — skip the intro rather than showing
       // it on every load.
     }
+    function replay() {
+      setIndex(0);
+      setOpen(true);
+    }
+    window.addEventListener(REPLAY_EVENT, replay);
+    return () => window.removeEventListener(REPLAY_EVENT, replay);
   }, []);
 
   function dismiss() {

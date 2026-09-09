@@ -183,7 +183,11 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
         <section
           ref={materialRef}
           aria-label="חומר הלימוד"
-          className="relative flex max-h-[70vh] min-w-0 flex-col gap-4 overflow-y-auto rounded-2xl border border-hairline-card bg-surface p-5"
+          // Independent scroll only in the desktop split view. On a phone the
+          // material flows into the page so the reader scrolls one column,
+          // and the pager below rides the page scroll to stay pinned to the
+          // viewport bottom.
+          className="relative flex min-w-0 flex-col gap-4 rounded-2xl border border-hairline-card bg-surface p-5 lg:max-h-[70vh] lg:overflow-y-auto"
         >
           {videoId && <TheaterVideo videoId={videoId} title={topicTitle} />}
 
@@ -296,7 +300,7 @@ export function LearningSplitView({ topicTitle, videoUrl, onQuizComplete, onClos
               screen size and every scroll position. Negative margins pull it
               flush to the card edges past the section's own padding. */}
           {module && stages.length > 1 && (
-            <div className="sticky bottom-0 -mx-5 -mb-5 mt-2 flex items-center justify-between gap-3 border-t border-hairline-card bg-surface/95 px-5 py-3 backdrop-blur-sm">
+            <div className="sticky bottom-16 z-20 -mx-5 -mb-5 mt-2 flex items-center justify-between gap-3 rounded-b-2xl border-t border-hairline-card bg-surface/95 px-5 py-3 shadow-[0_-8px_20px_-12px_rgba(16,16,20,0.18)] backdrop-blur-sm sm:bottom-0">
               <button
                 onClick={() => goTo(stageIndex - 1)}
                 disabled={isFirst}

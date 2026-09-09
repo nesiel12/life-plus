@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, CalendarRange, Check, Clock, Globe, Languages, Loader2, Mail } from "lucide-react";
+import { Bell, CalendarRange, Check, Clock, Compass, Globe, Languages, Loader2, Mail } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BackToHome } from "@/components/layout/BackToHome";
+import { replayWelcomeTour } from "@/components/features/WelcomeSlides";
 import { EmailDiagnostics } from "@/components/features/settings/EmailDiagnostics";
+import { PushToggle } from "@/components/features/settings/PushToggle";
 import { GoogleConnections } from "@/components/features/settings/GoogleConnections";
 import { usePreferences, type AppLanguage } from "@/components/providers/PreferencesProvider";
 import { useT } from "@/lib/i18n/useT";
@@ -200,6 +202,24 @@ export default function SettingsPage() {
                 className="focus-ring mt-1 size-4 shrink-0 accent-[var(--gold)]"
               />
             </label>
+          </GlassCard>
+
+          <PushToggle
+            enabled={settings.channelPush}
+            onChangePref={(v) => save({ channelPush: v })}
+          />
+
+          <GlassCard className="flex flex-wrap items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm font-medium text-muted">
+              <Compass size={16} className="text-accent-learning" aria-hidden />
+              סיור היכרות
+            </p>
+            <button
+              onClick={replayWelcomeTour}
+              className="focus-ring glass-control rounded-lg px-3 py-1.5 text-xs font-medium text-foreground"
+            >
+              צפה בסיור שוב
+            </button>
           </GlassCard>
 
           <EmailDiagnostics />
