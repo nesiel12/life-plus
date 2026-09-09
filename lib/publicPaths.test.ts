@@ -13,6 +13,7 @@ describe("isAlwaysPublicPath", () => {
       "/sitemap.xml",
       "/favicon.ico",
       "/manifest.webmanifest",
+      "/sw.js",
       "/.well-known/apple-app-site-association",
       "/.well-known/security.txt",
     ]) {

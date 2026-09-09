@@ -21,6 +21,7 @@ export async function getNotificationSettingsAction(): Promise<NotificationSetti
 
 export interface NotificationSettingsPatch {
   channelEmail?: boolean;
+  channelPush?: boolean;
   quietHoursStart?: number;
   quietHoursEnd?: number;
   maxPerDay?: number;
@@ -48,6 +49,7 @@ export async function updateNotificationSettingsAction(
 
   const prefsPatch: Record<string, unknown> = {};
   if (patch.channelEmail !== undefined) prefsPatch.channel_email = patch.channelEmail;
+  if (patch.channelPush !== undefined) prefsPatch.channel_push = patch.channelPush;
   if (patch.quietHoursStart !== undefined) prefsPatch.quiet_hours_start = clampHour(patch.quietHoursStart);
   if (patch.quietHoursEnd !== undefined) prefsPatch.quiet_hours_end = clampHour(patch.quietHoursEnd);
   if (patch.maxPerDay !== undefined) {

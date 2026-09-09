@@ -7,7 +7,7 @@
 // runtime and the next-auth import graph.
 
 const PUBLIC_FILE =
-  /^\/(?:google[0-9a-z]+\.html|BingSiteAuth\.xml|robots\.txt|sitemap\.xml|favicon\.ico|apple-icon\.png|icon\.png|manifest\.webmanifest)$/i;
+  /^\/(?:google[0-9a-z]+\.html|BingSiteAuth\.xml|robots\.txt|sitemap\.xml|favicon\.ico|apple-icon\.png|icon\.png|manifest\.webmanifest|sw\.js)$/i;
 
 export function isAlwaysPublicPath(pathname: string): boolean {
   return PUBLIC_FILE.test(pathname) || pathname.startsWith("/.well-known/");

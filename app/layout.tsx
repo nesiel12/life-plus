@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Heebo } from "next/font/google";
 import { MotionConfig } from "framer-motion";
 import "./globals.css";
@@ -6,6 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { ThemeProvider, themeInitScript } from "@/components/providers/ThemeProvider";
 import { PreferencesProvider, preferencesInitScript } from "@/components/providers/PreferencesProvider";
+import { ServiceWorkerRegistrar } from "@/components/providers/ServiceWorkerRegistrar";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -24,6 +25,11 @@ export const metadata: Metadata = {
   verification: {
     google: "hu1yXiRy9cLRr1E5zCh83reeAov7fV3FLBnU7mCStGY",
   },
+  appleWebApp: { capable: true, title: "Life Plus", statusBarStyle: "black-translucent" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#100f13",
 };
 
 export default function RootLayout({
@@ -49,6 +55,7 @@ export default function RootLayout({
             <PreferencesProvider>
               <AuthProvider>
                 <AppShell>{children}</AppShell>
+                <ServiceWorkerRegistrar />
               </AuthProvider>
             </PreferencesProvider>
           </ThemeProvider>
