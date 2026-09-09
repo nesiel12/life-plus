@@ -37,8 +37,28 @@ const FALLBACK: RangeResponse = { connected: false, events: [] };
 // The grid's resting window. Widened by the day's own events, so an early
 // flight or a night shift still shows without every ordinary day paying for
 // the empty hours.
-const BASE_FROM_HOUR = 7;
+const BASE_FROM_HOUR = 6;
 const BASE_TO_HOUR = 23;
+
+// Life Plus accent palette — events are coloured by a stable hash of the
+// calendar they belong to, so a busy day is scannable by colour the way
+// Google Calendar's is, without fetching Google's own colour ids.
+const EVENT_ACCENTS = [
+  "--accent-career",
+  "--accent-learning",
+  "--accent-faith",
+  "--accent-family",
+  "--accent-health",
+  "--accent-finance",
+  "--accent-time",
+] as const;
+
+function accentForCalendar(calendarId: string | undefined): string {
+  if (!calendarId || calendarId === "primary") return "--accent-career";
+  let hash = 0;
+  for (let i = 0; i < calendarId.length; i++) hash = (hash * 31 + calendarId.charCodeAt(i)) | 0;
+  return EVENT_ACCENTS[Math.abs(hash) % EVENT_ACCENTS.length];
+}
 
 function toDateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
@@ -110,6 +130,7 @@ export function DayView({ anchor, chronotype, editMode = false }: DayViewProps) 
           end: e.end,
           calendarId: e.calendarId,
           canEdit: e.canEdit,
+          accentVar: accentForCalendar(e.calendarId),
         })),
     [events]
   );
@@ -264,19 +285,32 @@ export function DayView({ anchor, chronotype, editMode = false }: DayViewProps) 
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
       {allDay.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted">כל היום</span>
-          {allDay.map((event) => (
-            <span
-              key={event.id}
-              className="group flex items-center gap-1 rounded-lg bg-gold-soft px-2 py-1 text-xs text-gold-ink"
-            >
-              {event.title}
-              <DeleteEventButton event={event} onRequest={deletion.request} size="sm" />
-            </span>
-          ))}
+        // All-day / multi-day events have no honest place on a time grid, so
+        // they get their own full-width banner row above it — the same shape
+        // Google Calendar uses.
+        <div className="flex items-start gap-2">
+          <span className="w-14 shrink-0 pt-1 text-[0.7rem] text-muted">כל היום</span>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {allDay.map((event) => {
+              const accent = accentForCalendar(event.calendarId);
+              return (
+                <div
+                  key={event.id}
+                  className="group flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium"
+                  style={{
+                    background: `color-mix(in srgb, var(${accent}) 14%, var(--surface))`,
+                    color: `color-mix(in srgb, var(${accent}) 60%, var(--foreground))`,
+                    boxShadow: `inset 3px 0 0 0 var(${accent})`,
+                  }}
+                >
+                  <span className="min-w-0 flex-1 truncate">{event.title}</span>
+                  <DeleteEventButton event={event} onRequest={deletion.request} size="sm" />
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
