@@ -8,6 +8,7 @@ import { Sidebar, MobileTabBar } from "@/components/layout/Sidebar";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { AICompanion } from "@/components/layout/AICompanion";
 import { QuickCapture } from "@/components/features/QuickCapture";
+import { AlarmCenter } from "@/components/features/reminders/AlarmCenter";
 import { OnboardingFlow } from "@/components/features/OnboardingFlow";
 import { WelcomeSlides } from "@/components/features/WelcomeSlides";
 import { Logo } from "@/components/ui/Logo";
@@ -119,6 +120,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <MobileTabBar />
         <AICompanion />
         <QuickCapture />
+        <AlarmCenter />
         <WelcomeSlides />
         <OnboardingFlow />
       </div>
