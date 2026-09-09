@@ -49,8 +49,12 @@ export function BentoGrid({ children, className }: BentoGridProps) {
       variants={GRID_VARIANTS}
       initial="hidden"
       animate="show"
+      // Tight, deliberately: the dashboard reads as one panel of grouped
+      // widgets, not a scatter of distant cards. Just enough of a seam
+      // (0.75rem, a touch more at width) to keep each card's own border and
+      // shadow legible.
       className={cn(
-        "grid w-full grid-cols-1 items-stretch gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7",
+        "grid w-full grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4",
         className
       )}
     >
