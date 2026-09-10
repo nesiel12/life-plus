@@ -96,16 +96,18 @@ export default function Home() {
       />
 
       {/* ─── Hero ─────────────────────────────────────────────────────────── */}
-      <header className="relative isolate overflow-hidden px-6 pb-16 pt-16 sm:px-10 sm:pb-20 sm:pt-24 lg:px-16">
+      <header className="relative isolate overflow-hidden px-6 pb-10 pt-10 sm:px-10 sm:pb-12 sm:pt-14 lg:px-16">
         {/* The atmosphere layer covers the whole header box and is feathered
             with a radial mask, so the grid has no edge on any side — it just
-            dissolves into the page. */}
+            dissolves into the page. Kept wide so the grid actually reaches the
+            edges of a full-width header rather than fading to blank on the
+            sides. */}
         <motion.div
           aria-hidden
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1.4, ease: "easeOut" }}
-          className="pointer-events-none absolute inset-0 -z-10 [mask-image:radial-gradient(135%_120%_at_50%_0%,black_30%,rgba(0,0,0,0.55)_62%,transparent_88%)]"
+          className="pointer-events-none absolute inset-0 -z-10 [mask-image:radial-gradient(180%_150%_at_50%_-10%,black_45%,rgba(0,0,0,0.4)_78%,transparent_100%)]"
         >
           <RetroGrid
             noScrim
@@ -125,57 +127,61 @@ export default function Home() {
           className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(120%_90%_at_50%_-10%,color-mix(in_srgb,var(--gold)_13%,transparent),transparent_62%)]"
         />
 
-        <div className="relative w-full">
-          {/* Brand kicker — the isolated mark with the wordmark beside it. */}
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, ease: "easeOut" }}
-            className="mb-6 flex items-center gap-3 sm:gap-4"
-          >
-            <Logo size={52} className="shrink-0" />
-            <KineticText
-              as="span"
-              dir="ltr"
-              text="LIFE PLUS"
-              animateOnLoad
-              delay={0.15}
-              letterClassName="text-gold-gradient"
-              className="text-xl font-bold uppercase leading-none tracking-[0.34em] sm:text-2xl"
-            />
-          </motion.div>
+        {/* One row that spans the full width: the greeting sits on the
+            inline-start edge, the day's context chips on the inline-end edge,
+            so a wide header is used end to end instead of a lopsided block of
+            text with dead space beside it. Stacks on a phone. */}
+        <div className="relative flex w-full flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+          <div className="min-w-0">
+            {/* Brand kicker — the isolated mark with the wordmark beside it. */}
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, ease: "easeOut" }}
+              className="mb-4 flex items-center gap-3"
+            >
+              <Logo size={40} className="shrink-0" />
+              <KineticText
+                as="span"
+                dir="ltr"
+                text="LIFE PLUS"
+                animateOnLoad
+                delay={0.15}
+                letterClassName="text-gold-gradient"
+                className="text-base font-bold uppercase leading-none tracking-[0.32em] sm:text-lg"
+              />
+            </motion.div>
 
-          {/* The greeting is the header text now that the wordmark lives in
-              the artwork, so KineticText carries it: letters stage in on load
-              and respond to the pointer. wordSafe keeps Hebrew words whole
-              when the line wraps. Keyed on the greeting so the letters
-              re-stage once the real time-of-day resolves after mount. */}
-          <h1 className="flex flex-wrap items-baseline gap-x-[0.3em] text-5xl font-bold leading-[1.06] tracking-tight sm:text-6xl lg:text-7xl xl:text-8xl">
-            <KineticText
-              key={greeting ?? "pending"}
-              as="span"
-              text={`${greeting ?? "שלום"},`}
-              animateOnLoad
-              wordSafe
-              delay={0.1}
-              className="font-bold text-foreground"
-            />
-            <KineticText
-              as="span"
-              text={displayName}
-              animateOnLoad
-              wordSafe
-              delay={0.32}
-              letterClassName="text-gold-gradient"
-              className="font-bold"
-            />
-          </h1>
+            {/* The greeting. Sized to be a warm hello, not a billboard —
+                capped at 6xl so it never leaves a wall of empty space beside
+                it on a wide screen. */}
+            <h1 className="flex flex-wrap items-baseline gap-x-[0.3em] text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
+              <KineticText
+                key={greeting ?? "pending"}
+                as="span"
+                text={`${greeting ?? "שלום"},`}
+                animateOnLoad
+                wordSafe
+                delay={0.1}
+                className="font-bold text-foreground"
+              />
+              <KineticText
+                as="span"
+                text={displayName}
+                animateOnLoad
+                wordSafe
+                delay={0.32}
+                letterClassName="text-gold-gradient"
+                className="font-bold"
+              />
+            </h1>
+          </div>
 
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.42, ease: "easeOut" }}
-            className="mt-8 flex flex-wrap items-center gap-2.5"
+            className="flex flex-wrap items-center gap-2.5 lg:justify-end"
           >
             {session?.user?.image && (
               <Image
