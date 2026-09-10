@@ -177,20 +177,24 @@ export function VideoStudyPanel() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex gap-2">
+      {/* A single row that holds together at any width: the input is allowed
+          to shrink past its intrinsic size (min-w-0), the button never
+          shrinks and never grows, and the placeholder truncates rather than
+          forcing the row wider than the card. */}
+      <div className="flex w-full items-stretch gap-2">
         <input
           value={urlInput}
           onChange={(e) => setUrlInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && loadVideo()}
           placeholder="הדבק קישור YouTube כדי ללמוד מתוך Life Plus"
           aria-label="קישור לסרטון YouTube"
-          className="focus-ring ltr flex-1 rounded-xl border border-hairline-card bg-surface-sunken px-3 py-2.5 text-sm text-foreground placeholder:text-muted"
+          className="focus-ring ltr min-w-0 flex-1 rounded-xl border border-hairline-card bg-surface-sunken px-3 py-2.5 text-sm text-foreground placeholder:text-muted"
           dir="ltr"
         />
         <button
           onClick={loadVideo}
           disabled={!urlInput.trim() || busy === "load"}
-          className="focus-ring flex shrink-0 items-center gap-1.5 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-[var(--background)] transition-opacity disabled:opacity-40"
+          className="focus-ring flex shrink-0 items-center gap-1.5 rounded-xl bg-ink px-3 py-2.5 text-sm font-medium text-[var(--background)] transition-opacity disabled:opacity-40 sm:px-4"
         >
           {busy === "load" ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Send size={14} aria-hidden />}
           טען
