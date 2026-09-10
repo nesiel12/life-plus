@@ -1,14 +1,18 @@
 import "server-only";
-import { generateText, generateObject, streamText, experimental_transcribe as transcribe } from "ai";
+import { generateText, generateObject, streamText } from "ai";
 import type { z } from "zod";
 import type { ChatModelCandidate } from "@/lib/ai/provider";
-import { getChatModel, getChatModelChain, getTranscriptionModel } from "@/lib/ai/provider";
+import {
+  getChatModel,
+  getChatModelChain,
+  getGeminiAudioModel,
+  transcriptionPlan,
+  WHISPER_MODEL_ID,
+} from "@/lib/ai/provider";
 import { isRetryableAiError } from "@/lib/ai/retryableError";
 import { bytezGenerateObject, bytezGenerateText } from "@/lib/ai/bytez";
 import {
-  actualAudioMinutes,
   budgetsFor,
-  dayWindow,
   estimatedAudioMinutes,
   quotaLimits,
   quotaMessage,
@@ -16,7 +20,7 @@ import {
   type AiActor,
   type AiOperation,
 } from "@/lib/ai/quota";
-import { adjustAiUnits, consumeAiUnits } from "@/lib/db/aiUsage";
+import { consumeAiUnits } from "@/lib/db/aiUsage";
 
 // The one shared AI service (Unified AI Provider Layer) — every AI-backed
 // route calls through here instead of importing the `ai` SDK or
@@ -292,26 +296,116 @@ export interface TranscriptionResult {
   durationInSeconds?: number;
 }
 
+const TRANSCRIBE_TIMEOUT_MS = 55_000;
+
+const TRANSCRIBE_PROMPT =
+  "Transcribe this audio recording verbatim. Return ONLY the spoken words, with no " +
+  "preamble, no quotation marks, no translation, and no commentary. Keep the original " +
+  "language (usually Hebrew). If there is no discernible speech, return an empty string.";
+
+// Browsers hand MediaRecorder blobs like "audio/webm;codecs=opus" or
+// "audio/mp4". Providers want a bare type; strip parameters and normalise the
+// couple of aliases that matter.
+function normaliseAudioType(raw: string | undefined): string {
+  const base = (raw ?? "").split(";")[0].trim().toLowerCase();
+  if (!base || !base.startsWith("audio/")) return "audio/webm";
+  if (base === "audio/x-m4a" || base === "audio/m4a") return "audio/mp4";
+  if (base === "audio/mpeg") return "audio/mp3";
+  return base;
+}
+
+function extensionFor(mediaType: string): string {
+  const map: Record<string, string> = {
+    "audio/webm": "webm",
+    "audio/mp4": "m4a",
+    "audio/mp3": "mp3",
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/ogg": "ogg",
+    "audio/flac": "flac",
+  };
+  return map[mediaType] ?? "webm";
+}
+
+async function transcribeWithGemini(audio: Uint8Array, mediaType: string): Promise<string> {
+  const { text } = await generateText({
+    model: getGeminiAudioModel(),
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: TRANSCRIBE_PROMPT },
+          { type: "file", data: audio, mediaType },
+        ],
+      },
+    ],
+    maxRetries: 1,
+    abortSignal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
+  });
+  return text.trim();
+}
+
+async function transcribeWithWhisper(audio: Uint8Array, mediaType: string): Promise<string> {
+  // Direct REST rather than the AI SDK's experimental_transcribe: the pinned
+  // @ai-sdk/openai (v4-spec) transcription model does not carry its auth
+  // header through this `ai` runtime, so the SDK call 401s even with a valid
+  // key. Same "plain fetch beats a broken SDK path" choice the Google
+  // Calendar and Bytez integrations already make.
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("no OpenAI key");
+  const form = new FormData();
+  form.set(
+    "file",
+    new Blob([audio as BlobPart], { type: mediaType }),
+    `audio.${extensionFor(mediaType)}`
+  );
+  form.set("model", WHISPER_MODEL_ID);
+  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
+    signal: AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`whisper ${res.status}: ${body.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as { text?: string };
+  return (data.text ?? "").trim();
+}
+
 export async function transcribeAudio(
   audio: Uint8Array,
-  actor: AiActor
+  actor: AiActor,
+  rawMediaType?: string
 ): Promise<TranscriptionResult> {
-  // Reserved from the file size, because Whisper only reports the true
-  // duration once it has already processed the audio — by which point the
-  // money is spent. The estimate is settled below.
+  const plan = transcriptionPlan();
+  if (plan.length === 0) {
+    throw new Error("[ai] transcribeAudio: no transcription backend configured");
+  }
+
+  const mediaType = normaliseAudioType(rawMediaType);
+  // Reserved from the file size up front; there is no reliable duration from
+  // either backend, so this estimate stands (no post-hoc settle).
   const estimated = estimatedAudioMinutes(audio.byteLength);
   await chargeQuota(actor, "transcription", estimated);
 
-  const result = await transcribe({ model: getTranscriptionModel(), audio });
-
-  if (actor.kind === "user") {
-    const actual = actualAudioMinutes(result.durationInSeconds);
-    if (actual !== null && actual !== estimated) {
-      // Best-effort: the call already succeeded, so a settle failure must not
-      // become an error the user sees.
-      await adjustAiUnits(actor.userId, "transcribe_day", dayWindow(new Date()), actual - estimated);
+  let lastError: unknown;
+  for (let i = 0; i < plan.length; i++) {
+    const backend = plan[i];
+    try {
+      const text =
+        backend === "gemini"
+          ? await transcribeWithGemini(audio, mediaType)
+          : await transcribeWithWhisper(audio, mediaType);
+      if (i > 0) console.warn(`[ai] transcribeAudio recovered on fallback backend "${backend}"`);
+      return { text };
+    } catch (err) {
+      lastError = err;
+      const isLast = i === plan.length - 1;
+      console.error(`[ai] transcribeAudio failed on "${backend}":`, err instanceof Error ? err.message : err);
+      if (isLast || !isRetryableAiError(err)) throw err;
     }
   }
-
-  return { text: result.text, durationInSeconds: result.durationInSeconds };
+  throw lastError;
 }

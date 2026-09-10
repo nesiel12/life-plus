@@ -148,9 +148,30 @@ export function getChatModelChain(): ChatModelCandidate[] {
     : [{ kind: "sdk", label: `openai:${OPENAI_CHAT_MODEL_ID}`, model: openai(OPENAI_CHAT_MODEL_ID) }];
 }
 
-export function getTranscriptionModel() {
-  return openai.transcription(TRANSCRIPTION_MODEL_ID);
+export type TranscriptionBackend = "gemini" | "whisper";
+
+/**
+ * How to transcribe audio, in priority order, based on which keys exist.
+ *
+ * Gemini goes first — it is this app's primary provider, its flash models
+ * take audio natively, and it means transcription works on a Gemini-only
+ * deployment (the common case: OPENAI_API_KEY is often blank). Whisper is
+ * the fallback when an OpenAI key is configured. Empty → transcription is
+ * genuinely unavailable and the route says so.
+ */
+export function transcriptionPlan(): TranscriptionBackend[] {
+  const plan: TranscriptionBackend[] = [];
+  if (process.env.GEMINI_API_KEY) plan.push("gemini");
+  if (process.env.OPENAI_API_KEY) plan.push("whisper");
+  return plan;
 }
+
+/** A Gemini model that accepts an audio file part alongside a prompt. */
+export function getGeminiAudioModel(): LanguageModel {
+  return getGoogleProvider()(GEMINI_CHAT_MODEL_ID);
+}
+
+export const WHISPER_MODEL_ID = TRANSCRIPTION_MODEL_ID;
 
 // Every AI-backed route previously checked process.env.OPENAI_API_KEY
 // directly before deciding whether to call a real model or fall back to an
@@ -161,12 +182,11 @@ export function isProviderConfigured(): boolean {
   return currentChatProvider() !== null;
 }
 
-// Audio transcription (Torah Space uploads) is OpenAI/Whisper-specific —
-// @ai-sdk/google has no transcription model in this version, only
-// text-to-speech (the opposite direction). Kept distinct from
-// isProviderConfigured() so app/api/torah/extract's audio path gates on the
-// capability it actually needs: a Gemini-only setup enables chat/text
-// generation everywhere, but not audio transcription.
+// Audio transcription works whenever ANY audio-capable provider is
+// configured — Gemini (native audio input) or OpenAI Whisper. Kept distinct
+// from isProviderConfigured() only so a route can give a precise "no
+// transcription backend" message; in practice a Gemini chat key is also a
+// transcription key.
 export function isTranscriptionConfigured(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY);
+  return transcriptionPlan().length > 0;
 }

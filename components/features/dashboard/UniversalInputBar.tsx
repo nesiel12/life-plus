@@ -170,37 +170,58 @@ export function UniversalInputBar() {
 
   async function startRecording() {
     setError(null);
+    if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setError("הדפדפן הזה לא תומך בהקלטת קול.");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      // Pick a container the browser will actually produce. Chrome/Firefox
+      // give webm/opus; Safari gives mp4. Passing an unsupported type to the
+      // constructor throws, so probe first and let the browser default only
+      // as a last resort.
+      const preferred = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+      ].find((t) => MediaRecorder.isTypeSupported?.(t));
+      const recorder = new MediaRecorder(stream, preferred ? { mimeType: preferred } : undefined);
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        if (blob.size === 0) return;
+        const type = recorder.mimeType || preferred || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type });
+        if (blob.size === 0) {
+          setError("לא נקלט אודיו. נסה שוב.");
+          return;
+        }
 
         setTranscribing(true);
         try {
+          const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
           const form = new FormData();
-          form.set("file", new File([blob], "note.webm", { type: blob.type }));
+          form.set("file", new File([blob], `note.${ext}`, { type }));
           const res = await fetch("/api/ai/transcribe-audio", { method: "POST", body: form });
-          const data = (await res.json()) as { text?: string; transcript?: string; error?: string };
-          if (!res.ok) {
-            setError(data.error ?? "התמלול נכשל.");
+          const data = (await res.json().catch(() => null)) as
+            | { text?: string; transcript?: string; error?: string }
+            | null;
+          if (!res.ok || !data) {
+            setError((data?.error as string) ?? "התמלול נכשל. נסה שוב.");
             return;
           }
           const transcript = (data.text ?? data.transcript ?? "").trim();
           if (!transcript) {
-            setError("לא שמעתי כלום. נסה שוב.");
+            setError("לא זיהינו דיבור. נסה להקליט שוב, קרוב יותר למיקרופון.");
             return;
           }
           setText(transcript);
           await interpret(transcript);
         } catch {
-          setError("התמלול נכשל.");
+          setError("לא הצלחנו להגיע לשירות התמלול.");
         } finally {
           setTranscribing(false);
         }
@@ -209,7 +230,7 @@ export function UniversalInputBar() {
       recorderRef.current = recorder;
       setRecording(true);
     } catch {
-      setError("אין גישה למיקרופון.");
+      setError("אין גישה למיקרופון. אשר את ההרשאה בדפדפן ונסה שוב.");
     }
   }
 

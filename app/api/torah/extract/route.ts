@@ -62,7 +62,7 @@ async function transcribeAudio(
   actor: AiActor
 ): Promise<{ text: string; durationMinutes?: number }> {
   const buffer = new Uint8Array(await file.arrayBuffer());
-  const result = await transcribeWithProvider(buffer, actor);
+  const result = await transcribeWithProvider(buffer, actor, file.type);
   return {
     text: result.text.trim(),
     durationMinutes: result.durationInSeconds ? Math.round(result.durationInSeconds / 60) : undefined,

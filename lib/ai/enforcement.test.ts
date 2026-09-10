@@ -24,13 +24,18 @@ vi.mock("ai", () => ({
   generateText: vi.fn(async () => ({ text: "ok" })),
   generateObject: vi.fn(async () => ({ object: { ok: true } })),
   streamText: vi.fn(() => ({ toTextStreamResponse: () => new Response("ok") })),
-  experimental_transcribe: vi.fn(async () => ({ text: "hello", durationInSeconds: 120 })),
+  // Not used by the service any more (transcription went to Gemini + a
+  // direct Whisper REST call), but @ai-sdk/openai still imports it from the
+  // now-mocked `ai` module, so it has to exist on the mock.
+  experimental_transcribe: vi.fn(async () => ({ text: "hello" })),
 }));
 
 vi.mock("@/lib/ai/provider", () => ({
   getChatModel: () => "model",
   getChatModelChain: () => [{ label: "test", model: "model" }],
-  getTranscriptionModel: () => "whisper",
+  getGeminiAudioModel: () => "gemini-audio",
+  transcriptionPlan: () => ["gemini"],
+  WHISPER_MODEL_ID: "whisper-1",
 }));
 
 const { AiQuotaExceededError, generateChatText, transcribeAudio } = await import("@/lib/ai/service");
@@ -124,23 +129,17 @@ describe("the system actor", () => {
 });
 
 describe("transcription", () => {
-  it("reserves from the file size, then settles against the real duration", async () => {
+  it("reserves transcription units from the estimated file size before calling a backend", async () => {
     allow();
-    // 3 MB estimates 3 minutes; the stub reports 120s = 2 minutes.
-    await transcribeAudio(new Uint8Array(3_000_000), USER);
+    // 3 MB estimates 3 minutes.
+    await transcribeAudio(new Uint8Array(3_000_000), USER, "audio/webm");
     const budgets = consumeAiUnits.mock.calls[0][1] as { scope: string; cost: number }[];
     expect(budgets.find((b) => b.scope === "transcribe_day")?.cost).toBe(3);
-    expect(adjustAiUnits).toHaveBeenCalledWith(USER.userId, "transcribe_day", expect.any(String), -1);
   });
 
-  it("does not settle for a system actor", async () => {
-    await transcribeAudio(new Uint8Array(3_000_000), SYSTEM);
-    expect(adjustAiUnits).not.toHaveBeenCalled();
-  });
-
-  it("is refused when the transcription budget is spent", async () => {
+  it("is refused when the transcription budget is spent — before any backend call", async () => {
     deny("transcribe_day");
-    const err = await transcribeAudio(new Uint8Array(1_000_000), USER).catch((e) => e);
+    const err = await transcribeAudio(new Uint8Array(1_000_000), USER, "audio/webm").catch((e) => e);
     expect(err).toBeInstanceOf(AiQuotaExceededError);
     expect(err.message).toContain("תמלול");
   });

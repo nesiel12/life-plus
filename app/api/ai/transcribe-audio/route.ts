@@ -60,15 +60,16 @@ export async function POST(request: Request) {
 
   try {
     const buffer = new Uint8Array(await file.arrayBuffer());
-    const { text } = await transcribeAudio(buffer, actor);
+    const { text } = await transcribeAudio(buffer, actor, file.type);
     if (!text.trim()) {
-      return NextResponse.json({ error: "לא הצלחנו לחלץ תמלול מקובץ השמע." }, { status: 422 });
+      return NextResponse.json({ error: "לא זיהינו דיבור בהקלטה. נסה להקליט שוב, קרוב יותר למיקרופון." }, { status: 422 });
     }
     return NextResponse.json({ text: text.trim() });
   } catch (err) {
     const quota = aiQuotaResponse(err);
     if (quota) return quota;
-    console.error("Audio transcription failed:", err);
-    return NextResponse.json({ error: "תמלול קובץ השמע נכשל. נסה שוב." }, { status: 500 });
+    // The real reason goes to the server log; the user gets a clean line.
+    console.error("[transcribe-audio] failed:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "התמלול נכשל. נסה שוב." }, { status: 500 });
   }
 }
