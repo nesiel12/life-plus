@@ -344,8 +344,9 @@ body::before {
    fill that label text sits on colour rather than on whatever happens to be
    behind the control, and the whole effect drops to an opaque fill under
    both @supports and prefers-reduced-transparency. */
+/* `position` lives in the `components` layer, not here — see the @layer block
+   right after this rule. Everything else stays unlayered on purpose. */
 .glass-control {
-  position: relative;
   isolation: isolate;
   background: var(--control-glass-bg);
   border: 1px solid var(--control-glass-rim);
@@ -361,6 +362,30 @@ body::before {
     transform 180ms ease;
   /* Scoped to the elements that actually animate on hover. */
   will-change: transform;
+}
+
+/* Why this one declaration is layered while the rest of .glass-control is not:
+   Tailwind v4 emits every utility inside `@layer utilities`, and an unlayered
+   rule beats *any* layered one regardless of specificity. So a plain
+   `.glass-control { position: relative }` here silently won over `fixed`,
+   `absolute` and `sticky` on every element that carries both — the class name
+   quietly decided the element's positioning scheme.
+
+   That is not a cosmetic detail. AlarmCenter's floating button is
+   `glass-control fixed …`: forced back to `relative`, it stayed an in-flow
+   flex item of the AppShell row, ate a 48px column beside the page content
+   (the empty inline-start strip), and its `right-4` then pushed it 16px past
+   the viewport edge. FocusMode's close button, TheaterVideo's control and the
+   Sidebar's active-row pill lost their `absolute` the same way.
+
+   Declared in the `components` layer, it still applies to the ~40 controls
+   that set no position of their own, and now yields to a positioning utility
+   whenever a call site asks for one. Only `position` moves; every other
+   property above stays unlayered so no utility can override the material. */
+@layer components {
+  .glass-control {
+    position: relative;
+  }
 }
 
 .glass-control:hover {

@@ -108,7 +108,10 @@ export function Sidebar() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <aside className="glass-panel sticky top-0 hidden h-screen w-20 shrink-0 flex-col items-center border-s px-2 py-6 sm:flex lg:w-64 lg:items-stretch lg:px-4">
+    // The top inset keeps the rail's logo level with the page content beside
+    // it on an installed tablet, where the status bar overlays the view. 0px
+    // in a browser, so py-6 is what it has always been there.
+    <aside className="glass-panel sticky top-0 hidden h-screen w-20 shrink-0 flex-col items-center border-s px-2 pb-6 pt-[calc(1.5rem+env(safe-area-inset-top))] sm:flex lg:w-64 lg:items-stretch lg:px-4">
       <div className="relative mb-8 flex w-full flex-col items-center">
         <AnimatedThemeToggler
           theme={theme}
@@ -192,8 +195,11 @@ export function MobileTabBar() {
   const pathname = usePathname();
   const items = [HOME_ITEM, ...NAV_ITEMS];
 
+  // The bottom padding keeps the tabs clear of the iPhone home indicator now
+  // that viewport-fit=cover lets the bar reach the physical bottom edge. The
+  // inset is 0px where there is no indicator, so py-2 is unchanged there.
   return (
-    <nav className="glass-panel fixed inset-x-0 bottom-0 z-30 flex items-center justify-around px-1 py-2 sm:hidden">
+    <nav className="glass-panel fixed inset-x-0 bottom-0 z-30 flex items-center justify-around px-1 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:hidden">
       {items.map((item) => {
         const Icon = item.icon;
         // `startsWith` would light Home up on every route, since every path

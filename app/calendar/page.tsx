@@ -160,7 +160,11 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* flex-wrap, like the row that holds this one: the three
+                  controls together are wider than a phone, and without it
+                  RangeTabs (4 × min-w-[3.25rem]) pushed the group 36px past
+                  the inline-start edge, where the page clipped it. */}
+              <div className="flex flex-wrap items-center gap-2">
                 <ClearCalendarButton anchor={anchor} onCleared={refresh} />
                 {range === "day" && (
                   <button

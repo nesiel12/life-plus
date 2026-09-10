@@ -30,6 +30,17 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#100f13",
+  // `appleWebApp.statusBarStyle: "black-translucent"` above means the
+  // installed iOS app draws the page *under* the status bar rather than
+  // below it — which is the immersive look we want, but it silently ate the
+  // top ~50px of every screen: the dashboard's brand kicker (pt-10) and each
+  // area page's back link sat behind the clock and carrier text.
+  //
+  // Nothing in the app compensated because `env(safe-area-inset-*)` only
+  // reports real values under `viewport-fit=cover`; without it the insets are
+  // all 0px and the padding that reads them is a no-op. Declaring it here is
+  // what makes AppShell's inset padding (and MobileTabBar's) actually resolve.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

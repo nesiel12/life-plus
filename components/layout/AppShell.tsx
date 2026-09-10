@@ -116,7 +116,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen">
         <Sidebar />
-        <div className="min-w-0 flex-1 pb-20 sm:pb-0">{children}</div>
+        {/* The one place every screen's content passes through, so the device
+            safe areas are honoured once here instead of in 14 page files.
+            Both insets are 0px on any viewport that has none, so this is
+            inert in a desktop browser and on Android. */}
+        <div className="min-w-0 flex-1 pt-[env(safe-area-inset-top)] pb-[calc(5rem+env(safe-area-inset-bottom))] sm:pb-0">
+          {children}
+        </div>
         <MobileTabBar />
         <AICompanion />
         <QuickCapture />

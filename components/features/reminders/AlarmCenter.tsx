@@ -318,7 +318,11 @@ export function AlarmCenter() {
       <motion.button
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "glass-control fixed bottom-36 right-4 flex size-12 items-center justify-center rounded-full text-foreground shadow-lg sm:bottom-24 sm:right-8",
+          // Right edge on a phone (opposite the AI companion, which sits
+          // bottom-left). From `sm` the right edge is the sidebar, so the
+          // offsets clear its rail — 5rem wide at sm, 16rem at lg — instead of
+          // floating over its settings and sign-out controls.
+          "glass-control fixed bottom-36 right-4 flex size-12 items-center justify-center rounded-full text-foreground shadow-lg sm:bottom-24 sm:right-24 lg:right-72",
           Z_INDEX.panel
         )}
         whileHover={{ scale: 1.06 }}
