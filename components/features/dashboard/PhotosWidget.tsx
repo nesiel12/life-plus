@@ -41,9 +41,19 @@ export function PhotosWidget() {
         {add}
       </div>
 
+      {picker.connectResult?.status === "connected" && (
+        <p role="status" className="mb-2 rounded-lg bg-accent-health/12 px-3 py-2 text-xs font-medium text-accent-health">
+          Google Photos חובר.
+        </p>
+      )}
+      {picker.connectResult && picker.connectResult.status !== "connected" && (
+        <p role="alert" className="mb-2 rounded-lg bg-accent-family/10 px-3 py-2 text-xs text-accent-family">
+          החיבור ל-Google Photos נכשל{picker.connectResult.reason ? `: ${picker.connectResult.reason}` : ""}
+        </p>
+      )}
       {picker.needsConnect && (
         <a
-          href="/api/photos/connect"
+          href="/api/photos/connect?return=/"
           className="focus-ring mb-2 rounded-lg bg-gold-soft px-3 py-2 text-center text-xs font-medium text-gold-ink"
         >
           חבר את Google Photos

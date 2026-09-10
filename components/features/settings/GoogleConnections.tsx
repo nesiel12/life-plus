@@ -48,6 +48,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
 export function GoogleConnections() {
   const [uris, setUris] = useState<RedirectUris | null>(null);
   const [failed, setFailed] = useState(false);
+  const [photosResult, setPhotosResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +59,21 @@ export function GoogleConnections() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // The Google Photos OAuth callback redirects here with ?photos=… — show it,
+  // then clean the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const photos = params.get("photos");
+    if (!photos) return;
+    const reason = params.get("reason");
+    if (photos === "connected") setPhotosResult({ ok: true, text: "Google Photos חובר בהצלחה." });
+    else setPhotosResult({ ok: false, text: `החיבור נכשל${reason ? `: ${reason}` : "."}` });
+    params.delete("photos");
+    params.delete("reason");
+    const qs = params.toString();
+    window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
   }, []);
 
   const looksLocal = uris?.origin.includes("localhost");
@@ -93,6 +109,26 @@ export function GoogleConnections() {
             </p>
           )}
 
+          {photosResult && (
+            <p
+              role={photosResult.ok ? "status" : "alert"}
+              className={
+                photosResult.ok
+                  ? "rounded-lg bg-accent-health/12 px-3 py-2 text-xs font-medium text-accent-health"
+                  : "rounded-lg bg-accent-family/10 px-3 py-2 text-xs text-accent-family"
+              }
+            >
+              {photosResult.text}
+            </p>
+          )}
+
+          <p className="text-xs text-muted">
+            בנוסף, ל-Google Photos צריך להפעיל את <span className="ltr font-medium">Photos Picker API</span> בפרויקט,
+            ולוודא שמסך ההסכמה כולל את ההיקף{" "}
+            <code className="ltr">photospicker.mediaitems.readonly</code>. אם האפליקציה במצב
+            “Testing”, רק משתמשי-בדיקה מאושרים יוכלו לחבר.
+          </p>
+
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <a
               href="https://console.cloud.google.com/apis/credentials"
@@ -100,11 +136,20 @@ export function GoogleConnections() {
               rel="noopener noreferrer"
               className="focus-ring inline-flex items-center gap-1 text-xs text-gold-ink hover:opacity-80"
             >
-              פתח את Google Cloud Console
+              OAuth credentials
               <ExternalLink size={11} aria-hidden />
             </a>
             <a
-              href="/api/photos/connect"
+              href="https://console.cloud.google.com/apis/library/photospicker.googleapis.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="focus-ring inline-flex items-center gap-1 text-xs text-gold-ink hover:opacity-80"
+            >
+              הפעל Photos Picker API
+              <ExternalLink size={11} aria-hidden />
+            </a>
+            <a
+              href="/api/photos/connect?return=/settings"
               className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-hairline-card px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground"
             >
               חבר את Google Photos

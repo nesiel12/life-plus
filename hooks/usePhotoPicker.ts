@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // Drives the Google Photos picking flow from the client.
 //
@@ -17,6 +17,13 @@ const MAX_POLL_MS = 15 * 60 * 1000;
 
 type PickerState = "idle" | "opening" | "waiting" | "importing" | "done" | "error";
 
+/** The result of the OAuth round trip, read once from the ?photos= query the
+ *  callback redirects back with. */
+export type PhotosConnectResult =
+  | { status: "connected" }
+  | { status: "denied" | "error" | "state_mismatch"; reason?: string }
+  | null;
+
 interface UsePhotoPickerResult {
   state: PickerState;
   error: string | null;
@@ -25,6 +32,9 @@ interface UsePhotoPickerResult {
   result: { imported: number; skipped: number } | null;
   /** Set once a session exists — a fallback link if the popup was blocked. */
   pickerUri: string | null;
+  /** The outcome of the last connect attempt (from the OAuth redirect). */
+  connectResult: PhotosConnectResult;
+  dismissConnectResult: () => void;
   start: (purpose: "memories" | "avatar", personId?: string) => Promise<void>;
   reset: () => void;
 }
@@ -43,7 +53,36 @@ export function usePhotoPicker(onComplete?: () => void): UsePhotoPickerResult {
   const [needsConnect, setNeedsConnect] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
   const [pickerUri, setPickerUri] = useState<string | null>(null);
+  const [connectResult, setConnectResult] = useState<PhotosConnectResult>(null);
   const cancelled = useRef(false);
+
+  // On mount, read the outcome the OAuth callback redirected back with, then
+  // strip it from the URL so a refresh doesn't re-show it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const photos = params.get("photos");
+    if (!photos) return;
+    const reason = params.get("reason") ?? undefined;
+    if (photos === "connected") {
+      setConnectResult({ status: "connected" });
+      onComplete?.();
+    } else if (photos === "denied" || photos === "error" || photos === "state_mismatch") {
+      setConnectResult({ status: photos, reason });
+    }
+    params.delete("photos");
+    params.delete("reason");
+    const qs = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash
+    );
+    // Read exactly once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const dismissConnectResult = useCallback(() => setConnectResult(null), []);
 
   const reset = useCallback(() => {
     cancelled.current = true;
@@ -146,5 +185,15 @@ export function usePhotoPicker(onComplete?: () => void): UsePhotoPickerResult {
     [onComplete]
   );
 
-  return { state, error, needsConnect, result, pickerUri, start, reset };
+  return {
+    state,
+    error,
+    needsConnect,
+    result,
+    pickerUri,
+    connectResult,
+    dismissConnectResult,
+    start,
+    reset,
+  };
 }

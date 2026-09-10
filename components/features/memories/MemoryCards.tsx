@@ -30,10 +30,18 @@ const FALLBACK: MemoriesResponse = { connected: false, corpusSize: 0, memories: 
 // Atlas", not "your Google Photos". Google removed the ability to scan a
 // library by date in March 2025, so anything implying Atlas can see the whole
 // library would be a lie the empty state eventually exposes.
+const CONNECT_ERROR_HINT: Record<string, string> = {
+  redirect_uri_mismatch:
+    "כתובת ההפניה לא רשומה בקונסולת Google Cloud. הוסף אותה ב-OAuth client → Authorized redirect URIs (ראה הגדרות → חיבורי Google).",
+  access_denied: "הגישה נדחתה. אשר את ההרשאה למסך של Google Photos ונסה שוב.",
+  invalid_client: "פרטי ה-OAuth client שגויים בשרת (GOOGLE_CLIENT_ID / SECRET).",
+};
+
 export function MemoryCards() {
   const reduce = useReducedMotion();
   const { data, refresh } = useInsights<MemoriesResponse>("/api/photos/memories", FALLBACK);
   const picker = usePhotoPicker(refresh);
+  const connect = picker.connectResult;
 
   const busy = picker.state === "opening" || picker.state === "waiting" || picker.state === "importing";
 
@@ -64,9 +72,28 @@ export function MemoryCards() {
         {addButton}
       </div>
 
+      {connect?.status === "connected" && (
+        <p role="status" className="rounded-lg bg-accent-health/12 px-3 py-2 text-xs font-medium text-accent-health">
+          Google Photos חובר. אפשר להוסיף תמונות עכשיו.
+        </p>
+      )}
+      {connect && connect.status !== "connected" && (
+        <p role="alert" className="rounded-lg bg-accent-family/10 px-3 py-2 text-xs text-accent-family">
+          החיבור ל-Google Photos נכשל
+          {connect.reason && (
+            <>
+              {": "}
+              <span className="text-foreground/70">
+                {CONNECT_ERROR_HINT[connect.reason] ?? connect.reason}
+              </span>
+            </>
+          )}
+        </p>
+      )}
+
       {picker.needsConnect && (
         <a
-          href="/api/photos/connect"
+          href="/api/photos/connect?return=/"
           className="focus-ring rounded-lg bg-gold-soft px-3 py-2 text-center text-xs font-medium text-gold-ink"
         >
           חבר את Google Photos כדי להוסיף תמונות
