@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
   CalendarClock,
   Lightbulb,
@@ -35,6 +36,11 @@ interface NavItem {
   colorVar: string;
 }
 
+// A motion-enhanced <Link>, defined once at module scope (motion.create must
+// not be called per-render) so nav rows get whileTap/whileHover physics
+// without an extra wrapper element around the anchor.
+const MotionLink = motion.create(Link);
+
 // UI/UX Revamp: the primary nav, right-docked (RTL-conventional — the
 // leading edge in Hebrew reading direction), replacing the old horizontal
 // NavBar. Six items, exact Hebrew labels as specified, each tied to one of
@@ -61,15 +67,44 @@ const NAV_ITEMS: NavItem[] = [
 
 const HOME_ITEM: NavItem = { href: "/", labelKey: "nav.today", icon: Home, colorVar: "--gold" };
 
+// Liquid spring for the active-item glass capsule and the icon pop — tuned
+// for a quick, slightly overshooting settle (stiffness > damping²/4·mass)
+// rather than the linear-feeling duration/easeOut this replaced. This is
+// what makes the highlight read as *flowing* to the new item instead of
+// just relocating there.
+const LIQUID_SPRING = { type: "spring", stiffness: 420, damping: 32, mass: 0.8 } as const;
+const ICON_POP_TRANSITION = { duration: 0.45, ease: [0.34, 1.56, 0.64, 1] } as const;
+
+const iconVariants: Variants = {
+  idle: { scale: 1, rotate: 0 },
+  active: { scale: [1, 1.22, 1], rotate: [0, -8, 0] },
+};
+
+// A real pane of glass catches light where the pointer is, not uniformly —
+// this feeds a radial highlight (see .nav-liquid-item::before in globals.css)
+// with the pointer's position, so hovering genuinely looks like light
+// crossing the surface rather than a flat background swap. Plain DOM style
+// mutation, not React state: it fires on every pointermove and a re-render
+// per pixel would be wasteful for a purely cosmetic effect.
+function trackLiquidPointer(e: ReactPointerEvent<HTMLElement>) {
+  const rect = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.style.setProperty("--liquid-x", `${((e.clientX - rect.left) / rect.width) * 100}%`);
+  e.currentTarget.style.setProperty("--liquid-y", `${((e.clientY - rect.top) / rect.height) * 100}%`);
+}
+
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
   const t = useT();
   const label = t(item.labelKey);
+  const reduceMotion = useReducedMotion();
+
   return (
-    <Link
+    <MotionLink
       href={item.href}
+      onPointerMove={trackLiquidPointer}
+      whileTap={reduceMotion ? undefined : { scale: 0.96 }}
       className={cn(
-        "focus-ring group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+        "focus-ring nav-liquid-item group relative flex items-center gap-3 rounded-full px-3 py-2.5 text-sm transition-colors",
         // Glass only on hover for inactive rows; the active row gets its
         // frost from the accent pill below, which keeps its own colour.
         active ? "text-foreground" : "glass-control-hover text-muted hover:text-foreground"
@@ -78,26 +113,21 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
       {active && (
         <motion.span
           layoutId="sidebar-active"
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          // .glass-control supplies the backdrop blur and inset sheen; the
-          // inline style below still wins for background/border/shadow, so
-          // this row's life-area accent colour is exactly as it was.
-          className="glass-control absolute inset-0 rounded-xl"
-          style={{
-            background: `linear-gradient(135deg, color-mix(in srgb, var(${item.colorVar}) 22%, transparent), color-mix(in srgb, var(${item.colorVar}) 6%, transparent))`,
-            border: `1px solid color-mix(in srgb, var(${item.colorVar}) 35%, transparent)`,
-            boxShadow: `0 0 24px -8px color-mix(in srgb, var(${item.colorVar}) 55%, transparent)`,
-          }}
+          transition={reduceMotion ? { duration: 0 } : LIQUID_SPRING}
+          className="nav-liquid-active absolute inset-0 z-0 rounded-full"
+          style={{ "--item-accent": `var(${item.colorVar})` } as CSSProperties}
         />
       )}
-      <Icon
-        size={18}
-        className="relative shrink-0"
-        style={active ? { color: `var(${item.colorVar})` } : undefined}
-        aria-hidden
-      />
-      <span className="relative hidden lg:inline">{label}</span>
-    </Link>
+      <motion.span
+        className="relative z-10 flex shrink-0 items-center justify-center"
+        variants={iconVariants}
+        animate={active ? "active" : "idle"}
+        transition={reduceMotion ? { duration: 0 } : ICON_POP_TRANSITION}
+      >
+        <Icon size={18} style={active ? { color: `var(${item.colorVar})` } : undefined} aria-hidden />
+      </motion.span>
+      <span className="relative z-10 hidden lg:inline">{label}</span>
+    </MotionLink>
   );
 }
 
@@ -108,7 +138,7 @@ export function Sidebar() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <aside className="glass-panel sticky top-0 hidden h-screen w-20 shrink-0 flex-col items-center border-s px-2 py-6 sm:flex lg:w-64 lg:items-stretch lg:px-4">
+    <aside className="glass-panel nav-liquid-rail sticky top-0 hidden h-screen w-20 shrink-0 flex-col items-center border-s px-2 py-6 sm:flex lg:w-64 lg:items-stretch lg:px-4">
       <div className="relative mb-8 flex w-full flex-col items-center">
         <AnimatedThemeToggler
           theme={theme}
@@ -146,7 +176,8 @@ export function Sidebar() {
             <NotificationCenter />
             <Link
               href="/settings"
-              className="focus-ring glass-control-hover grid size-9 place-items-center rounded-lg text-muted transition-colors hover:text-foreground"
+              className="focus-ring nav-liquid-item glass-control-hover grid size-9 place-items-center rounded-full text-muted transition-colors hover:text-foreground"
+              onPointerMove={trackLiquidPointer}
               aria-label={t("nav.settings")}
             >
               <Settings size={17} aria-hidden />
@@ -167,7 +198,8 @@ export function Sidebar() {
             </div>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="focus-ring rounded-lg p-2 text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
+              className="focus-ring nav-liquid-item glass-control-hover rounded-full p-2 text-muted transition-colors hover:text-foreground"
+              onPointerMove={trackLiquidPointer}
               aria-label={t("nav.signOut")}
             >
               <LogOut size={16} />
@@ -190,25 +222,49 @@ export function Sidebar() {
 export function MobileTabBar() {
   const t = useT();
   const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
   const items = [HOME_ITEM, ...NAV_ITEMS];
 
   return (
-    <nav className="glass-panel fixed inset-x-0 bottom-0 z-30 flex items-center justify-around px-1 py-2 sm:hidden">
+    <nav className="glass-panel nav-liquid-rail fixed inset-x-0 bottom-0 z-30 flex items-center justify-around px-1 py-2 sm:hidden">
       {items.map((item) => {
         const Icon = item.icon;
         // `startsWith` would light Home up on every route, since every path
         // starts with "/". Home is active only on an exact match.
         const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         return (
-          <Link
+          <MotionLink
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className="focus-ring flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-1.5"
+            whileTap={reduceMotion ? undefined : { scale: 0.92 }}
+            // Same box the plain <Link> used before (icon + this padding,
+            // nothing else) — the liquid pill is sized to *this* box via
+            // absolute inset-0, not a separately-sized wrapper, so nine
+            // items keep fitting a phone-width bar exactly as they always
+            // did. A per-item circle with its own min-width previously
+            // pushed the row past 375px and clipped the leading icon off
+            // the edge of the screen.
+            className="focus-ring nav-liquid-item relative flex flex-col items-center gap-0.5 rounded-full px-1.5 py-1.5"
             aria-label={t(item.labelKey)}
           >
-            <Icon size={18} style={active ? { color: `var(${item.colorVar})` } : undefined} className={!active ? "text-muted" : undefined} aria-hidden />
-          </Link>
+            {active && (
+              <motion.span
+                layoutId="mobile-nav-active"
+                transition={reduceMotion ? { duration: 0 } : LIQUID_SPRING}
+                className="nav-liquid-active absolute inset-0 rounded-full"
+                style={{ "--item-accent": `var(${item.colorVar})` } as CSSProperties}
+              />
+            )}
+            <motion.span
+              className="relative z-10 flex items-center justify-center"
+              variants={iconVariants}
+              animate={active ? "active" : "idle"}
+              transition={reduceMotion ? { duration: 0 } : ICON_POP_TRANSITION}
+            >
+              <Icon size={18} style={active ? { color: `var(${item.colorVar})` } : undefined} className={!active ? "text-muted" : undefined} aria-hidden />
+            </motion.span>
+          </MotionLink>
         );
       })}
 

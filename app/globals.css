@@ -477,6 +477,11 @@ body::before {
   --control-glass-rim: rgba(16, 16, 20, 0.1);
   --control-glass-rim-hover: rgba(16, 16, 20, 0.16);
   --control-glass-sheen: rgba(255, 255, 255, 0.75);
+  /* Nav rail liquid-glass extras (Sidebar / MobileTabBar only). */
+  --nav-rail-sheen: color-mix(in srgb, white 55%, transparent);
+  --nav-liquid-catchlight: color-mix(in srgb, white 75%, transparent);
+  --nav-liquid-dome: color-mix(in srgb, white 60%, transparent);
+  --nav-liquid-shade: color-mix(in srgb, black 12%, transparent);
 }
 
 :root[data-theme="dark"] {
@@ -486,6 +491,10 @@ body::before {
   --control-glass-rim: rgba(255, 255, 255, 0.14);
   --control-glass-rim-hover: rgba(255, 255, 255, 0.22);
   --control-glass-sheen: rgba(255, 255, 255, 0.12);
+  --nav-rail-sheen: color-mix(in srgb, white 9%, transparent);
+  --nav-liquid-catchlight: color-mix(in srgb, white 20%, transparent);
+  --nav-liquid-dome: color-mix(in srgb, white 22%, transparent);
+  --nav-liquid-shade: color-mix(in srgb, black 45%, transparent);
 }
 
 /* Without backdrop-filter the translucent fill would sit over raw scrolling
@@ -506,6 +515,105 @@ body::before {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     background: var(--surface);
+  }
+}
+
+/* ── Liquid Glass: navigation rail ─────────────────────────────────────────
+   Sidebar + MobileTabBar only. Layered on top of .glass-panel's blur to read
+   as an actual pane of glass rather than a frosted card:
+     1. .nav-liquid-rail — a soft sheen across the top of the whole rail,
+        the way light grazes the top edge of a curved glass panel.
+     2. .nav-liquid-item — a pointer-tracked catch-light (via --liquid-x/
+        --liquid-y, set from onPointerMove) so hovering genuinely looks like
+        light moving across glass, not a background-color swap.
+     3. .nav-liquid-active — the selected item's capsule: a tinted glass
+        fill in the item's own accent, an inset dome highlight top-left,
+        inset shade at the bottom for falloff, and a soft outer bloom —
+        the glow-through-glass look from the reference. It moves between
+        items via a shared framer-motion layoutId with a spring transition,
+        which is the "liquid" part: it morphs position, it doesn't cut.
+   Everything here is a static gradient, a transform, or an opacity fade —
+   no continuous/looping animation, so it costs nothing while idle. */
+.nav-liquid-rail {
+  /* NOT `position: relative` — the rail (<aside>, sticky; <nav>, fixed)
+     already establishes its own positioning via Tailwind utilities, and
+     since those live in an earlier cascade layer, a same-specificity class
+     rule declared here would win on source order and silently downgrade
+     `fixed`/`sticky` to `relative`. `isolation: isolate` alone is enough to
+     give the ::before sheen its own stacking context on a static element. */
+  isolation: isolate;
+}
+.nav-liquid-rail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(180deg, var(--nav-rail-sheen) 0%, transparent 28%);
+}
+
+.nav-liquid-item {
+  position: relative;
+  isolation: isolate;
+}
+.nav-liquid-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(
+    130px 90px at var(--liquid-x, 50%) var(--liquid-y, 0%),
+    var(--nav-liquid-catchlight),
+    transparent 70%
+  );
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+.nav-liquid-item:hover::before,
+.nav-liquid-item:focus-visible::before {
+  opacity: 1;
+}
+
+.nav-liquid-active {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--item-accent) 26%, var(--control-glass-bg-active)) 0%,
+    color-mix(in srgb, var(--item-accent) 7%, var(--control-glass-bg-active)) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--item-accent) 40%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.7);
+  backdrop-filter: blur(20px) saturate(1.7);
+  box-shadow:
+    inset 0 1px 0 var(--nav-liquid-dome),
+    inset 0 -10px 14px -11px var(--nav-liquid-shade),
+    0 0 26px -6px color-mix(in srgb, var(--item-accent) 55%, transparent);
+}
+.nav-liquid-active::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: radial-gradient(60% 55% at 30% 10%, var(--nav-liquid-dome), transparent 65%);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .nav-liquid-active {
+    background: color-mix(in srgb, var(--item-accent) 16%, var(--surface));
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .nav-liquid-active {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: color-mix(in srgb, var(--item-accent) 16%, var(--surface));
+  }
+  .nav-liquid-item::before {
+    display: none;
   }
 }
 
