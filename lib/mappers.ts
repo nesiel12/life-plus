@@ -271,6 +271,26 @@ export function toBook(row: BookRow): Book {
     author: row.author ?? undefined,
     category: row.category ?? undefined,
     notes: row.notes ?? undefined,
+    hebrewTitle: row.hebrew_title ?? undefined,
+    coverImageUrl: row.cover_image_url ?? undefined,
+    publishedYear: row.published_year ?? undefined,
+    description: row.description ?? undefined,
+    preStudyNotes: row.pre_study_notes ?? undefined,
+    authorRabbiId: row.author_rabbi_id ?? undefined,
+    externalRefs: (row.external_refs as Record<string, unknown> | null) ?? undefined,
+    // numeric columns arrive as strings from some Postgres drivers; Number()
+    // on an already-numeric value is a no-op, and on null would be 0 — hence
+    // the explicit null check rather than a bare Number(row.x) || undefined,
+    // which would also swallow a legitimate 0.
+    avgPriceIls: row.avg_price_ils === null ? undefined : Number(row.avg_price_ils),
+    rating: row.rating === null ? undefined : Number(row.rating),
+    ratingsCount: row.ratings_count ?? undefined,
+    lastSyncedAt: row.last_synced_at ?? undefined,
+    keyTopics: stringArray(row.key_topics),
+    personalRating: row.personal_rating ?? undefined,
+    personalReview: row.personal_review ?? undefined,
+    recommendedBy: row.recommended_by ?? undefined,
+    isbn: row.isbn ?? undefined,
   };
 }
 
@@ -283,6 +303,22 @@ export function toBookPatch(patch: Partial<Book>): BookUpdate {
   if (patch.author !== undefined) row.author = patch.author || null;
   if (patch.category !== undefined) row.category = patch.category || null;
   if (patch.notes !== undefined) row.notes = patch.notes || null;
+  if (patch.hebrewTitle !== undefined) row.hebrew_title = patch.hebrewTitle || null;
+  if (patch.coverImageUrl !== undefined) row.cover_image_url = patch.coverImageUrl || null;
+  if (patch.publishedYear !== undefined) row.published_year = patch.publishedYear ?? null;
+  if (patch.description !== undefined) row.description = patch.description || null;
+  if (patch.preStudyNotes !== undefined) row.pre_study_notes = patch.preStudyNotes || null;
+  if (patch.authorRabbiId !== undefined) row.author_rabbi_id = patch.authorRabbiId || null;
+  if (patch.externalRefs !== undefined) row.external_refs = patch.externalRefs as Json;
+  if (patch.avgPriceIls !== undefined) row.avg_price_ils = patch.avgPriceIls ?? null;
+  if (patch.rating !== undefined) row.rating = patch.rating ?? null;
+  if (patch.ratingsCount !== undefined) row.ratings_count = patch.ratingsCount ?? null;
+  if (patch.lastSyncedAt !== undefined) row.last_synced_at = patch.lastSyncedAt || null;
+  if (patch.keyTopics !== undefined) row.key_topics = patch.keyTopics as Json;
+  if (patch.personalRating !== undefined) row.personal_rating = patch.personalRating ?? null;
+  if (patch.personalReview !== undefined) row.personal_review = patch.personalReview || null;
+  if (patch.recommendedBy !== undefined) row.recommended_by = patch.recommendedBy || null;
+  if (patch.isbn !== undefined) row.isbn = patch.isbn || null;
   return row;
 }
 
@@ -292,6 +328,28 @@ export function toRabbi(row: RabbiRow): Rabbi {
     name: row.name,
     title: row.title ?? undefined,
     notes: row.notes ?? undefined,
+    hebrewName: row.hebrew_name ?? undefined,
+    portraitUrl: row.portrait_url ?? undefined,
+    birthYear: row.birth_year ?? undefined,
+    deathYear: row.death_year ?? undefined,
+    birthPlace: row.birth_place ?? undefined,
+    deathPlace: row.death_place ?? undefined,
+    locations: jsonArray<NonNullable<Rabbi["locations"]>[number]>(row.locations),
+    era: row.era ?? undefined,
+    bio: row.bio ?? undefined,
+    historicalContext: row.historical_context ?? undefined,
+    achievements: stringArray(row.achievements),
+    lineage: jsonArray<NonNullable<Rabbi["lineage"]>[number]>(row.lineage),
+    works: jsonArray<NonNullable<Rabbi["works"]>[number]>(row.works),
+    isContemporary: row.is_contemporary ?? undefined,
+    phone: row.phone ?? undefined,
+    whatsappUrl: row.whatsapp_url ?? undefined,
+    websiteUrl: row.website_url ?? undefined,
+    youtubeChannelUrl: row.youtube_channel_url ?? undefined,
+    email: row.email ?? undefined,
+    suggestedLinks: jsonArray<NonNullable<Rabbi["suggestedLinks"]>[number]>(row.suggested_links),
+    externalRefs: (row.external_refs as Record<string, unknown> | null) ?? undefined,
+    lastSyncedAt: row.last_synced_at ?? undefined,
   };
 }
 
@@ -300,7 +358,42 @@ export function toRabbiPatch(patch: Partial<Rabbi>): RabbiUpdate {
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.title !== undefined) row.title = patch.title || null;
   if (patch.notes !== undefined) row.notes = patch.notes || null;
+  if (patch.hebrewName !== undefined) row.hebrew_name = patch.hebrewName || null;
+  if (patch.portraitUrl !== undefined) row.portrait_url = patch.portraitUrl || null;
+  if (patch.birthYear !== undefined) row.birth_year = patch.birthYear ?? null;
+  if (patch.deathYear !== undefined) row.death_year = patch.deathYear ?? null;
+  if (patch.birthPlace !== undefined) row.birth_place = patch.birthPlace || null;
+  if (patch.deathPlace !== undefined) row.death_place = patch.deathPlace || null;
+  if (patch.locations !== undefined) row.locations = patch.locations as unknown as Json;
+  if (patch.era !== undefined) row.era = patch.era || null;
+  if (patch.bio !== undefined) row.bio = patch.bio || null;
+  if (patch.historicalContext !== undefined) row.historical_context = patch.historicalContext || null;
+  if (patch.achievements !== undefined) row.achievements = patch.achievements as Json;
+  if (patch.lineage !== undefined) row.lineage = patch.lineage as unknown as Json;
+  if (patch.works !== undefined) row.works = patch.works as unknown as Json;
+  if (patch.isContemporary !== undefined) row.is_contemporary = patch.isContemporary ?? null;
+  // Contact columns are user-asserted: an empty string clears one.
+  if (patch.phone !== undefined) row.phone = patch.phone || null;
+  if (patch.whatsappUrl !== undefined) row.whatsapp_url = patch.whatsappUrl || null;
+  if (patch.websiteUrl !== undefined) row.website_url = patch.websiteUrl || null;
+  if (patch.youtubeChannelUrl !== undefined) row.youtube_channel_url = patch.youtubeChannelUrl || null;
+  if (patch.email !== undefined) row.email = patch.email || null;
+  if (patch.suggestedLinks !== undefined) row.suggested_links = patch.suggestedLinks as unknown as Json;
+  if (patch.externalRefs !== undefined) row.external_refs = patch.externalRefs as Json;
+  if (patch.lastSyncedAt !== undefined) row.last_synced_at = patch.lastSyncedAt || null;
   return row;
+}
+
+/** A jsonb array column as a typed array; anything malformed reads as empty. */
+function jsonArray<T>(value: Json | null | undefined): T[] {
+  return Array.isArray(value) ? (value as unknown as T[]) : [];
+}
+
+/** A jsonb string-array column, dropping anything that is not a non-blank string. */
+function stringArray(value: Json | null | undefined): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
 }
 
 export function toSummary(row: SummaryRow): Summary {

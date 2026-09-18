@@ -31,7 +31,32 @@ type UserScopedTableName =
   | "meals"
   | "workouts"
   | "notifications"
-  | "routine_blocks";
+  | "routine_blocks"
+  // מרחב תורה — Knowledge Graph (20260916000000–000002). Every one of these
+  // is (id uuid pk, user_id uuid, …), so they fit this factory as-is.
+  // lesson_transcripts deliberately does not: it is keyed by lesson_id, and
+  // lib/db/lessons.ts gives it its own accessor rather than bending the
+  // factory around one table.
+  | "kg_edges"
+  | "concepts"
+  | "concept_mentions"
+  | "lessons"
+  | "lesson_segments"
+  | "lesson_sources"
+  | "learning_chunks"
+  | "practice_questions"
+  | "practice_attempts"
+  | "srs_cards"
+  | "srs_reviews"
+  | "study_tracks"
+  | "study_track_items"
+  | "havruta_threads"
+  | "havruta_messages"
+  | "contradiction_alerts"
+  | "contradiction_scan_pairs"
+  // מרחב תורה — universal audio + handwriting scanner (20260920000000).
+  | "entity_audio"
+  | "handwriting_scans";
 
 export function createUserScopedRepo<T extends UserScopedTableName>(table: T) {
   type Row = Database["public"]["Tables"][T]["Row"];
@@ -57,6 +82,13 @@ export function createUserScopedRepo<T extends UserScopedTableName>(table: T) {
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as Row[];
+    },
+
+    /** One row by id, or null — scoped to the user like every other read. */
+    async get(userId: string, id: string): Promise<Row | null> {
+      const { data, error } = await from().select("*").eq("id", id).eq("user_id", userId).maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as Row | null;
     },
 
     async insert(row: Insert): Promise<Row> {

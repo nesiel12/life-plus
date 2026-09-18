@@ -1,3 +1,5 @@
+import type { LineageEntry, RabbiLocation, RabbiWork, SuggestedLink } from "@/lib/torah/rabbiProfile";
+
 export type LifeAreaKey = "faith" | "family" | "knowledge" | "health" | "career";
 
 export interface LifeArea {
@@ -89,7 +91,38 @@ export interface Book {
   title: string;
   author?: string;
   category?: string;
+  /** The user's own note. Distinct from `description`, which is provider/AI text. */
   notes?: string;
+
+  // — Smart-hub enrichment (Torah KG Phase 1). Every field optional: a book
+  //   typed in by hand with nothing but a title is still a valid book, and
+  //   the hub degrades to exactly what it was before rather than showing
+  //   empty scaffolding.
+  hebrewTitle?: string;
+  coverImageUrl?: string;
+  publishedYear?: number;
+  /** What this sefer is — from Sefaria, or generated. */
+  description?: string;
+  /** "Important things to know before learning this." */
+  preStudyNotes?: string;
+  /** Set once the author has been promoted to a full Rabbi entity. */
+  authorRabbiId?: string;
+  /** Provider payloads, keyed by provider name. */
+  externalRefs?: Record<string, unknown>;
+  avgPriceIls?: number;
+  rating?: number;
+  ratingsCount?: number;
+  lastSyncedAt?: string;
+
+  // — Book page (Torah KG Phase 2).
+  /** Hebrew topic chips — "what is inside". */
+  keyTopics?: string[];
+  /** The user's own 1–5 verdict, distinct from the provider's `rating`. */
+  personalRating?: number;
+  personalReview?: string;
+  /** Who recommended this sefer. */
+  recommendedBy?: string;
+  isbn?: string;
 }
 
 export interface Rabbi {
@@ -97,6 +130,38 @@ export interface Rabbi {
   name: string;
   title?: string;
   notes?: string;
+
+  // — Rabbi profile (Torah KG Phases 0 + 2). Every field optional: a rabbi
+  //   added by typing a name is a valid rabbi, and the profile degrades to
+  //   an elegant empty state plus an "enrich" action.
+  hebrewName?: string;
+  portraitUrl?: string;
+  birthYear?: number;
+  deathYear?: number;
+  birthPlace?: string;
+  deathPlace?: string;
+  locations?: RabbiLocation[];
+  /** Hebrew era label ("אחרונים"). */
+  era?: string;
+  /** The story of his life, in Hebrew. */
+  bio?: string;
+  /** The world he lived in, in Hebrew. */
+  historicalContext?: string;
+  achievements?: string[];
+  /** Teachers and students known about him, in or out of the library. */
+  lineage?: LineageEntry[];
+  /** His bookshelf, in or out of the library. */
+  works?: RabbiWork[];
+  isContemporary?: boolean;
+  phone?: string;
+  whatsappUrl?: string;
+  websiteUrl?: string;
+  youtubeChannelUrl?: string;
+  email?: string;
+  /** Links a model proposed; never shown as confirmed contact details. */
+  suggestedLinks?: SuggestedLink[];
+  externalRefs?: Record<string, unknown>;
+  lastSyncedAt?: string;
 }
 
 /** A user-defined top-level grouping for summaries (פרשת שבוע, דברי תורה, …). */
@@ -181,7 +246,7 @@ export interface SummarySection {
  * What a study item is. The table is still called `summaries` — see the
  * migration for why renaming it was not worth breaking every consumer.
  */
-export type StudyItemKind = "summary" | "video" | "source";
+export type StudyItemKind = "summary" | "video" | "source" | "audio";
 
 export interface Summary {
   id: string;

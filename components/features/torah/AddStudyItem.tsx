@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Loader2, NotebookPen, Plus, Video, X } from "lucide-react";
+import { ExternalLink, Headphones, Loader2, NotebookPen, Plus, Video, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { nextSortOrder } from "@/lib/torah/studyHub";
 import { youtubeVideoId } from "@/lib/learning/youtube";
@@ -16,11 +16,16 @@ interface AddStudyItemProps {
   entityId?: string;
   /** Opens the rich editor instead of creating inline. */
   onWriteSummary: () => void;
+  /** Limits the quick-add kinds offered — a dedicated audio section offers only audio. */
+  kinds?: Exclude<StudyItemKind, "summary">[];
+  /** Hides the "write summary" button, for sections that are not about notes. */
+  hideWriteSummary?: boolean;
 }
 
 const KINDS: { kind: Exclude<StudyItemKind, "summary">; label: string; icon: typeof Video; placeholder: string }[] = [
   { kind: "video", label: "שיעור וידאו", icon: Video, placeholder: "קישור YouTube" },
   { kind: "source", label: "מקור", icon: ExternalLink, placeholder: "קישור למקור" },
+  { kind: "audio", label: "שיעור אודיו", icon: Headphones, placeholder: "קישור לקובץ שמע (mp3)" },
 ];
 
 // Quick-add for the two item kinds that are essentially a title plus a link.
@@ -28,7 +33,14 @@ const KINDS: { kind: Exclude<StudyItemKind, "summary">; label: string; icon: typ
 // Written summaries deliberately do not have an inline form here — they open
 // the rich editor, because a one-line input would produce exactly the thin,
 // unstructured notes the summary system was rebuilt to replace.
-export function AddStudyItem({ sectionId, entityType, entityId, onWriteSummary }: AddStudyItemProps) {
+export function AddStudyItem({
+  sectionId,
+  entityType,
+  entityId,
+  onWriteSummary,
+  kinds,
+  hideWriteSummary = false,
+}: AddStudyItemProps) {
   const summaries = useAtlasStore((s) => s.summaries);
   const addSummary = useAtlasStore((s) => s.addSummary);
 
@@ -54,6 +66,12 @@ export function AddStudyItem({ sectionId, entityType, entityId, onWriteSummary }
     // the card renders an empty player later, with nothing explaining why.
     if (kind === "video" && !youtubeVideoId(trimmedUrl)) {
       setError("זה לא נראה כמו קישור YouTube תקין.");
+      return;
+    }
+    // An audio element given a non-http(s) URL is at best a silent player
+    // and at worst a javascript: href in a fallback link.
+    if ((kind === "audio" || kind === "source") && !/^https?:\/\/[^\s]+\.[^\s]+/i.test(trimmedUrl)) {
+      setError("יש להזין קישור מלא שמתחיל ב-https://");
       return;
     }
 
@@ -129,14 +147,16 @@ export function AddStudyItem({ sectionId, entityType, entityId, onWriteSummary }
 
   return (
     <div className="flex flex-wrap gap-2">
-      <button
-        onClick={onWriteSummary}
-        className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-foreground"
-      >
-        <NotebookPen size={13} className="text-accent-faith" aria-hidden />
-        כתוב סיכום
-      </button>
-      {KINDS.map((k) => {
+      {!hideWriteSummary && (
+        <button
+          onClick={onWriteSummary}
+          className="glass-control focus-ring flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-foreground"
+        >
+          <NotebookPen size={13} className="text-accent-faith" aria-hidden />
+          כתוב סיכום
+        </button>
+      )}
+      {KINDS.filter((k) => !kinds || kinds.includes(k.kind)).map((k) => {
         const Icon = k.icon;
         return (
           <button

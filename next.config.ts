@@ -19,6 +19,11 @@ const logoMark =
   "life-plus-mark.svg";
 
 const nextConfig: NextConfig = {
+  // Overridable so a second dev server can run from this folder at the same
+  // time (see "life-plus-dev-alt" in .claude/launch.json). Two `next dev`
+  // processes writing one .next directory corrupt each other's manifests and
+  // both start answering 500.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   env: {
     NEXT_PUBLIC_LOGO_MARK: `/${logoMark}`,
   },
@@ -27,6 +32,18 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "lh3.googleusercontent.com",
+      },
+      // Book cover art for the ספרים hub. Both hosts are Google Books' own
+      // thumbnail CDNs. These URLs are only ever written server-side from the
+      // Google Books API response (app/actions/books.ts), never from client
+      // input, so this does not widen what a user can point an <img> at.
+      {
+        protocol: "https",
+        hostname: "books.google.com",
+      },
+      {
+        protocol: "https",
+        hostname: "books.googleusercontent.com",
       },
     ],
   },

@@ -19,9 +19,26 @@ interface EntityHubProps {
   onBack: () => void;
   /** Following an @mention out of this hub. The page owns where that goes. */
   onEntityClick?: (ref: EntityRef) => void;
+  /**
+   * Rendered inside a Book or Rabbi page, which has its own hero and back
+   * navigation — the hub drops its header and keeps only the material.
+   */
+  embedded?: boolean;
+  /** Which kinds this hub shows; the pages give video and audio their own sections. */
+  kinds?: HubKind[];
 }
 
-type HubTab = "all" | "summaries" | "videos" | "sources";
+type HubKind = "summaries" | "videos" | "sources" | "audios";
+type HubTab = "all" | HubKind;
+
+const TAB_LABELS: Record<HubKind, string> = {
+  summaries: "סיכומים",
+  videos: "שיעורים",
+  sources: "מקורות",
+  audios: "אודיו",
+};
+
+const ALL_KINDS: HubKind[] = ["summaries", "videos", "sources", "audios"];
 
 // The one-stop hub behind clicking a book or a rabbi.
 //
@@ -33,7 +50,16 @@ type HubTab = "all" | "summaries" | "videos" | "sources";
 // material filed *about* the entity and material that merely @mentions it,
 // and marks which is which — so a note about another book that quotes this
 // rabbi shows up here, labelled, rather than being invisible.
-export function EntityHub({ entityType, entityId, name, subtitle, onBack, onEntityClick }: EntityHubProps) {
+export function EntityHub({
+  entityType,
+  entityId,
+  name,
+  subtitle,
+  onBack,
+  onEntityClick,
+  embedded = false,
+  kinds = ALL_KINDS,
+}: EntityHubProps) {
   const summaries = useAtlasStore((s) => s.summaries);
   const knowledgeEntries = useAtlasStore((s) => s.knowledgeEntries);
   const books = useAtlasStore((s) => s.books);
@@ -58,44 +84,42 @@ export function EntityHub({ entityType, entityId, name, subtitle, onBack, onEnti
   );
 
   const visible: HubItem[] = useMemo(() => {
-    const pick =
-      tab === "summaries" ? hub.summaries : tab === "videos" ? hub.videos : tab === "sources" ? hub.sources : null;
-    if (pick) return pick;
     // "All" keeps the kind grouping rather than interleaving — written
     // material first, then lessons, then sources, which is the order a
     // person actually studies in.
-    return [...hub.summaries, ...hub.videos, ...hub.sources];
-  }, [tab, hub]);
+    const picked = tab === "all" ? kinds : [tab];
+    return picked.flatMap((kind) => hub[kind]);
+  }, [tab, hub, kinds]);
 
   const TABS: { key: HubTab; label: string; count: number }[] = [
-    { key: "all", label: "הכל", count: hub.summaries.length + hub.videos.length + hub.sources.length },
-    { key: "summaries", label: "סיכומים", count: hub.summaries.length },
-    { key: "videos", label: "שיעורים", count: hub.videos.length },
-    { key: "sources", label: "מקורות", count: hub.sources.length },
+    { key: "all", label: "הכל", count: kinds.reduce((sum, kind) => sum + hub[kind].length, 0) },
+    ...kinds.map((kind) => ({ key: kind, label: TAB_LABELS[kind], count: hub[kind].length })),
   ];
 
   const Icon = entityType === "book" ? BookOpen : GraduationCap;
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-faith/15 text-accent-faith">
-            <Icon size={18} aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <h2 className="truncate text-lg font-medium text-foreground">{name}</h2>
-            {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
+      {!embedded && (
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-faith/15 text-accent-faith">
+              <Icon size={18} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-medium text-foreground">{name}</h2>
+              {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
+            </div>
           </div>
+          <button
+            onClick={onBack}
+            className="glass-control focus-ring flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-foreground"
+          >
+            <ArrowRight size={13} aria-hidden />
+            חזרה
+          </button>
         </div>
-        <button
-          onClick={onBack}
-          className="glass-control focus-ring flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-foreground"
-        >
-          <ArrowRight size={13} aria-hidden />
-          חזרה
-        </button>
-      </div>
+      )}
 
       <div role="tablist" aria-label="תוכן" className="flex flex-wrap gap-1.5">
         {TABS.map((t) => (
@@ -129,6 +153,9 @@ export function EntityHub({ entityType, entityId, name, subtitle, onBack, onEnti
           entityType={entityType}
           entityId={entityId}
           onWriteSummary={() => setEditorTarget("new")}
+          kinds={kinds
+            .filter((kind): kind is Exclude<HubKind, "summaries"> => kind !== "summaries")
+            .map((kind) => (kind === "videos" ? "video" : kind === "sources" ? "source" : "audio"))}
         />
       )}
 
@@ -138,6 +165,7 @@ export function EntityHub({ entityType, entityId, name, subtitle, onBack, onEnti
         onEdit={(id) => setEditorTarget(id)}
         onMove={(id, delta) => reorderSummaryInSection(id, delta).catch(() => {})}
         onEntityClick={onEntityClick}
+        currentBookId={entityType === "book" ? entityId : undefined}
         emptyLabel={
           entityType === "book"
             ? "אין עדיין חומרים לספר הזה. הוסף סיכום, שיעור או מקור."

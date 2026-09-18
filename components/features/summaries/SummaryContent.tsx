@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { isEntityType, type EntityRef } from "@/lib/summaries/entityRef";
 import { sanitizeSummaryHtml } from "@/lib/summaries/sanitizeHtml";
+import { buildAutoLinkTargets, linkifyHtml, linkifyText } from "@/lib/torah/autoLink";
+import { SEFORIM_CATALOG } from "@/lib/torah/seforimCatalog";
+import { useAtlasStore } from "@/store/useAtlasStore";
 
 interface SummaryContentProps {
   /** Rich HTML from the editor. */
@@ -12,6 +16,11 @@ interface SummaryContentProps {
   className?: string;
   /** Makes @mention chips clickable. Omit to render them as plain chips. */
   onEntityClick?: (ref: EntityRef) => void;
+  /**
+   * The book whose page this note is shown on, so its own name is not linked
+   * back to itself. Auto-linking is on whenever the content is navigable.
+   */
+  currentBookId?: string;
 }
 
 // Renders a saved summary as structured text on an entity page.
@@ -24,13 +33,28 @@ interface SummaryContentProps {
 // user copied from. The allowlist in lib/summaries/sanitizeHtml.ts is exactly
 // the tag set the editor can produce, so nothing legitimate is lost.
 //
-// When onEntityClick is supplied the mention chips become navigable. The
-// affordances (role, tabindex) are applied to the live DOM after render
-// rather than baked into the stored HTML: keeping them out of the saved
-// markup means the sanitiser's attribute allowlist stays as narrow as it is,
-// and the same content renders inert wherever no host wires navigation up.
-export function SummaryContent({ html, text, className, onEntityClick }: SummaryContentProps) {
-  const safe = useMemo(() => (html ? sanitizeSummaryHtml(html) : null), [html]);
+// When onEntityClick is supplied the mention chips become navigable, and book
+// names written in plain prose ("כמו שכתוב בשולחן ערוך") are auto-linked to
+// their pages (lib/torah/autoLink.ts). Auto-linking runs AFTER sanitising and
+// only wraps text in a span with data attributes whose values are escaped, so
+// it cannot reintroduce markup the sanitiser removed. The stored note is never
+// modified.
+export function SummaryContent({ html, text, className, onEntityClick, currentBookId }: SummaryContentProps) {
+  const router = useRouter();
+  const books = useAtlasStore((s) => s.books);
+  const autoLink = Boolean(onEntityClick);
+
+  const targets = useMemo(
+    () => (autoLink ? buildAutoLinkTargets(books, SEFORIM_CATALOG, { excludeBookId: currentBookId }) : []),
+    [autoLink, books, currentBookId]
+  );
+
+  const safe = useMemo(() => {
+    if (!html) return null;
+    const sanitized = sanitizeSummaryHtml(html);
+    return targets.length > 0 ? linkifyHtml(sanitized, targets) : sanitized;
+  }, [html, targets]);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,6 +78,19 @@ export function SummaryContent({ html, text, className, onEntityClick }: Summary
   const activate = useCallback(
     (target: EventTarget | null) => {
       if (!onEntityClick || !(target instanceof Element)) return;
+
+      const autoLinkEl = target.closest<HTMLElement>(".auto-book-link");
+      if (autoLinkEl) {
+        const { autoBookId, autoBookTitle } = autoLinkEl.dataset;
+        if (autoBookId) {
+          onEntityClick({ type: "book", id: autoBookId, label: autoLinkEl.textContent ?? "" });
+        } else if (autoBookTitle) {
+          // Not on the shelf yet: the resolver adds it and opens its page.
+          router.push(`/areas/torah/open?type=book&title=${encodeURIComponent(autoBookTitle)}`);
+        }
+        return;
+      }
+
       const chip = target.closest<HTMLElement>(".entity-mention");
       if (!chip) return;
       const { entityType, entityId, label } = chip.dataset;
@@ -62,8 +99,16 @@ export function SummaryContent({ html, text, className, onEntityClick }: Summary
       if (!entityType || !entityId || !isEntityType(entityType)) return;
       onEntityClick({ type: entityType, id: entityId, label: label ?? "" });
     },
-    [onEntityClick]
+    [onEntityClick, router]
   );
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      // Space would otherwise scroll the page out from under the link.
+      if (e.target instanceof Element && e.target.closest(".entity-mention, .auto-book-link")) e.preventDefault();
+      activate(e.target);
+    }
+  };
 
   if (safe) {
     return (
@@ -72,13 +117,7 @@ export function SummaryContent({ html, text, className, onEntityClick }: Summary
         className={`summary-content ${className ?? ""}`}
         dir="rtl"
         onClick={(e) => activate(e.target)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            // Space would otherwise scroll the page out from under the chip.
-            if (e.target instanceof Element && e.target.closest(".entity-mention")) e.preventDefault();
-            activate(e.target);
-          }
-        }}
+        onKeyDown={onKeyDown}
         dangerouslySetInnerHTML={{ __html: safe }}
       />
     );
@@ -86,9 +125,30 @@ export function SummaryContent({ html, text, className, onEntityClick }: Summary
 
   // Pre-editor summaries are plain text with meaningful line breaks.
   if (text?.trim()) {
+    const segments = targets.length > 0 ? linkifyText(text, targets) : [{ kind: "text" as const, text }];
     return (
-      <div className={`summary-content whitespace-pre-line ${className ?? ""}`} dir="rtl">
-        {text}
+      <div
+        className={`summary-content whitespace-pre-line ${className ?? ""}`}
+        dir="rtl"
+        onClick={(e) => activate(e.target)}
+        onKeyDown={onKeyDown}
+      >
+        {segments.map((segment, i) =>
+          segment.kind === "text" ? (
+            segment.text
+          ) : (
+            <span
+              key={i}
+              className="auto-book-link"
+              role="link"
+              tabIndex={0}
+              data-auto-book-id={segment.target.bookId}
+              data-auto-book-title={segment.target.bookId ? undefined : segment.target.title}
+            >
+              {segment.text}
+            </span>
+          )
+        )}
       </div>
     );
   }

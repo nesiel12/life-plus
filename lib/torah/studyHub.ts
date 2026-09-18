@@ -37,6 +37,8 @@ export interface StudyHub {
   videos: HubItem[];
   /** Reference texts and links. */
   sources: HubItem[];
+  /** Audio lessons (hosted files, until the Phase 3 upload pipeline). */
+  audios: HubItem[];
   /** Torah knowledge entries whose topic or source names the entity. */
   relatedEntries: KnowledgeEntry[];
   /** Everything, for a count. */
@@ -162,6 +164,7 @@ export function buildStudyHub({
     summaries: byKind(all, "summary"),
     videos: byKind(all, "video"),
     sources: byKind(all, "source"),
+    audios: byKind(all, "audio"),
     relatedEntries,
     total: all.length + relatedEntries.length,
   };

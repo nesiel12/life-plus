@@ -28,6 +28,9 @@ export const JOB_LOADERS: Partial<Record<JobName, () => Promise<Job>>> = {
     import("@/lib/proactive/jobs/recoverySupport").then((m) => m.recoverySupportJob),
   notification_dispatch: () =>
     import("@/lib/proactive/jobs/notificationDispatch").then((m) => m.notificationDispatchJob),
+  lesson_pipeline: () => import("@/lib/proactive/jobs/lessonPipeline").then((m) => m.lessonPipelineJob),
+  audio_transcription: () =>
+    import("@/lib/proactive/jobs/audioTranscription").then((m) => m.audioTranscriptionJob),
 };
 
 /** The job names that currently have an implementation. */

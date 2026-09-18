@@ -170,3 +170,10 @@ export function isProviderConfigured(): boolean {
 export function isTranscriptionConfigured(): boolean {
   return Boolean(process.env.OPENAI_API_KEY);
 }
+
+// Lesson media (uploaded shiurim, YouTube videos) is transcribed by Gemini,
+// which reads audio and video directly — see lib/ai/geminiMedia.ts. Distinct
+// from isTranscriptionConfigured(), which is the Whisper path.
+export function isMediaTranscriptionConfigured(): boolean {
+  return Boolean(process.env.GEMINI_API_KEY);
+}

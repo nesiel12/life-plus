@@ -17,6 +17,11 @@ import {
   type AiOperation,
 } from "@/lib/ai/quota";
 import { adjustAiUnits, consumeAiUnits } from "@/lib/db/aiUsage";
+import { geminiTranscribeWindow, type MediaSource, type RawWindowLine } from "@/lib/ai/geminiMedia";
+
+// Same aliases and order as the chat chain (lib/ai/provider.ts): lite first,
+// the full flash model only as a capacity fallback.
+const MEDIA_TRANSCRIPTION_MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest"];
 
 // The one shared AI service (Unified AI Provider Layer) — every AI-backed
 // route calls through here instead of importing the `ai` SDK or
@@ -223,6 +228,12 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
    * about an image the model never saw.
    */
   images?: Uint8Array[];
+  /**
+   * Overrides the standard structured-output deadline. For long inputs only —
+   * a whole shiur's transcript takes longer to read than a paragraph, and the
+   * callers that pass this run in background jobs, not a user's request.
+   */
+  timeoutMs?: number;
 }) {
   await chargeQuota(params.actor, params.operation ?? "structured");
   const { images } = params;
@@ -279,12 +290,46 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
       // satisfy should fail fast to the caller's fallback instead of
       // burning the whole budget rediscovering that.
       maxRetries: 1,
-      abortSignal: AbortSignal.timeout(STRUCTURED_TIMEOUT_MS),
+      abortSignal: AbortSignal.timeout(params.timeoutMs ?? STRUCTURED_TIMEOUT_MS),
     });
     return object;
     },
     images && images.length > 0 ? { filter: (c) => c.kind === "sdk" } : {}
   );
+}
+
+/**
+ * Transcribes one time window of a lesson's media — uploaded audio (a Gemini
+ * Files API URI) or a YouTube video — with timestamps.
+ *
+ * Gemini-only, and deliberately so: it is the configured provider that reads
+ * audio and video directly, so a shiur can be transcribed without Whisper.
+ * Charged as one structured request per window rather than per audio minute:
+ * the per-minute budget was sized for Whisper's pricing, under which a single
+ * 60-minute shiur would exhaust a week of the free allowance, while Gemini
+ * prices audio per token at a small fraction of that.
+ *
+ * Fails over from the lite model to the full flash model on a capacity error
+ * only, like withModelFallback.
+ */
+export async function transcribeMediaWindow(params: {
+  source: MediaSource;
+  window: { start: number; end: number; from: string; to: string };
+  actor: AiActor;
+}): Promise<RawWindowLine[]> {
+  await chargeQuota(params.actor, "structured");
+  const models = MEDIA_TRANSCRIPTION_MODELS;
+  let lastError: unknown;
+  for (let i = 0; i < models.length; i++) {
+    try {
+      return await geminiTranscribeWindow({ model: models[i], source: params.source, ...params.window });
+    } catch (err) {
+      lastError = err;
+      if (i === models.length - 1 || !isRetryableAiError(err)) throw err;
+      console.warn(`[ai] transcribeMediaWindow failed on ${models[i]}, trying ${models[i + 1]}:`, err instanceof Error ? err.message : err);
+    }
+  }
+  throw lastError;
 }
 
 export interface TranscriptionResult {

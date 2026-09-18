@@ -3,6 +3,8 @@
 //
 //   npm run cron -- daily_insight
 //   npm run cron -- recommendation_expiry
+//   npm run cron -- lesson_pipeline      (transcribe + analyse uploaded shiurim)
+//   npm run cron -- audio_transcription  (transcribe recordings attached to entities)
 //
 // Runs the real runJob() code path against whatever SUPABASE_* / AI env is in
 // .env.local. Safe to re-run: job_runs idempotency skips already-succeeded
@@ -21,6 +23,8 @@ const VALID: JobName[] = [
   "schedule_transition",
   "recovery_support",
   "relationship_nudge",
+  "lesson_pipeline",
+  "audio_transcription",
 ];
 
 const job = process.argv[2] as JobName | undefined;

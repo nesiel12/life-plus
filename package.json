@@ -17,6 +17,7 @@
     "cron:reminder-sweep": "npm run cron -- reminder_sweep",
     "cron:busy-week-scan": "npm run cron -- busy_week_scan",
     "cron:dispatch": "npm run cron -- notification_dispatch",
+    "cron:lesson-pipeline": "npm run cron -- lesson_pipeline",
     "check:schema": "node --env-file=.env.local scripts/check-schema-drift.mjs"
   },
   "dependencies": {

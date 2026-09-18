@@ -9,7 +9,9 @@ export type JobName =
   | "notification_dispatch"
   | "schedule_transition"
   | "recovery_support"
-  | "relationship_nudge";
+  | "relationship_nudge"
+  | "lesson_pipeline"
+  | "audio_transcription";
 
 export type NotificationKind =
   | "daily_insight"

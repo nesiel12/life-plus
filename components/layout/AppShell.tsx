@@ -114,13 +114,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
     return (
       <div className="flex min-h-screen">
-        <Sidebar />
-        <div className="min-w-0 flex-1 pb-20 sm:pb-0">{children}</div>
-        <MobileTabBar />
-        <AICompanion />
-        <QuickCapture />
-        <WelcomeSlides />
-        <OnboardingFlow />
+        {/* The app chrome is screen furniture: printing a page (הדפסה לשבת)
+            must put the page's own content on the paper and nothing else.
+            `contents` keeps the flex layout identical on screen; `print:hidden`
+            removes the whole wrapper from the printed document. */}
+        <div className="contents print:hidden">
+          <Sidebar />
+          <MobileTabBar />
+          <AICompanion />
+          <QuickCapture />
+          <WelcomeSlides />
+          <OnboardingFlow />
+        </div>
+        <div className="min-w-0 flex-1 pb-20 sm:pb-0 print:pb-0">{children}</div>
       </div>
     );
   })();

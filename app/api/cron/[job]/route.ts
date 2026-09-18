@@ -15,6 +15,8 @@ const VALID_JOBS: JobName[] = [
   "schedule_transition",
   "recovery_support",
   "relationship_nudge",
+  "lesson_pipeline",
+  "audio_transcription",
 ];
 
 /**
@@ -42,11 +44,24 @@ const JOB_GROUPS: Record<string, JobName[]> = {
     "schedule_transition",
     "recovery_support",
     "notification_dispatch",
+    // Last, so a long media backlog cannot starve the morning notifications.
+    "lesson_pipeline",
+    "audio_transcription",
   ],
   // A lighter pass for later in the day: fires reminders whose window opened
   // since the morning run, and delivers anything the morning's quiet hours
   // deferred.
-  sweep: ["reminder_sweep", "schedule_transition", "recovery_support", "notification_dispatch"],
+  sweep: [
+    "reminder_sweep",
+    "schedule_transition",
+    "recovery_support",
+    "notification_dispatch",
+    "lesson_pipeline",
+    "audio_transcription",
+  ],
+  // The lessons worker on its own, for a scheduler that can call more often
+  // than Vercel's free tier (e.g. an external cron hitting it every few minutes).
+  lessons: ["lesson_pipeline"],
   // Weekly.
   weekly: ["busy_week_scan", "notification_dispatch"],
 };

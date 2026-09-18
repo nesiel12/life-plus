@@ -1,0 +1,109 @@
+/*
+ * The Shabbat pamphlet's own stylesheet.
+ *
+ * Everything is scoped under .shabbat-sheet except the @page rule, which has
+ * to be global to reach the printer. On screen the sheet is shown as a paper
+ * page on the app's background; in print it becomes the page itself, and the
+ * app shell around it is hidden (components/layout/AppShell.tsx marks the
+ * chrome print:hidden).
+ */
+
+.shabbat-sheet {
+  --sheet-ink: #1a1614;
+  --sheet-muted: #5c5148;
+  --sheet-rule: #c9b48a;
+  --sheet-gold: #8a6d2f;
+  color: var(--sheet-ink);
+  background: #fffdf8;
+  line-height: 1.75;
+}
+
+.shabbat-sheet h1,
+.shabbat-sheet h2,
+.shabbat-sheet h3 {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+/* Section head: a Hebrew title with a rule running out from it. */
+.sheet-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.05rem;
+  color: var(--sheet-gold);
+  margin-bottom: 0.65rem;
+}
+
+.sheet-section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to left, var(--sheet-rule), transparent);
+}
+
+.sheet-columns {
+  column-count: 2;
+  column-gap: 1.6rem;
+  column-rule: 1px solid #ece3d2;
+}
+
+.sheet-block {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+@media (max-width: 640px) {
+  .sheet-columns {
+    column-count: 1;
+  }
+}
+
+@page {
+  size: A4;
+  margin: 18mm 16mm 16mm;
+
+  /* Page numbers, in Hebrew numerals — Chromium supports page margin boxes.
+     A browser that does not simply prints without them. */
+  @bottom-center {
+    content: counter(page, hebrew);
+    font-family: "Frank Ruhl Libre", serif;
+    font-size: 10pt;
+    color: #8a6d2f;
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .shabbat-sheet {
+    background: #fff;
+    /* The screen frame is scaffolding; on paper the page margin is @page's. */
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    font-size: 11.5pt;
+  }
+
+  .shabbat-sheet a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* A section should not start with its heading orphaned at the foot. */
+  .shabbat-sheet section {
+    break-inside: auto;
+  }
+
+  .sheet-section-title {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}

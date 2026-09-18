@@ -8,18 +8,19 @@ import type { Rabbi } from "@/types";
 
 interface RabbiDraft {
   name: string;
+  hebrewName: string;
   title: string;
   notes: string;
 }
 
 function draftFor(rabbi: Rabbi): RabbiDraft {
-  return { name: rabbi.name, title: rabbi.title ?? "", notes: rabbi.notes ?? "" };
+  return { name: rabbi.name, hebrewName: rabbi.hebrewName ?? "", title: rabbi.title ?? "", notes: rabbi.notes ?? "" };
 }
 
 interface EditRabbiModalProps {
   rabbi: Rabbi | null;
   onClose: () => void;
-  onSave: (id: string, patch: Omit<Rabbi, "id">) => void;
+  onSave: (id: string, patch: Partial<Omit<Rabbi, "id">>) => void;
   onDelete: (id: string) => void;
 }
 
@@ -41,10 +42,13 @@ export function EditRabbiModal({ rabbi, onClose, onSave, onDelete }: EditRabbiMo
 
   function handleSave() {
     if (!draft || !draft.name.trim()) return;
+    // Empty strings, not undefined, for cleared fields: toRabbiPatch skips
+    // undefined, so clearing a field has to be sent as "" to reach the row.
     onSave(currentRabbi.id, {
       name: draft.name.trim(),
-      title: draft.title.trim() || undefined,
-      notes: draft.notes.trim() || undefined,
+      hebrewName: draft.hebrewName.trim(),
+      title: draft.title.trim(),
+      notes: draft.notes.trim(),
     });
     onClose();
   }
@@ -84,6 +88,13 @@ export function EditRabbiModal({ rabbi, onClose, onSave, onDelete }: EditRabbiMo
           onChange={(e) => updateDraft({ name: e.target.value })}
           placeholder="שם הרב"
           aria-label="שם הרב"
+          className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
+        />
+        <input
+          value={draft.hebrewName}
+          onChange={(e) => updateDraft({ hebrewName: e.target.value })}
+          placeholder="השם המלא כפי שהוא מוכר, למשל: רבי ישראל מאיר הכהן"
+          aria-label="השם המלא בעברית"
           className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
         />
         <input

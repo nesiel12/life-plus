@@ -25,8 +25,20 @@ import {
   type RoutineBlockInput,
 } from "@/app/actions/routineBlocks";
 import { addKnowledgeEntryAction, markKnowledgeReviewedAction } from "@/app/actions/knowledge";
-import { addBookAction, updateBookAction, deleteBookAction } from "@/app/actions/books";
-import { addRabbiAction, updateRabbiAction, deleteRabbiAction } from "@/app/actions/rabbis";
+import {
+  addBookAction,
+  addBookFromProviderAction,
+  openBookAuthorAction,
+  openOrCreateBookAction,
+  updateBookAction,
+  deleteBookAction,
+} from "@/app/actions/books";
+import {
+  addRabbiAction,
+  openOrCreateRabbiAction,
+  updateRabbiAction,
+  deleteRabbiAction,
+} from "@/app/actions/rabbis";
 import { addSummaryAction, deleteSummaryAction, updateSummaryAction } from "@/app/actions/summaries";
 import { addCheckInAction, listCheckInsAction } from "@/app/actions/checkIns";
 import {
@@ -182,11 +194,37 @@ interface AtlasState extends HydratedState {
   markKnowledgeReviewed: (entryId: string) => Promise<void>;
   updateLifeAreaScore: (key: LifeArea["key"], score: number) => Promise<void>;
 
-  addBook: (book: { title: string; author?: string; category?: string; notes?: string }) => Promise<void>;
+  addBook: (book: { title: string; author?: string; category?: string; notes?: string }) => Promise<Book>;
+  /**
+   * Adds a book picked from the search command center, enriched server-side.
+   * Opens the existing row instead when the sefer is already on the shelf.
+   */
+  addBookFromProvider: (input: {
+    title: string;
+    provider?: "sefaria" | "googleBooks";
+    sefariaTitle?: string;
+  }) => Promise<Book>;
+  /** The Rabbi → Book hop of the investigation loop. */
+  openOrCreateBook: (input: Parameters<typeof openOrCreateBookAction>[0]) => Promise<Book>;
+  /** The Book → Rabbi hop: resolves (or creates) the author's rabbi row. */
+  openBookAuthor: (bookId: string) => Promise<{ rabbi: Rabbi } | { error: string }>;
   updateBook: (bookId: string, patch: Partial<Book>) => Promise<void>;
+  /**
+   * Replaces a book in the store with one an API route already persisted.
+   *
+   * Distinct from updateBook, which *performs* the write. The enrich route
+   * saves its own result, so calling updateBook with it would write the same
+   * values back a second time and race with anything else the user just
+   * changed.
+   */
+  applyBookPatch: (book: Book) => void;
   deleteBook: (bookId: string) => Promise<void>;
-  addRabbi: (rabbi: { name: string; title?: string; notes?: string }) => Promise<void>;
+  addRabbi: (rabbi: { name: string; title?: string; notes?: string }) => Promise<Rabbi>;
+  /** Opens a rabbi from a lineage list or search, creating him on first visit. */
+  openOrCreateRabbi: (input: Parameters<typeof openOrCreateRabbiAction>[0]) => Promise<Rabbi>;
   updateRabbi: (rabbiId: string, patch: Partial<Rabbi>) => Promise<void>;
+  /** Replaces a rabbi with one an API route (enrich) already persisted. See applyBookPatch. */
+  applyRabbiPatch: (rabbi: Rabbi) => void;
   deleteRabbi: (rabbiId: string) => Promise<void>;
   addSummary: (summary: {
     title: string;
@@ -352,6 +390,17 @@ const EMPTY_STATE: HydratedState = {
   notificationUnreadCount: 0,
 };
 
+/**
+ * Replaces the row with the same id, or prepends it when it is new.
+ *
+ * The open-or-create actions return a row that may or may not already be in
+ * the store — following a link to a book already on the shelf must not
+ * render it twice.
+ */
+function upsertById<T extends { id: string }>(rows: T[], row: T): T[] {
+  return rows.some((r) => r.id === row.id) ? rows.map((r) => (r.id === row.id ? row : r)) : [row, ...rows];
+}
+
 export const useAtlasStore = create<AtlasState>((set, get) => ({
   ...EMPTY_STATE,
   hydrated: false,
@@ -489,11 +538,40 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   addBook: async (book) => {
     const created = await addBookAction(book);
     set((state) => ({ books: [created, ...state.books] }));
+    return created;
+  },
+
+  addBookFromProvider: async (input) => {
+    const { book } = await addBookFromProviderAction(input);
+    set((state) => ({ books: upsertById(state.books, book) }));
+    return book;
+  },
+
+  openOrCreateBook: async (input) => {
+    const { book } = await openOrCreateBookAction(input);
+    set((state) => ({ books: upsertById(state.books, book) }));
+    return book;
+  },
+
+  openBookAuthor: async (bookId) => {
+    const result = await openBookAuthorAction(bookId);
+    if ("error" in result && result.error) return { error: result.error };
+    if (!("rabbi" in result) || !result.rabbi) return { error: "פתיחת דף הרב נכשלה. נסה שוב." };
+    const { book, rabbi } = result;
+    set((state) => ({
+      books: upsertById(state.books, book),
+      rabbis: upsertById(state.rabbis, rabbi),
+    }));
+    return { rabbi };
   },
 
   updateBook: async (bookId, patch) => {
     const updated = await updateBookAction(bookId, patch);
     set((state) => ({ books: state.books.map((b) => (b.id === bookId ? updated : b)) }));
+  },
+
+  applyBookPatch: (book) => {
+    set((state) => ({ books: state.books.map((b) => (b.id === book.id ? book : b)) }));
   },
 
   deleteBook: async (bookId) => {
@@ -504,11 +582,22 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   addRabbi: async (rabbi) => {
     const created = await addRabbiAction(rabbi);
     set((state) => ({ rabbis: [created, ...state.rabbis] }));
+    return created;
+  },
+
+  openOrCreateRabbi: async (input) => {
+    const { rabbi } = await openOrCreateRabbiAction(input);
+    set((state) => ({ rabbis: upsertById(state.rabbis, rabbi) }));
+    return rabbi;
   },
 
   updateRabbi: async (rabbiId, patch) => {
     const updated = await updateRabbiAction(rabbiId, patch);
     set((state) => ({ rabbis: state.rabbis.map((r) => (r.id === rabbiId ? updated : r)) }));
+  },
+
+  applyRabbiPatch: (rabbi) => {
+    set((state) => ({ rabbis: state.rabbis.map((r) => (r.id === rabbi.id ? rabbi : r)) }));
   },
 
   deleteRabbi: async (rabbiId) => {

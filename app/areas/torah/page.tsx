@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FileText, UploadCloud, FileAudio, Sparkles, Plus, Link2, Search } from "lucide-react";
 import { AiSummaryModal } from "@/components/features/torah/AiSummaryModal";
 import { useAtlasStore } from "@/store/useAtlasStore";
@@ -10,7 +10,6 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { LearningInsightsHero } from "@/components/features/LearningInsightsHero";
 import { KnowledgeLibraryCard } from "@/components/features/KnowledgeLibraryCard";
 import { TorahTabs, isCustomTab, type TorahTab } from "@/components/features/torah/TorahTabs";
-import { EntityHub } from "@/components/features/torah/EntityHub";
 import { AddStudyItem } from "@/components/features/torah/AddStudyItem";
 import { StudyItemList } from "@/components/features/torah/StudyItemList";
 import { SectionHeader } from "@/components/features/torah/SectionHeader";
@@ -18,6 +17,12 @@ import { buildSectionHub } from "@/lib/torah/studyHub";
 import { orderSummaries, sectionAndDescendants } from "@/lib/summaries/hierarchy";
 import type { EntityRef, EntitySources } from "@/lib/summaries/entityRef";
 import { BookCard } from "@/components/features/torah/BookCard";
+import { TorahCommandCenter, type CommandScope } from "@/components/features/torah/TorahCommandCenter";
+import { TorahToolsStrip } from "@/components/features/torah/TorahToolsStrip";
+import { IyunHavrutaWidget } from "@/components/features/torah/havruta/IyunHavrutaWidget";
+import { LessonUploader } from "@/components/features/torah/lessons/LessonUploader";
+import { LessonsList } from "@/components/features/torah/lessons/LessonsList";
+import { PracticeOverviewCard } from "@/components/features/torah/lessons/PracticeOverviewCard";
 import { RabbiCard } from "@/components/features/torah/RabbiCard";
 import { SummaryCard } from "@/components/features/torah/SummaryCard";
 import { SummaryWorkspace } from "@/components/features/summaries/SummaryWorkspace";
@@ -50,8 +55,27 @@ function findRelatedSessions(topic: string, entries: KnowledgeEntry[]): Knowledg
   return entries.filter((entry) => entry.topic.split(/\s+/).some((word) => topicWords.has(word)));
 }
 
-export default function TorahSpacePage() {
-  const [activeTab, setActiveTab] = useState<TorahTab>("shiurim");
+// useSearchParams needs a Suspense boundary above it for static rendering.
+export default function TorahSpacePageRoute() {
+  return (
+    <Suspense fallback={null}>
+      <TorahSpacePage />
+    </Suspense>
+  );
+}
+
+const BUILTIN_TABS = new Set<string>(["books", "rabbis", "shiurim", "summaries"]);
+
+function TorahSpacePage() {
+  const searchParams = useSearchParams();
+  // Deep links from Book/Rabbi pages and the command center: ?tab=summaries
+  // or ?section=<id> land on that tab instead of the default.
+  const [activeTab, setActiveTab] = useState<TorahTab>(() => {
+    const section = searchParams.get("section");
+    if (section) return { sectionId: section };
+    const tab = searchParams.get("tab");
+    return tab && BUILTIN_TABS.has(tab) ? (tab as TorahTab) : "shiurim";
+  });
 
   const knowledgeEntries = useAtlasStore((s) => s.knowledgeEntries);
   const addKnowledgeEntry = useAtlasStore((s) => s.addKnowledgeEntry);
@@ -162,24 +186,16 @@ export default function TorahSpacePage() {
   // v1) — same store-action + useApiCall + "quick-add row + full edit/
   // delete modal" convention the Family page already established for people.
   const books = useAtlasStore((s) => s.books);
-  const addBook = useAtlasStore((s) => s.addBook);
   const updateBook = useAtlasStore((s) => s.updateBook);
   const deleteBook = useAtlasStore((s) => s.deleteBook);
-  const [newBookTitle, setNewBookTitle] = useState("");
-  const [newBookAuthor, setNewBookAuthor] = useState("");
   const [editingBook, setEditingBook] = useState<Book | null>(null);
-  const { loading: addingBook, error: addBookError, run: createBook } = useApiCall(addBook);
   const { error: saveBookError, run: saveBook } = useApiCall(updateBook);
   const { error: deleteBookError, run: removeBook } = useApiCall(deleteBook);
 
   const rabbis = useAtlasStore((s) => s.rabbis);
-  const addRabbi = useAtlasStore((s) => s.addRabbi);
   const updateRabbi = useAtlasStore((s) => s.updateRabbi);
   const deleteRabbi = useAtlasStore((s) => s.deleteRabbi);
-  const [newRabbiName, setNewRabbiName] = useState("");
-  const [newRabbiTitle, setNewRabbiTitle] = useState("");
   const [editingRabbi, setEditingRabbi] = useState<Rabbi | null>(null);
-  const { loading: addingRabbi, error: addRabbiError, run: createRabbi } = useApiCall(addRabbi);
   const { error: saveRabbiError, run: saveRabbi } = useApiCall(updateRabbi);
   const { error: deleteRabbiError, run: removeRabbi } = useApiCall(deleteRabbi);
 
@@ -200,9 +216,6 @@ export default function TorahSpacePage() {
   const reorderSummaryInSection = useAtlasStore((s) => s.reorderSummaryInSection);
   // null = the "all" tab.
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
-  // The book or rabbi whose hub is open. One state for both — the hub
-  // component is shared, so the page only needs to know which entity.
-  const [openEntity, setOpenEntity] = useState<{ type: "book" | "rabbi"; id: string } | null>(null);
   const router = useRouter();
   const [sectionEditorTarget, setSectionEditorTarget] = useState<string | null>(null);
   const addSummarySection = useAtlasStore((s) => s.addSummarySection);
@@ -230,13 +243,13 @@ export default function TorahSpacePage() {
           const exists =
             ref.type === "book" ? books.some((b) => b.id === ref.id) : rabbis.some((r) => r.id === ref.id);
           if (!exists) return;
-          setActiveTab(ref.type === "book" ? "books" : "rabbis");
-          setOpenEntity({ type: ref.type, id: ref.id });
+          // Books and rabbis have their own pages now — the investigation
+          // loop needs real URLs, so back/forward and open-in-new-tab work.
+          router.push(`/areas/torah/${ref.type === "book" ? "books" : "rabbis"}/${ref.id}`);
           return;
         }
         case "section": {
           if (!summarySections.some((sec) => sec.id === ref.id)) return;
-          setOpenEntity(null);
           setSectionEditorTarget(null);
           setActiveTab({ sectionId: ref.id });
           return;
@@ -294,18 +307,16 @@ export default function TorahSpacePage() {
   );
   const { error: deleteSummaryError, run: removeSummary } = useApiCall(deleteSummary);
 
-  function handleAddBook() {
-    const title = newBookTitle.trim();
-    if (!title) return;
-    createBook({ title, author: newBookAuthor.trim() || undefined })
-      .then(() => {
-        setNewBookTitle("");
-        setNewBookAuthor("");
-      })
-      .catch(() => {
-        // error is already captured in addBookError for display below
-      });
-  }
+  // A ?section= deep link can arrive after the first render (client-side
+  // navigation to this page with a different query).
+  useEffect(() => {
+    const section = searchParams.get("section");
+    if (section) setActiveTab({ sectionId: section });
+  }, [searchParams]);
+
+  // The command center's scope follows the tab the user is standing on.
+  const commandScope: CommandScope =
+    activeTab === "books" ? "books" : activeTab === "rabbis" ? "rabbis" : activeTab === "summaries" ? "notes" : "all";
 
   function handleSaveBook(id: string, patch: Omit<Book, "id">) {
     saveBook(id, patch).catch(() => {
@@ -319,20 +330,7 @@ export default function TorahSpacePage() {
     });
   }
 
-  function handleAddRabbi() {
-    const name = newRabbiName.trim();
-    if (!name) return;
-    createRabbi({ name, title: newRabbiTitle.trim() || undefined })
-      .then(() => {
-        setNewRabbiName("");
-        setNewRabbiTitle("");
-      })
-      .catch(() => {
-        // error is already captured in addRabbiError for display below
-      });
-  }
-
-  function handleSaveRabbi(id: string, patch: Omit<Rabbi, "id">) {
+  function handleSaveRabbi(id: string, patch: Partial<Omit<Rabbi, "id">>) {
     saveRabbi(id, patch).catch(() => {
       // error is already captured in saveRabbiError for display below
     });
@@ -368,46 +366,28 @@ export default function TorahSpacePage() {
     <main className="min-h-screen px-6 py-16 sm:px-10 lg:px-16">
       <BackToHome className="mb-6 -ms-2.5" />
       <h1 className="mb-1 text-2xl font-medium tracking-tight">מרחב תורה</h1>
-      <p className="mb-8 text-sm text-muted">הספרייה האישית שלך — ספרים, רבנים, שיעורים וסיכומים, במקום אחד.</p>
+      <p className="mb-6 text-sm text-muted">הספרייה האישית שלך — ספרים, רבנים, שיעורים וסיכומים, במקום אחד.</p>
+
+      <TorahCommandCenter defaultScope={commandScope} className="mb-6 max-w-3xl" />
+
+      <TorahToolsStrip className="mb-4" />
+
+      <div className="mb-8">
+        <IyunHavrutaWidget />
+      </div>
 
       <TorahTabs
         active={activeTab}
         onChange={(tab) => {
           setActiveTab(tab);
-          // Leaving a tab closes any open hub, so returning to Books does not
-          // land back inside the book the user was last reading.
-          setOpenEntity(null);
           setSectionEditorTarget(null);
         }}
         sections={summarySections}
         onAddSection={(name) => addSummarySection({ name }).catch(() => {})}
       />
 
-      {/* The hub takes over the whole tab body when an entity is open — a
-          deep-dive is a destination, not a panel beside the list. */}
-      {openEntity && (
-        <GlassCard>
-          <EntityHub
-            entityType={openEntity.type}
-            entityId={openEntity.id}
-            name={
-              openEntity.type === "book"
-                ? (books.find((b) => b.id === openEntity.id)?.title ?? "")
-                : (rabbis.find((r) => r.id === openEntity.id)?.name ?? "")
-            }
-            subtitle={
-              openEntity.type === "book"
-                ? books.find((b) => b.id === openEntity.id)?.author
-                : rabbis.find((r) => r.id === openEntity.id)?.title
-            }
-            onBack={() => setOpenEntity(null)}
-            onEntityClick={handleMentionNavigate}
-          />
-        </GlassCard>
-      )}
-
       {/* A custom section: mixed study items, ordered by the user. */}
-      {!openEntity && isCustomTab(activeTab) && (
+      {isCustomTab(activeTab) && (
         <div className="flex flex-col gap-5">
           {activeSection && (
             <SectionHeader
@@ -461,37 +441,10 @@ export default function TorahSpacePage() {
         </div>
       )}
 
-      {!openEntity && activeTab === "books" && (
+      {activeTab === "books" && (
         <div className="flex flex-col gap-6">
-          <div className="flex max-w-xl flex-col gap-2 sm:flex-row">
-            <input
-              value={newBookTitle}
-              onChange={(e) => setNewBookTitle(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddBook()}
-              placeholder="שם ספר, למשל: משנה ברורה"
-              aria-label="שם הספר החדש"
-              className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
-            />
-            <input
-              value={newBookAuthor}
-              onChange={(e) => setNewBookAuthor(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddBook()}
-              placeholder="מחבר (לא חובה)"
-              aria-label="מחבר הספר"
-              className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-48"
-            />
-            <button
-              onClick={handleAddBook}
-              disabled={!newBookTitle.trim() || addingBook}
-              className="focus-ring flex items-center justify-center gap-1 rounded-lg bg-accent-faith/20 px-3 py-2 text-sm text-accent-faith transition-opacity disabled:opacity-40"
-            >
-              <Plus size={14} />
-              {addingBook ? "מוסיף…" : "הוסף ספר"}
-            </button>
-          </div>
-
-          {(addBookError || saveBookError || deleteBookError) && (
-            <p className="text-xs text-accent-family">{addBookError ?? saveBookError ?? deleteBookError}</p>
+          {(saveBookError || deleteBookError) && (
+            <p className="text-xs text-accent-family">{saveBookError ?? deleteBookError}</p>
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -501,14 +454,15 @@ export default function TorahSpacePage() {
                 book={book}
                 delay={Math.min(i * 0.06, 0.3)}
                 onEdit={setEditingBook}
-                // Clicking a book now lands in its hub — all its summaries,
-                // lessons and sources in one place — rather than a metadata
-                // modal. The modal remains reachable from the edit action.
-                onOpenProfile={(b) => setOpenEntity({ type: "book", id: b.id })}
+                // A book opens its own page — the start of the investigation
+                // loop. The metadata modal stays reachable from the edit action.
+                onOpenProfile={(b) => router.push(`/areas/torah/books/${b.id}`)}
               />
             ))}
           </div>
-          {books.length === 0 && <p className="text-sm text-muted">הספרייה שלך עדיין ריקה. הוסף את הספר הראשון למעלה.</p>}
+          {books.length === 0 && (
+            <p className="text-sm text-muted">הספרייה שלך עדיין ריקה. חפש ספר בשורת החיפוש למעלה כדי להוסיף אותו.</p>
+          )}
 
           <EditBookModal
             book={editingBook}
@@ -519,37 +473,10 @@ export default function TorahSpacePage() {
         </div>
       )}
 
-      {!openEntity && activeTab === "rabbis" && (
+      {activeTab === "rabbis" && (
         <div className="flex flex-col gap-6">
-          <div className="flex max-w-xl flex-col gap-2 sm:flex-row">
-            <input
-              value={newRabbiName}
-              onChange={(e) => setNewRabbiName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddRabbi()}
-              placeholder="שם הרב"
-              aria-label="שם הרב החדש"
-              className="focus-ring flex-1 rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted"
-            />
-            <input
-              value={newRabbiTitle}
-              onChange={(e) => setNewRabbiTitle(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddRabbi()}
-              placeholder="תפקיד / קהילה (לא חובה)"
-              aria-label="תפקיד או קהילה של הרב"
-              className="focus-ring rounded-lg bg-fill-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted sm:w-48"
-            />
-            <button
-              onClick={handleAddRabbi}
-              disabled={!newRabbiName.trim() || addingRabbi}
-              className="focus-ring flex items-center justify-center gap-1 rounded-lg bg-accent-faith/20 px-3 py-2 text-sm text-accent-faith transition-opacity disabled:opacity-40"
-            >
-              <Plus size={14} />
-              {addingRabbi ? "מוסיף…" : "הוסף רב"}
-            </button>
-          </div>
-
-          {(addRabbiError || saveRabbiError || deleteRabbiError) && (
-            <p className="text-xs text-accent-family">{addRabbiError ?? saveRabbiError ?? deleteRabbiError}</p>
+          {(saveRabbiError || deleteRabbiError) && (
+            <p className="text-xs text-accent-family">{saveRabbiError ?? deleteRabbiError}</p>
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -559,11 +486,13 @@ export default function TorahSpacePage() {
                 rabbi={rabbi}
                 delay={Math.min(i * 0.06, 0.3)}
                 onEdit={setEditingRabbi}
-                onOpenProfile={(r) => setOpenEntity({ type: "rabbi", id: r.id })}
+                onOpenProfile={(r) => router.push(`/areas/torah/rabbis/${r.id}`)}
               />
             ))}
           </div>
-          {rabbis.length === 0 && <p className="text-sm text-muted">עדיין לא הוספת רבנים. הוסף את הראשון למעלה.</p>}
+          {rabbis.length === 0 && (
+            <p className="text-sm text-muted">עדיין לא הוספת רבנים. חפש רב בשורת החיפוש למעלה — או פתח ספר ולחץ על שם המחבר.</p>
+          )}
 
           <EditRabbiModal
             rabbi={editingRabbi}
@@ -574,8 +503,14 @@ export default function TorahSpacePage() {
         </div>
       )}
 
-      {!openEntity && activeTab === "shiurim" && (
+      {activeTab === "shiurim" && (
         <div className="flex flex-col gap-6">
+          {/* Phase 3: uploaded shiurim run through the background pipeline
+              (transcript, chapters, sources, practice parts). */}
+          <PracticeOverviewCard />
+          <LessonUploader />
+          <LessonsList />
+
           <LearningInsightsHero
             insights={insights}
             onAcceptNextReview={handleAcceptNextReview}
@@ -583,12 +518,13 @@ export default function TorahSpacePage() {
           />
 
           <GlassCard delay={0.05}>
-            <p className="mb-4 text-sm font-medium text-muted">העלאת שיעור (אודיו / PDF)</p>
+            <p className="mb-1 text-sm font-medium text-muted">סיכום מהיר מקובץ PDF</p>
+            <p className="mb-4 text-xs text-muted">מחלץ נושא, מקור וסיכום ורושם ביומן הלימוד. להקלטות ולסרטונים — השתמש בהעלאת השיעור למעלה.</p>
 
             <input
               ref={inputRef}
               type="file"
-              accept="audio/*,application/pdf"
+              accept="application/pdf"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -602,7 +538,7 @@ export default function TorahSpacePage() {
               className="focus-ring flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-glass-border py-8 text-muted transition-colors hover:text-foreground disabled:opacity-40"
             >
               <UploadCloud size={24} aria-hidden />
-              <span className="text-sm">גרור קובץ או לחץ לבחירה</span>
+              <span className="text-sm">בחר קובץ PDF</span>
             </button>
 
             {extractError && <p className="mt-3 text-xs text-accent-family">{extractError}</p>}
@@ -701,7 +637,7 @@ export default function TorahSpacePage() {
         </div>
       )}
 
-      {!openEntity && activeTab === "summaries" && (
+      {activeTab === "summaries" && (
         <div className="flex flex-col gap-6">
           <GlassCard delay={0} className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, CornerUpLeft, ExternalLink, NotebookPen, Trash2, Video } from "lucide-react";
+import { ChevronDown, ChevronUp, CornerUpLeft, ExternalLink, Headphones, NotebookPen, Trash2, Video } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { SummaryContent } from "@/components/features/summaries/SummaryContent";
 import { InlineVideoPlayer } from "@/components/features/learning/InlineVideoPlayer";
@@ -17,6 +17,8 @@ interface StudyItemListProps {
   /** Makes @mention chips inside item bodies navigable. */
   onEntityClick?: (ref: EntityRef) => void;
   emptyLabel?: string;
+  /** The book page these items are shown on — its own name is not auto-linked. */
+  currentBookId?: string;
 }
 
 function hostOf(url: string): string {
@@ -40,7 +42,15 @@ function hostOf(url: string): string {
 // user put it here, and its reorder arrows would be a lie — they would move
 // it within a list it does not belong to. Mentioned items are therefore
 // labelled with where they actually live, and are not reorderable.
-export function StudyItemList({ items, onDelete, onEdit, onMove, onEntityClick, emptyLabel }: StudyItemListProps) {
+export function StudyItemList({
+  items,
+  onDelete,
+  onEdit,
+  onMove,
+  onEntityClick,
+  emptyLabel,
+  currentBookId,
+}: StudyItemListProps) {
   const filed = items.filter((i) => i.relation === "filed");
   const orderable = filed.map((i) => ({ id: i.summary.id, sortOrder: i.summary.sortOrder ?? 0 }));
 
@@ -63,6 +73,8 @@ export function StudyItemList({ items, onDelete, onEdit, onMove, onEntityClick, 
                   <Video size={14} className="shrink-0 text-accent-family" aria-hidden />
                 ) : kind === "source" ? (
                   <ExternalLink size={14} className="shrink-0 text-accent-knowledge" aria-hidden />
+                ) : kind === "audio" ? (
+                  <Headphones size={14} className="shrink-0 text-accent-learning" aria-hidden />
                 ) : (
                   <NotebookPen size={14} className="shrink-0 text-accent-faith" aria-hidden />
                 )}
@@ -135,6 +147,16 @@ export function StudyItemList({ items, onDelete, onEdit, onMove, onEntityClick, 
               </div>
             )}
 
+            {/* preload="none": a page of shiurim must not start downloading
+                hours of audio before anyone presses play. */}
+            {kind === "audio" && item.url && (
+              <audio controls preload="none" src={item.url} className="mb-2 w-full" aria-label={item.title}>
+                <a href={item.url} target="_blank" rel="noreferrer">
+                  {item.title}
+                </a>
+              </audio>
+            )}
+
             {kind === "source" && item.url && (
               <a
                 href={item.url}
@@ -154,6 +176,7 @@ export function StudyItemList({ items, onDelete, onEdit, onMove, onEntityClick, 
                 html={item.contentHtml}
                 text={item.content}
                 onEntityClick={onEntityClick}
+                currentBookId={currentBookId}
                 className="text-sm text-foreground/80"
               />
             )}
