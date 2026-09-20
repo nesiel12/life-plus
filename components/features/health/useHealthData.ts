@@ -106,5 +106,11 @@ export function useWater() {
     }
   }, [logs, load]);
 
-  return { logs, error, add, undo };
+  // True while a just-tapped glass is still being saved. undo() ignores an
+  // unsaved row (there is nothing on the server to remove yet), so callers with
+  // an undo button should disable it for this window rather than let a press
+  // do nothing.
+  const pending = logs?.some((log) => log.id.startsWith("temp-")) ?? false;
+
+  return { logs, error, add, undo, pending };
 }

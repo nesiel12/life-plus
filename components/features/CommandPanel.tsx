@@ -1,34 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Zap, Check, X, Mic } from "lucide-react";
+import { Zap, Check, X, Mic, MessageCircle } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
-import type { MomentCategory, LifeAreaKey } from "@/types";
-
-type CommandPeriod = "morning" | "afternoon" | "evening" | "night";
-type CommandDay = "today" | "tomorrow";
-
-interface CalendarEventProposal {
-  googleEventId: string;
-  /** Absent on proposals produced before multi-calendar support, which were
-   *  all necessarily on the primary calendar. */
-  calendarId?: string;
-  title: string;
-  start: string;
-  end: string;
-}
-
-interface CommandProposal {
-  type: "add_moment" | "add_goal" | "log_family_interaction" | "clear_calendar_range";
-  recommendationEventId: string;
-  addMoment?: { category: MomentCategory; title: string; content: string };
-  addGoal?: { title: string; category: LifeAreaKey };
-  logFamilyInteraction?: { personId: string; personName: string; note?: string };
-  clearCalendarRange?: { period: CommandPeriod; day: CommandDay; events: CalendarEventProposal[] };
-}
+import type { CommandProposal } from "@/lib/commands/proposal";
+import { isSosMessage } from "@/lib/ai/fabIntents";
 
 interface CommandTurn {
   id: string;
@@ -50,7 +29,23 @@ const FRIENDLY_ERROR = "לא הצלחתי להתחבר כרגע. נסה שוב �
 // the same mutation (addMoment, addGoal, logPersonInteraction, and — for
 // calendar clearing specifically, since it needs the user's Google token —
 // the DELETE handler on app/api/calendar/events).
-export function CommandPanel() {
+/** Something the Companion hands to the panel from outside its own input. */
+export type CommandPanelIncoming =
+  | { id: string; kind: "command"; text: string }
+  | { id: string; kind: "proposal"; commandText: string; reply: string; proposal: CommandProposal };
+
+interface CommandPanelProps {
+  /** A command to interpret, or a proposal already resolved elsewhere (the FAB). */
+  incoming?: CommandPanelIncoming | null;
+  /** Called once `incoming` has been taken, so a remount cannot replay it. */
+  onConsumed?: () => void;
+  /** A distress message was typed here: nothing was sent; open SOS mode. */
+  onSos?: () => void;
+  /** "Ask in chat" on a turn that produced no proposal. */
+  onAskInChat?: (text: string) => void;
+}
+
+export function CommandPanel({ incoming, onConsumed, onSos, onAskInChat }: CommandPanelProps = {}) {
   const addMoment = useAtlasStore((s) => s.addMoment);
   const addGoal = useAtlasStore((s) => s.addGoal);
   const logPersonInteraction = useAtlasStore((s) => s.logPersonInteraction);
@@ -60,10 +55,20 @@ export function CommandPanel() {
   const [sending, setSending] = useState(false);
   const voice = useVoiceInput((transcript) => setInput((prev) => (prev ? `${prev} ${transcript}` : transcript)));
 
-  async function handleSend() {
+  function handleSend() {
     const commandText = input.trim();
     if (!commandText || sending) return;
     setInput("");
+    // Same rule as every free-text input in the Companion: a distress message
+    // is decided on the device and never reaches /api/commands/interpret.
+    if (isSosMessage(commandText)) {
+      onSos?.();
+      return;
+    }
+    void sendCommand(commandText);
+  }
+
+  async function sendCommand(commandText: string) {
     setSending(true);
 
     const turnId = crypto.randomUUID();
@@ -96,6 +101,33 @@ export function CommandPanel() {
       setSending(false);
     }
   }
+
+  // Taken exactly once per id. The ref is what makes this safe under React's
+  // dev-mode double-invoked effects, and onConsumed is what makes it safe
+  // across a remount (switching tabs away and back).
+  const handledIncoming = useRef<string | null>(null);
+  useEffect(() => {
+    if (!incoming || handledIncoming.current === incoming.id) return;
+    handledIncoming.current = incoming.id;
+    if (incoming.kind === "command") {
+      void sendCommand(incoming.text);
+    } else {
+      setTurns((prev) => [
+        ...prev,
+        {
+          id: incoming.id,
+          commandText: incoming.commandText,
+          reply: incoming.reply,
+          proposal: incoming.proposal,
+          resolved: "pending",
+          executing: false,
+        },
+      ]);
+    }
+    onConsumed?.();
+    // sendCommand closes over state setters only; the guard above is the dedupe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incoming]);
 
   function updateTurn(id: string, patch: Partial<CommandTurn>) {
     setTurns((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
@@ -211,6 +243,19 @@ export function CommandPanel() {
                 <p className="mt-2 text-xs text-accent-health">בוצע.</p>
               )}
               {turn.resolved === "rejected" && <p className="mt-2 text-xs text-muted">בוטל.</p>}
+
+              {/* No proposal means the command pipeline did not recognise an
+                  action — often because it was a question, not a command. The
+                  user, not a guess, decides whether chat should take it. */}
+              {!turn.proposal && onAskInChat && (
+                <button
+                  onClick={() => onAskInChat(turn.commandText)}
+                  className="focus-ring mt-2 flex items-center gap-1 rounded-lg bg-fill-subtle px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground"
+                >
+                  <MessageCircle size={12} aria-hidden />
+                  שאל בשיחה
+                </button>
+              )}
             </div>
           </div>
         ))}

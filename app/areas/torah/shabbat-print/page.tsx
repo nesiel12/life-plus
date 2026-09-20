@@ -7,6 +7,9 @@ import { personalDnaRepo } from "@/lib/db/personalDna";
 import { resolveUserTimezone } from "@/lib/proactive/timezone";
 import { HAVRUTA_INSIGHT_LABELS } from "@/lib/torah/havruta";
 import { loadShabbatSheet } from "@/lib/torah/shabbatSheetData";
+import { QrCodeSvg } from "@/components/features/torah/QrCodeSvg";
+import { lessonDigitalUrl } from "@/lib/intelligence/crossModule/shabbatQr";
+import { appBaseUrl } from "@/lib/appUrl";
 import "./print.css";
 
 // The traditional Hebrew face for a Shabbat sheet — a serif with real
@@ -14,6 +17,17 @@ import "./print.css";
 const frank = Frank_Ruhl_Libre({ subsets: ["hebrew", "latin"], weight: ["400", "500", "700"], variable: "--font-sheet" });
 
 export const dynamic = "force-dynamic";
+
+// The origin the QR codes point back to. A deployment with no configured origin
+// prints a sheet without codes rather than failing to render the sheet at all:
+// the learning on the page matters more than the shortcut back to it.
+function qrBaseUrl(): string | null {
+  try {
+    return appBaseUrl();
+  } catch {
+    return null;
+  }
+}
 
 /**
  * "הדפסה לשבת" — the week's learning as a printable pamphlet.
@@ -36,6 +50,7 @@ export default async function ShabbatPrintPage({ searchParams }: { searchParams:
   const weekOffset = Number.isFinite(requested) ? Math.min(0, Math.max(-52, Math.trunc(requested))) : 0;
 
   const sheet = await loadShabbatSheet(user.id, timeZone, weekOffset);
+  const baseUrl = qrBaseUrl();
   const counts = [
     sheet.summaries.length && `${sheet.summaries.length} סיכומים`,
     sheet.lessons.length && `${sheet.lessons.length} שיעורים`,
@@ -139,25 +154,38 @@ export default async function ShabbatPrintPage({ searchParams }: { searchParams:
                 <h2 className="sheet-section-title">מן השיעורים</h2>
                 <div className="flex flex-col gap-5">
                   {sheet.lessons.map((lesson) => (
-                    <div key={lesson.id} className="sheet-block">
-                      <h3 className="text-base">
-                        {lesson.title}
-                        {lesson.speaker && (
-                          <span className="ms-2 text-xs font-normal" style={{ color: "var(--sheet-muted)" }}>
-                            · {lesson.speaker}
-                          </span>
+                    <div key={lesson.id} className="sheet-block sheet-lesson" data-lesson-id={lesson.id}>
+                      <div className="sheet-lesson-body">
+                        <h3 className="text-base">
+                          {lesson.title}
+                          {lesson.speaker && (
+                            <span className="ms-2 text-xs font-normal" style={{ color: "var(--sheet-muted)" }}>
+                              · {lesson.speaker}
+                            </span>
+                          )}
+                        </h3>
+                        {lesson.summary && <p className="mt-1 text-[0.95rem]">{lesson.summary}</p>}
+                        {lesson.keyPoints.length > 0 && (
+                          <ul className="mt-2 flex flex-col gap-1 ps-4 text-[0.92rem]" style={{ listStyleType: "hebrew" }}>
+                            {lesson.keyPoints.map((point, i) => (
+                              <li key={i} className="list-item">
+                                {point}
+                              </li>
+                            ))}
+                          </ul>
                         )}
-                      </h3>
-                      {lesson.summary && <p className="mt-1 text-[0.95rem]">{lesson.summary}</p>}
-                      {lesson.keyPoints.length > 0 && (
-                        <ul className="mt-2 flex flex-col gap-1 ps-4 text-[0.92rem]" style={{ listStyleType: "hebrew" }}>
-                          {lesson.keyPoints.map((point, i) => (
-                            <li key={i} className="list-item">
-                              {point}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      </div>
+                      {/* The paper is a door back into the app: scanning this,
+                          signed in, opens the lesson it was printed from. */}
+                      {(() => {
+                        const url = baseUrl ? lessonDigitalUrl(baseUrl, lesson.id) : null;
+                        return url ? (
+                          <figure className="sheet-qr" data-qr-url={url}>
+                            <QrCodeSvg value={url} label={`קוד QR לפתיחת השיעור: ${lesson.title}`} className="sheet-qr-code" />
+                            <figcaption>סרוק לפתיחת השיעור</figcaption>
+                          </figure>
+                        ) : null;
+                      })()}
                     </div>
                   ))}
                 </div>

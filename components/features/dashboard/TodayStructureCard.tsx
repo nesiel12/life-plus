@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, CalendarClock, Check, ListTodo, Repeat } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { useInsights } from "@/hooks/useInsights";
-import { buildDailyTimelineRows, type TimelineRowData, type WeekCalendarEvent } from "@/lib/time/buildDailyTimeline";
+import { buildDailyTimelineRows, timelineRowTitle, type WeekCalendarEvent } from "@/lib/time/buildDailyTimeline";
 import { toDateKey } from "@/components/features/time/DayCarousel";
 
 interface WeekResponse {
@@ -15,23 +15,6 @@ interface WeekResponse {
 
 const FALLBACK: WeekResponse = { connected: false, events: [] };
 const MAX_ROWS = 4;
-
-function rowTitle(row: TimelineRowData): string {
-  switch (row.kind) {
-    case "event":
-      return row.event.title;
-    case "task":
-      return row.task.title;
-    case "manual-event":
-      return row.manualEvent.title;
-    case "shift":
-      return row.transaction.title;
-    case "meal":
-      return row.meal.description;
-    case "workout":
-      return row.workout.title;
-  }
-}
 
 // "Today's Structure" — the dashboard's window into the unified Calendar &
 // Tasks hub. The next few things on the day, plus open-task and habit counts,
@@ -109,7 +92,7 @@ export function TodayStructureCard() {
                   <CalendarClock size={14} className="shrink-0 text-accent-time" aria-hidden />
                 )}
                 <span className={done ? "min-w-0 flex-1 truncate text-muted line-through" : "min-w-0 flex-1 truncate text-foreground/90"}>
-                  {rowTitle(row)}
+                  {timelineRowTitle(row)}
                 </span>
                 <span className="ltr shrink-0 whitespace-nowrap text-xs text-muted">{row.time ?? "היום"}</span>
               </li>

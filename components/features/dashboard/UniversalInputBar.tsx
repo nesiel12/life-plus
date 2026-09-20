@@ -5,6 +5,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, Loader2, Mic, Send, Sparkles, Square, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
+import { isSosMessage } from "@/lib/ai/fabIntents";
+import { requestCompanionSos } from "@/lib/companion/sosEvent";
 import {
   ROUTINE_KIND_LABELS,
   WEEKDAY_INITIALS,
@@ -143,6 +145,14 @@ export function UniversalInputBar() {
   }, []);
 
   const interpret = useCallback(async (message: string) => {
+    // A distress message is decided on the device and never reaches
+    // /api/commands/interpret (which calls a model and stores a
+    // recommendation_event). See lib/ai/fabIntents.ts isSosMessage.
+    if (isSosMessage(message)) {
+      setText("");
+      requestCompanionSos();
+      return;
+    }
     setThinking(true);
     setError(null);
     setReply(null);

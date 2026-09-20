@@ -23,7 +23,7 @@ interface NewTransactionModalProps {
     shiftEnd?: string;
     employer?: string;
     isRecurring?: boolean;
-  }) => Promise<void>;
+  }) => Promise<unknown>;
 }
 
 function todayDateInputValue(): string {

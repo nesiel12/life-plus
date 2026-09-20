@@ -8,7 +8,7 @@ import { useApiCall } from "@/hooks/useApiCall";
 interface NewTaskModalProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (task: { title: string; description?: string; dueDate?: string }) => Promise<void>;
+  onCreate: (task: { title: string; description?: string; dueDate?: string }) => Promise<unknown>;
 }
 
 // The Time & Tasks Space's "New Task" flow — same fixed-header/scrolling-

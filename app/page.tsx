@@ -20,7 +20,9 @@ import { MotivationCard } from "@/components/features/dashboard/MotivationCard";
 import { UniversalInputBar } from "@/components/features/dashboard/UniversalInputBar";
 import { IntentionComposer } from "@/components/features/dashboard/IntentionComposer";
 import { WidgetFrame } from "@/components/features/dashboard/WidgetFrame";
-import { BentoGrid, BentoCard } from "@/components/magicui/bento-grid";
+import { ContextSwitcher } from "@/components/features/dashboard/ContextSwitcher";
+import { BentoCard } from "@/components/magicui/bento-grid";
+import { MasonryGrid } from "@/components/features/dashboard/MasonryGrid";
 import { RetroGrid } from "@/components/magicui/retro-grid";
 import { LightRays } from "@/components/magicui/light-rays";
 import { Confetti, type ConfettiRef } from "@/components/magicui/confetti";
@@ -30,7 +32,9 @@ import { daysUntil } from "@/lib/utils";
 import { timeOfDayFromHour } from "@/lib/greeting";
 import { useT, type TranslationKey } from "@/lib/i18n/useT";
 import { useDashboardLayout } from "@/hooks/useDashboardLayout";
+import { useDashboardContext } from "@/hooks/useDashboardContext";
 import { hiddenWidgets, isCustomised, spanOf, visibleWidgets } from "@/lib/dashboard/layout";
+import { contextualWidgets } from "@/lib/dashboard/context";
 import type { ReactNode } from "react";
 
 const MAX_UPCOMING_ON_DASHBOARD = 3;
@@ -45,6 +49,9 @@ export default function Home() {
 
   const { layout, move, moveTo, hide, restore, resize, reset } = useDashboardLayout();
   const [editing, setEditing] = useState(false);
+  // What the day is asking for right now (lib/dashboard/context.ts). Layered
+  // over the layout above: it never writes to it, only derives a display order.
+  const dashboardContext = useDashboardContext();
 
   // Real time-of-day, computed after mount from the user's own browser clock.
   const t = useT();
@@ -199,6 +206,18 @@ export default function Home() {
 
       {/* ─── Bento dashboard ──────────────────────────────────────────────── */}
       <div className="mx-auto max-w-6xl px-6 pb-16 sm:px-10 lg:px-16">
+        {/* The context band. Hidden while editing: rearranging the grid should
+            work on the order the user actually saved, not the order the hour
+            happens to prefer. */}
+        {!editing && dashboardContext.ready && dashboardContext.context && dashboardContext.now && (
+          <ContextSwitcher
+            context={dashboardContext.context}
+            now={dashboardContext.now}
+            enabled={dashboardContext.enabled}
+            onToggle={dashboardContext.setEnabled}
+          />
+        )}
+
         {/* Widget bodies, keyed by registry id. The grid below renders
             whichever of these the user's layout asks for, in their order —
             the arrangement lives in data, not in this JSX. */}
@@ -254,7 +273,13 @@ export default function Home() {
             goals: { node: <GoalsPanel bare />, tilt: false },
           };
 
-          const visible = visibleWidgets(layout);
+          // Context reorders only what is DISPLAYED, only when enabled, and never
+          // in edit mode. The saved layout is untouched either way.
+          const contextOrdered =
+            !editing && dashboardContext.ready && dashboardContext.enabled && dashboardContext.context !== null;
+          const visible = contextOrdered
+            ? contextualWidgets(layout, dashboardContext.context!.promote)
+            : visibleWidgets(layout);
           const hiddenList = hiddenWidgets(layout);
 
           return (
@@ -279,7 +304,7 @@ export default function Home() {
                 </button>
               </div>
 
-              <BentoGrid>
+              <MasonryGrid>
                 {visible.map((widget, index) => {
                   const entry = CONTENT[widget.id];
                   // A registry entry with no body would render an empty card.
@@ -305,7 +330,7 @@ export default function Home() {
                     </WidgetFrame>
                   );
                 })}
-              </BentoGrid>
+              </MasonryGrid>
 
               {/* Hidden widgets stay reachable. "Delete" on a dashboard the
                   app itself ships has to mean "put away", not "destroy" —

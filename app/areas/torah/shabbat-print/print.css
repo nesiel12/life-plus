@@ -53,6 +53,39 @@
   page-break-inside: avoid;
 }
 
+/* A lesson with its QR code: the text takes the width, the code sits at the
+   trailing edge (left in RTL) at a size that scans from a printed page. */
+.sheet-lesson {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.1rem;
+}
+
+.sheet-lesson-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.sheet-qr {
+  flex: none;
+  width: 84px;
+  margin: 0;
+  text-align: center;
+}
+
+.sheet-qr-code {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sheet-qr figcaption {
+  margin-top: 0.15rem;
+  font-size: 0.6rem;
+  line-height: 1.3;
+  color: var(--sheet-muted);
+}
+
 @media (max-width: 640px) {
   .sheet-columns {
     column-count: 1;
@@ -95,6 +128,15 @@
   .shabbat-sheet a {
     color: inherit;
     text-decoration: none;
+  }
+
+  /* Print at a physical size, not a pixel one: 24mm is comfortably above what a
+     phone camera needs, and the vector code stays sharp at it. */
+  .sheet-qr {
+    width: 24mm;
+    /* Never let a printer's colour adjustments lighten the modules. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   /* A section should not start with its heading orphaned at the foot. */

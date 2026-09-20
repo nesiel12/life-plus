@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { WidgetDefinition, WidgetSpan } from "@/lib/dashboard/layout";
 import { useT, type TranslationKey } from "@/lib/i18n/useT";
 import { dictionaries } from "@/lib/i18n/dictionaries";
+import { useMasonryItem } from "@/components/features/dashboard/MasonryGrid";
 
 interface WidgetFrameProps {
   widget: WidgetDefinition;
@@ -55,6 +56,9 @@ export function WidgetFrame({
   const widgetKey = `widget.${widget.id}` as TranslationKey;
   const title = widgetKey in dictionaries.he ? t(widgetKey) : widget.title;
   const [dragOver, setDragOver] = useState(false);
+  // Reports this cell's height to the masonry grid it sits in. The edit chrome
+  // below is inside the cell, so it is part of the measured height.
+  const masonry = useMasonryItem();
 
   function handleDragStart(event: DragEvent) {
     event.dataTransfer.setData("text/plain", widget.id);
@@ -70,7 +74,14 @@ export function WidgetFrame({
 
   return (
     <div
-      className={cn("relative", SPAN_CLASS[span], dragOver && "ring-2 ring-[var(--gold)] ring-offset-2 rounded-2xl")}
+      ref={masonry.ref}
+      style={masonry.style}
+      className={cn(
+        "relative self-start",
+        masonry.className,
+        SPAN_CLASS[span],
+        dragOver && "ring-2 ring-[var(--gold)] ring-offset-2 rounded-2xl"
+      )}
       onDragOver={
         editing
           ? (e) => {

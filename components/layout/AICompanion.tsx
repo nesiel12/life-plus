@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import { Check, Copy, Eraser, ListTodo, Pin, PinOff, Sparkles, Trash2, X, Send, Info } from "lucide-react";
@@ -9,7 +9,14 @@ import { useApiCall } from "@/hooks/useApiCall";
 import { Logo } from "@/components/ui/Logo";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
 import { BriefingSignalList, type BriefingSignal } from "@/components/features/BriefingSignalList";
-import { CommandPanel } from "@/components/features/CommandPanel";
+import { CommandPanel, type CommandPanelIncoming } from "@/components/features/CommandPanel";
+import { QuickLogPanel } from "@/components/features/QuickLogPanel";
+import { SosPanel } from "@/components/features/SosPanel";
+import { UndoToast } from "@/components/ui/UndoToast";
+import { useUndoToast } from "@/hooks/useUndoToast";
+import { isSosMessage } from "@/lib/ai/fabIntents";
+import type { ProposalTurn } from "@/lib/ai/quickLog";
+import { COMPANION_SOS_EVENT } from "@/lib/companion/sosEvent";
 import { decodeBasedOnHeader } from "@/lib/api/basedOnHeader";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types";
@@ -40,7 +47,12 @@ const FRIENDLY_ERROR = "לא הצלחתי להתחבר כרגע. נסה שוב �
 export function AICompanion() {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"chat" | "command">("chat");
+  const [mode, setMode] = useState<"chat" | "quick" | "command">("chat");
+  // SOS mode is ephemeral React state and nothing else — see SosPanel.
+  const [sos, setSos] = useState(false);
+  // Work handed to the Command Panel from the quick-log tab.
+  const [incoming, setIncoming] = useState<CommandPanelIncoming | null>(null);
+  const undoToast = useUndoToast();
   const [input, setInput] = useState("");
   const user = useAtlasStore((s) => s.user);
   const chatHistory = useAtlasStore((s) => s.chatHistory);
@@ -84,12 +96,46 @@ export function AICompanion() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [clearConfirmOpen]);
 
+  // Opening SOS mode: drops whatever was typed, opens the panel, shows the
+  // guide. No store write, no request — see SosPanel and isSosMessage.
+  const enterSos = useCallback(() => {
+    setInput("");
+    setSos(true);
+    setOpen(true);
+  }, []);
+
+  function closeCompanion() {
+    setOpen(false);
+    setSos(false);
+  }
+
+  // Lets any surface ask for SOS mode without holding a reference to this
+  // component (lib/companion/sosEvent.ts).
+  useEffect(() => {
+    window.addEventListener(COMPANION_SOS_EVENT, enterSos);
+    return () => window.removeEventListener(COMPANION_SOS_EVENT, enterSos);
+  }, [enterSos]);
+
+  function handleQuickProposal(turn: ProposalTurn) {
+    setIncoming({ id: crypto.randomUUID(), kind: "proposal", ...turn });
+    setMode("command");
+  }
+
+  function handleQuickHandoff(text: string) {
+    setIncoming({ id: crypto.randomUUID(), kind: "command", text });
+    setMode("command");
+  }
+
   // Proactive opener: fetched once, only while there's no conversation yet
   // — a live conversation already has its own continuity; re-showing the
   // briefing on top of it would be exactly the "repeat what's already
   // known" this milestone was told to avoid.
   useEffect(() => {
-    if (!open || chatHistory.length > 0 || briefing !== null) return;
+    // Not while SOS mode is showing: opening the drawer from cold would otherwise
+    // fire this request the instant "קשה לי עכשיו" was pressed. It carries nothing
+    // about the moment, but SOS mode's promise is that it makes no request at all,
+    // and the briefing can wait until the person leaves it.
+    if (!open || sos || chatHistory.length > 0 || briefing !== null) return;
     let cancelled = false;
     fetch("/api/briefing")
       .then((res) => (res.ok ? res.json() : { signals: [], conflicts: [] }))
@@ -102,7 +148,7 @@ export function AICompanion() {
     return () => {
       cancelled = true;
     };
-  }, [open, chatHistory.length, briefing]);
+  }, [open, sos, chatHistory.length, briefing]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -176,6 +222,13 @@ export function AICompanion() {
   function handleSend(overrideText?: string) {
     const message = (overrideText ?? input).trim();
     if (!message || sending) return;
+
+    // Before addChatMessage: chat history is persisted to the database, so a
+    // distress message must be caught before it becomes a row.
+    if (isSosMessage(message)) {
+      enterSos();
+      return;
+    }
 
     // Captured before addChatMessage updates the store, so this turn's own
     // message isn't double-counted — the API reconstructs the full turn as
@@ -265,7 +318,7 @@ export function AICompanion() {
           `bottom-20`/`sm:bottom-4` split. */}
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={closeCompanion}
         backdrop={false}
         zIndex={Z_INDEX.panel}
         panelClassName="top-4 bottom-20 left-4 flex w-[calc(100%-2rem)] max-w-md flex-col sm:bottom-4 sm:w-[26rem]"
@@ -276,7 +329,7 @@ export function AICompanion() {
             <span className="text-sm font-medium text-foreground">Life Plus Assistant</span>
           </div>
           <div className="flex items-center gap-1">
-            {mode === "chat" && chatHistory.length > 0 && (
+            {!sos && mode === "chat" && chatHistory.length > 0 && (
               <button
                 onClick={() => setClearConfirmOpen(true)}
                 className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-fill-subtle hover:text-accent-family"
@@ -286,7 +339,7 @@ export function AICompanion() {
               </button>
             )}
             <button
-              onClick={() => setOpen(false)}
+              onClick={closeCompanion}
               className="focus-ring rounded-lg p-1.5 text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
               aria-label="סגור"
             >
@@ -299,6 +352,7 @@ export function AICompanion() {
             distinct, explicitly-chosen mode rather than silently guessing
             "is this message a command or a chat" from free text — the user
             decides, then the panel decides what to do with it. */}
+        {!sos && (
         <div className="flex gap-1 border-b border-glass-border px-3 py-2">
           <button
             onClick={() => setMode("chat")}
@@ -312,6 +366,17 @@ export function AICompanion() {
             שיחה
           </button>
           <button
+            onClick={() => setMode("quick")}
+            className={cn(
+              "focus-ring rounded-lg px-2.5 py-1 text-xs transition-colors",
+              mode === "quick"
+                ? "glass-control glass-control-active text-foreground"
+                : "glass-control-hover text-muted hover:text-foreground"
+            )}
+          >
+            רישום מהיר
+          </button>
+          <button
             onClick={() => setMode("command")}
             className={cn(
               "focus-ring rounded-lg px-2.5 py-1 text-xs transition-colors",
@@ -323,10 +388,32 @@ export function AICompanion() {
             פקודה
           </button>
         </div>
+        )}
 
-        {mode === "command" && <CommandPanel />}
+        {sos && <SosPanel onExit={() => setSos(false)} />}
 
-        {mode === "chat" && (
+        {!sos && mode === "quick" && (
+          <QuickLogPanel
+            onSos={enterSos}
+            onLogged={(log) => undoToast.show(log.summary, log.undo)}
+            onProposal={handleQuickProposal}
+            onHandoff={handleQuickHandoff}
+          />
+        )}
+
+        {!sos && mode === "command" && (
+          <CommandPanel
+            incoming={incoming}
+            onConsumed={() => setIncoming(null)}
+            onSos={enterSos}
+            onAskInChat={(text) => {
+              setMode("chat");
+              handleSend(text);
+            }}
+          />
+        )}
+
+        {!sos && mode === "chat" && (
         <>
         {/* Pinned messages sit outside the scrolling list entirely — always
             visible regardless of scroll position, matching "stick to the
@@ -604,10 +691,32 @@ export function AICompanion() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Inside the panel while it is open, so the toast sits above the
+            input instead of being hidden behind (or covering) the drawer. */}
+        {open && (
+          <UndoToast
+            toast={undoToast.toast}
+            onUndo={undoToast.undo}
+            onDismiss={undoToast.dismiss}
+            onPause={undoToast.setPaused}
+            className="absolute inset-x-3 bottom-16 z-10"
+          />
+        )}
       </Modal>
 
+      {!open && (
+        <UndoToast
+          toast={undoToast.toast}
+          onUndo={undoToast.undo}
+          onDismiss={undoToast.dismiss}
+          onPause={undoToast.setPaused}
+          className={cn("fixed bottom-36 left-4 w-[calc(100%-2rem)] max-w-sm sm:bottom-24 sm:left-8", Z_INDEX.panel)}
+        />
+      )}
+
       <motion.button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? closeCompanion() : setOpen(true))}
         className={cn(
           "fixed bottom-20 left-4 flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-accent-faith/80 to-accent-knowledge/80 text-background shadow-xl sm:bottom-6 sm:left-8",
           Z_INDEX.panel

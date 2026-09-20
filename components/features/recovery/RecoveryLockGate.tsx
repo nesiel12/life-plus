@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { Fingerprint, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { SosShortcut } from "@/components/features/SosShortcut";
 
 interface LockStatus {
   enrolled: boolean;
@@ -200,6 +201,12 @@ export function RecoveryLockGate({ children }: RecoveryLockGateProps) {
           {error}
         </p>
       )}
+
+      {/* Offered while locked, deliberately: authenticating is a hurdle nobody
+          in a bad moment should have to clear to get a calming screen. It opens
+          the Companion's offline SOS mode; the unlocked space keeps its own,
+          richer support sheet. */}
+      <SosShortcut />
     </GlassCard>
   );
 }

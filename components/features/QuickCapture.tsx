@@ -5,6 +5,7 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { LIFE_AREA_LIST } from "@/lib/lifeAreas";
 import { Modal, Z_INDEX } from "@/components/ui/Modal";
 import { useApiCall } from "@/hooks/useApiCall";
+import { QUICK_CAPTURE_EVENT } from "@/lib/capture/quickCaptureEvent";
 import type { MomentCategory } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,14 @@ export function QuickCapture() {
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Anything else in the app can open this without holding a reference to it
+  // (lib/capture/quickCaptureEvent.ts) — e.g. the evening reflection card.
+  useEffect(() => {
+    const open = () => setOpen(true);
+    window.addEventListener(QUICK_CAPTURE_EVENT, open);
+    return () => window.removeEventListener(QUICK_CAPTURE_EVENT, open);
   }, []);
 
   function handleSave() {

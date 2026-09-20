@@ -32,6 +32,24 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** The display title of a timeline row, whatever it is backed by. */
+export function timelineRowTitle(row: TimelineRowData): string {
+  switch (row.kind) {
+    case "event":
+      return row.event.title;
+    case "task":
+      return row.task.title;
+    case "manual-event":
+      return row.manualEvent.title;
+    case "shift":
+      return row.transaction.title;
+    case "meal":
+      return row.meal.description;
+    case "workout":
+      return row.workout.title;
+  }
+}
+
 // Merges Google Calendar events, store tasks, manual (user-created)
 // events, work-shift transactions, and Health & Fitness Space (Phase 8)
 // meals/workouts into one ordered timeline for a single date: all-day

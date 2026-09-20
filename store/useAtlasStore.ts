@@ -257,7 +257,9 @@ interface AtlasState extends HydratedState {
     description?: string;
     dueDate?: string;
     isHighPriority?: boolean;
-  }) => Promise<void>;
+    // Resolves with the created row: callers that offer an undo (the quick-log
+    // FAB) need its id to remove exactly what they added.
+  }) => Promise<Task>;
   updateTask: (taskId: string, patch: Partial<Task>) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
 
@@ -278,7 +280,8 @@ interface AtlasState extends HydratedState {
     shiftEnd?: string;
     employer?: string;
     isRecurring?: boolean;
-  }) => Promise<void>;
+    // Resolves with the created row, for the same reason as addTask.
+  }) => Promise<Transaction>;
   updateTransaction: (transactionId: string, patch: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (transactionId: string) => Promise<void>;
 
@@ -761,6 +764,7 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   addTask: async (task) => {
     const created = await addTaskAction(task);
     set((state) => ({ tasks: [created, ...state.tasks] }));
+    return created;
   },
 
   // Optimistic with rollback. This is the checklist tick: it has to flip the
@@ -844,6 +848,7 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   addTransaction: async (transaction) => {
     const created = await addTransactionAction(transaction);
     set((state) => ({ transactions: [created, ...state.transactions] }));
+    return created;
   },
 
   updateTransaction: async (transactionId, patch) => {
