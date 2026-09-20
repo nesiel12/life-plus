@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { youtubeVideoId } from "@/lib/learning/youtube";
+import { loadYoutubeApi, YT_PLAYING, type YTPlayer } from "@/lib/media/youtubePlayer";
 
 /** What the lesson page can do to the media, whatever the media is. */
 export interface LessonPlayerHandle {
@@ -19,62 +20,6 @@ interface LessonPlayerProps {
   onPlayingChange?: (playing: boolean) => void;
 }
 
-// ---------------------------------------------------------------------------
-// The YouTube IFrame API, loaded once per page.
-// ---------------------------------------------------------------------------
-
-interface YTPlayer {
-  seekTo(seconds: number, allowSeekAhead: boolean): void;
-  playVideo(): void;
-  pauseVideo(): void;
-  getCurrentTime(): number;
-  getPlayerState(): number;
-  destroy(): void;
-}
-
-interface YTNamespace {
-  Player: new (
-    element: HTMLElement,
-    options: {
-      videoId: string;
-      host?: string;
-      playerVars?: Record<string, number | string>;
-      events?: { onStateChange?: (event: { data: number }) => void; onReady?: () => void };
-    }
-  ) => YTPlayer;
-}
-
-declare global {
-  interface Window {
-    YT?: YTNamespace;
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
-let youtubeApi: Promise<YTNamespace> | null = null;
-
-function loadYoutubeApi(): Promise<YTNamespace> {
-  if (window.YT?.Player) return Promise.resolve(window.YT);
-  if (youtubeApi) return youtubeApi;
-  youtubeApi = new Promise((resolve, reject) => {
-    const previous = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      previous?.();
-      if (window.YT) resolve(window.YT);
-    };
-    const script = document.createElement("script");
-    script.src = "https://www.youtube.com/iframe_api";
-    script.async = true;
-    script.onerror = () => {
-      youtubeApi = null;
-      reject(new Error("YouTube player failed to load"));
-    };
-    document.head.appendChild(script);
-  });
-  return youtubeApi;
-}
-
-const YT_PLAYING = 1;
 
 /**
  * The lesson's media, behind one small interface — seek, play, pause, and a

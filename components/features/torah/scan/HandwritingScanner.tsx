@@ -22,6 +22,7 @@ import {
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { UNCERTAIN_MARK, type ScanQuality } from "@/lib/torah/handwriting";
 import type { LessonSummary } from "@/lib/torah/lessons/types";
+import { macLaunchVariants } from "@/lib/motion/macLaunch";
 import { cn } from "@/lib/utils";
 
 const MAX_PAGES = 4;
@@ -212,8 +213,10 @@ export function HandwritingScanner({ open, onClose, target, onSaved }: Handwriti
         role="dialog"
         aria-modal="true"
         aria-label="סורק כתב יד"
-        initial={reduceMotion ? false : { opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
+        variants={macLaunchVariants(Boolean(reduceMotion))}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
         className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl border border-hairline-card bg-background shadow-2xl sm:rounded-3xl"
       >
         <header className="flex items-center justify-between gap-3 border-b border-hairline-card px-5 py-3.5">

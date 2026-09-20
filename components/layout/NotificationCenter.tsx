@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Bell, Check, CheckCheck, Loader2, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
-import { Z_INDEX } from "@/components/ui/Modal";
+import { Modal, Z_INDEX } from "@/components/ui/Modal";
+import { launchOrigin } from "@/lib/motion/macLaunch";
 import { cn } from "@/lib/utils";
 import type { AppNotification } from "@/types";
 
@@ -64,7 +64,6 @@ function relativeTime(iso: string): string {
  */
 export function NotificationCenter() {
   const router = useRouter();
-  const reduce = useReducedMotion();
 
   const notifications = useAtlasStore((s) => s.notifications);
   const unreadCount = useAtlasStore((s) => s.notificationUnreadCount);
@@ -77,7 +76,8 @@ export function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const [origin, setOrigin] = useState<string | undefined>();
+  const bellRef = useRef<HTMLButtonElement>(null);
 
   const reload = useCallback(() => {
     setRefreshing(true);
@@ -110,24 +110,6 @@ export function NotificationCenter() {
     };
   }, [hydrated, refresh]);
 
-  // Close on outside click and on Escape — the panel is a popover, not a
-  // modal, so it must not trap focus or block the page behind it.
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: PointerEvent) {
-      if (!panelRef.current?.contains(e.target as Node)) setOpen(false);
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
   function handleOpen(notification: AppNotification) {
     if (!notification.readAt) {
       markRead(notification.id).catch(() => {
@@ -151,13 +133,28 @@ export function NotificationCenter() {
     router.push(target.route);
   }
 
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    // The panel grows out of the bell, as a macOS window grows out of its
+    // Dock icon: the origin is the bell's center in the panel's coordinates.
+    const bell = bellRef.current?.getBoundingClientRect();
+    if (bell) {
+      const width = Math.min(448, window.innerWidth - 32);
+      const height = Math.min(600, window.innerHeight * 0.8);
+      setOrigin(launchOrigin(bell, { width, height }, { width: window.innerWidth, height: window.innerHeight }));
+    }
+    setOpen(true);
+    reload();
+  }
+
   return (
-    <div className="relative" ref={panelRef}>
+    <>
       <button
-        onClick={() => {
-          setOpen((v) => !v);
-          if (!open) reload();
-        }}
+        ref={bellRef}
+        onClick={toggle}
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label={unreadCount > 0 ? `התראות — ${unreadCount} חדשות` : "התראות"}
@@ -174,132 +171,124 @@ export function NotificationCenter() {
         )}
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            role="dialog"
-            aria-label="מרכז ההתראות"
-            initial={reduce ? false : { opacity: 0, y: 8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-            className={cn(
-              "glass-panel glass-glow absolute overflow-hidden rounded-2xl",
-              Z_INDEX.panel,
-              // Anchored to the bell on desktop; on a phone the bell sits in
-              // the bottom tab bar, so the panel opens upward and spans the
-              // screen instead of hanging off the edge of it.
-              "bottom-full mb-2 w-[min(21rem,calc(100vw-1.5rem))] end-0",
-              "sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2"
+      {/* A centered, portalled glass modal. It used to be a popover anchored
+          inside the sidebar, whose backdrop-filter made the sidebar its
+          containing block — so the panel was clipped to a sliver of screen. */}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        align="center"
+        zIndex={Z_INDEX.panel}
+        origin={origin}
+        label="מרכז ההתראות"
+        backdropClassName="bg-black/35 backdrop-blur-[3px]"
+        panelClassName="flex max-h-[min(80vh,600px)] w-[min(28rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl"
+      >
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-glass-border px-5 py-3.5">
+          <p className="text-base font-semibold text-foreground">התראות</p>
+          <div className="flex items-center gap-1">
+            {refreshing && <Loader2 size={13} className="animate-spin text-muted" aria-hidden />}
+            {unreadCount > 0 && (
+              <button
+                onClick={() => markAllRead().catch(() => {})}
+                className="focus-ring flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted transition-colors hover:text-foreground"
+              >
+                <CheckCheck size={12} aria-hidden />
+                סמן הכל כנקרא
+              </button>
             )}
-          >
-            <div className="flex items-center justify-between gap-2 border-b border-glass-border px-4 py-3">
-              <p className="text-sm font-medium text-foreground">התראות</p>
-              <div className="flex items-center gap-1">
-                {refreshing && <Loader2 size={13} className="animate-spin text-muted" aria-hidden />}
-                {unreadCount > 0 && (
-                  <button
-                    onClick={() => markAllRead().catch(() => {})}
-                    className="focus-ring flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-muted transition-colors hover:text-foreground"
-                  >
-                    <CheckCheck size={12} aria-hidden />
-                    סמן הכל כנקרא
-                  </button>
-                )}
-              </div>
-            </div>
+          </div>
+        </div>
 
-            <div className="max-h-[min(26rem,60vh)] overflow-y-auto">
-              {error ? (
-                <div className="flex flex-col items-center gap-2 px-4 py-9 text-center">
-                  <p className="text-sm text-foreground">{error}</p>
-                  <button
-                    onClick={reload}
-                    className="focus-ring glass-control rounded-lg px-3 py-1.5 text-xs text-foreground"
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {error ? (
+            <div className="flex flex-col items-center gap-2 px-4 py-9 text-center">
+              <p className="text-sm text-foreground">{error}</p>
+              <button
+                onClick={reload}
+                className="focus-ring glass-control rounded-lg px-3 py-1.5 text-xs text-foreground"
+              >
+                נסה שוב
+              </button>
+            </div>
+          ) : !hydrated ? (
+            <div className="flex flex-col gap-2 p-4" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-14 animate-pulse rounded-xl bg-fill-subtle" />
+              ))}
+            </div>
+          ) : notifications.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+              <span className="grid size-11 place-items-center rounded-full bg-fill-subtle text-muted">
+                <Bell size={19} aria-hidden />
+              </span>
+              <p className="text-sm font-medium text-foreground">אין התראות חדשות</p>
+              <p className="text-xs text-muted">כשיהיה משהו שכדאי שתדע, זה יופיע כאן.</p>
+            </div>
+          ) : (
+            <ul className="flex flex-col">
+              {notifications.map((notification) => {
+                const target = actionTarget(notification.action);
+                const unread = !notification.readAt;
+                return (
+                  <li
+                    key={notification.id}
+                    className={cn(
+                      "group border-b border-glass-border/60 px-4 py-3 last:border-b-0",
+                      unread && "bg-gold-soft/25"
+                    )}
                   >
-                    נסה שוב
-                  </button>
-                </div>
-              ) : !hydrated ? (
-                <div className="flex flex-col gap-2 p-4" aria-hidden>
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="h-14 animate-pulse rounded-xl bg-fill-subtle" />
-                  ))}
-                </div>
-              ) : notifications.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-                  <span className="grid size-11 place-items-center rounded-full bg-fill-subtle text-muted">
-                    <Bell size={19} aria-hidden />
-                  </span>
-                  <p className="text-sm font-medium text-foreground">אין התראות חדשות</p>
-                  <p className="text-xs text-muted">כשיהיה משהו שכדאי שתדע, זה יופיע כאן.</p>
-                </div>
-              ) : (
-                <ul className="flex flex-col">
-                  {notifications.map((notification) => {
-                    const target = actionTarget(notification.action);
-                    const unread = !notification.readAt;
-                    return (
-                      <li
-                        key={notification.id}
-                        className={cn(
-                          "group border-b border-glass-border/60 px-4 py-3 last:border-b-0",
-                          unread && "bg-gold-soft/25"
-                        )}
+                    <div className="flex items-start gap-2">
+                      <button
+                        onClick={() => handleOpen(notification)}
+                        className="focus-ring min-w-0 flex-1 text-start"
                       >
-                        <div className="flex items-start gap-2">
-                          <button
-                            onClick={() => handleOpen(notification)}
-                            className="focus-ring min-w-0 flex-1 text-start"
-                          >
-                            <p
-                              className={cn(
-                                "text-sm text-foreground",
-                                unread ? "font-semibold" : "font-medium"
-                              )}
-                            >
-                              {notification.title}
-                            </p>
-                            <p className="mt-0.5 whitespace-pre-wrap text-xs leading-relaxed text-foreground/75">
-                              {notification.body}
-                            </p>
-                            {notification.reason && (
-                              <p className="mt-1 text-[0.68rem] italic text-muted">
-                                {notification.reason}
-                              </p>
-                            )}
-                            <p className="mt-1 text-[0.65rem] text-muted">
-                              {relativeTime(notification.createdAt)}
-                            </p>
-                          </button>
-
-                          <button
-                            onClick={() => dismiss(notification.id).catch(() => {})}
-                            aria-label={`הסתר את ההתראה ${notification.title}`}
-                            className="focus-ring grid size-6 shrink-0 place-items-center rounded-md text-muted opacity-100 transition-colors hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-                          >
-                            <X size={13} aria-hidden />
-                          </button>
-                        </div>
-
-                        {target && (
-                          <button
-                            onClick={() => handleAct(notification)}
-                            className="focus-ring mt-2 flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-[var(--background)] transition-opacity hover:opacity-85"
-                          >
-                            <Check size={12} aria-hidden />
-                            {target.label}
-                          </button>
+                        <p
+                          className={cn(
+                            "text-sm text-foreground",
+                            unread ? "font-semibold" : "font-medium"
+                          )}
+                        >
+                          {notification.title}
+                        </p>
+                        <p className="mt-0.5 whitespace-pre-wrap text-xs leading-relaxed text-foreground/75">
+                          {notification.body}
+                        </p>
+                        {notification.reason && (
+                          <p className="mt-1 text-[0.68rem] italic text-muted">
+                            {notification.reason}
+                          </p>
                         )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+                        <p className="mt-1 text-[0.65rem] text-muted">
+                          {relativeTime(notification.createdAt)}
+                        </p>
+                      </button>
+
+                      <button
+                        onClick={() => dismiss(notification.id).catch(() => {})}
+                        aria-label={`הסתר את ההתראה ${notification.title}`}
+                        className="focus-ring grid size-6 shrink-0 place-items-center rounded-md text-muted opacity-100 transition-colors hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                      >
+                        <X size={13} aria-hidden />
+                      </button>
+                    </div>
+
+                    {target && (
+                      <button
+                        onClick={() => handleAct(notification)}
+                        className="focus-ring mt-2 flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-[var(--background)] transition-opacity hover:opacity-85"
+                      >
+                        <Check size={12} aria-hidden />
+                        {target.label}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </Modal>
+    </>
   );
 }

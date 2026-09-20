@@ -89,3 +89,21 @@ describe("nextReviewLabel", () => {
     expect(nextReviewLabel(NOW, at(90 * 86_400_000))).toBe("3 חודשים");
   });
 });
+
+describe("battle sessions", () => {
+  it("add their combo bonus to XP and report the best combo", () => {
+    const base = { cards: [], reviews: [], attempts: [], completedChunks: 1, now: NOW, timeZone: TZ };
+    const without = computePracticeStats(base);
+    const withSessions = computePracticeStats({
+      ...base,
+      sessions: [
+        { bonusXp: 35, maxCombo: 6, endedAt: daysAgo(1) },
+        { bonusXp: 15, maxCombo: 9, endedAt: NOW },
+      ],
+    });
+    expect(withSessions.xp - without.xp).toBe(50);
+    expect(withSessions.sessionBonusXp).toBe(50);
+    expect(withSessions.bestCombo).toBe(9);
+    expect(without.bestCombo).toBe(0);
+  });
+});

@@ -13,19 +13,24 @@ import {
   CheckCircle2,
   ChevronDown,
   Circle,
+  Flame,
   GitCompareArrows,
   Layers,
   Lightbulb,
   Loader2,
   PartyPopper,
   PenLine,
+  Scale,
   Sparkles,
+  Swords,
   Target,
   Trophy,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
 import { ActionPill, SectionPlaceholder } from "@/components/features/torah/hub/PageSection";
+import { HavrutaHint } from "@/components/features/torah/practice/HavrutaHint";
+import { readyForChallenge } from "@/lib/torah/adaptive";
 import { FlashcardDeck } from "@/components/features/torah/lessons/FlashcardDeck";
 import { StatsStrip } from "@/components/features/torah/lessons/StatsStrip";
 import { useLesson } from "@/components/features/torah/lessons/useLesson";
@@ -45,6 +50,8 @@ const PHASES: { key: Phase; label: string; icon: LucideIcon }[] = [
 ];
 
 const KIND_LABELS: Record<PracticeQuestionView["kind"], { label: string; icon: LucideIcon }> = {
+  dilemma: { label: "דילמה תלמודית", icon: Scale },
+  counter: { label: "קושיא להשיב עליה", icon: Swords },
   scenario: { label: "תרחיש", icon: Lightbulb },
   application: { label: "יישום", icon: Target },
   compare: { label: "השוואה", icon: GitCompareArrows },
@@ -117,6 +124,31 @@ export function LessonPractice({ lessonId }: { lessonId: string }) {
       setPracticeError(err instanceof Error ? err.message : "יצירת התרגול נכשלה.");
     } finally {
       setPreparing(false);
+    }
+  }
+
+  // "אתגר קשה יותר" — two harder questions, appended, once the part is mastered.
+  const [challenging, setChallenging] = useState(false);
+  const [challengeError, setChallengeError] = useState<string | null>(null);
+  async function requestChallenge() {
+    if (!chunk || !practice) return;
+    setChallenging(true);
+    setChallengeError(null);
+    try {
+      const response = await fetch(`/api/torah/lessons/${lessonId}/chunks/${chunk.id}/practice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challenge: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "יצירת האתגר נכשלה.");
+      const before = practice.questions.length;
+      setPractice({ questions: data.questions, flashcards: data.flashcards });
+      setQuestionIndex(Math.min(before, data.questions.length - 1));
+    } catch (err) {
+      setChallengeError(err instanceof Error ? err.message : "יצירת האתגר נכשלה.");
+    } finally {
+      setChallenging(false);
     }
   }
 
@@ -275,6 +307,9 @@ export function LessonPractice({ lessonId }: { lessonId: string }) {
                     void reloadStats();
                   }}
                   onContinue={() => setPhase(practice?.flashcards.length ? "cards" : "done")}
+                  onChallenge={() => void requestChallenge()}
+                  challenging={challenging}
+                  challengeError={challengeError}
                 />
               )}
 
@@ -380,6 +415,9 @@ function QuestionsPhase({
   onRetry,
   onAnswered,
   onContinue,
+  onChallenge,
+  challenging,
+  challengeError,
 }: {
   preparing: boolean;
   error: string | null;
@@ -389,13 +427,16 @@ function QuestionsPhase({
   onRetry: () => void;
   onAnswered: (question: PracticeQuestionView) => void;
   onContinue: () => void;
+  onChallenge: () => void;
+  challenging: boolean;
+  challengeError: string | null;
 }) {
   if (preparing) {
     return (
       <div className="flex flex-col items-center gap-3 py-10 text-center" role="status">
         <Loader2 size={24} className="animate-spin text-gold-ink" aria-hidden />
         <p className="text-sm font-medium text-foreground">מכין שאלות מעמיקות על החלק…</p>
-        <p className="text-xs text-muted">תרחישים, יישום והשוואות — לא שאלות שינון.</p>
+        <p className="text-xs text-muted">דילמות, קושיות ויישום מעשי — לא שאלות שינון.</p>
       </div>
     );
   }
@@ -420,6 +461,10 @@ function QuestionsPhase({
 
   const question = practice.questions[Math.min(index, practice.questions.length - 1)];
   const answeredCount = practice.questions.filter((q) => q.latestAttempt).length;
+  // Adaptive difficulty: mastery of every question so far unlocks a harder pair.
+  const canChallenge =
+    answeredCount === practice.questions.length &&
+    readyForChallenge(practice.questions.map((q) => q.latestAttempt?.score ?? null));
 
   return (
     <div className="flex flex-col gap-4">
@@ -459,11 +504,19 @@ function QuestionsPhase({
             {question.latestAttempt ? "לשאלה הבאה" : "דלג"}
           </ActionPill>
         ) : (
-          <ActionPill icon={ArrowLeft} onClick={onContinue} variant="gold">
-            {practice.flashcards.length ? "לכרטיסיות" : "לסיום החלק"}
-          </ActionPill>
+          <div className="flex flex-wrap items-center gap-2">
+            {canChallenge && (
+              <ActionPill icon={challenging ? Loader2 : Flame} busy={challenging} onClick={onChallenge}>
+                אתגר קשה יותר
+              </ActionPill>
+            )}
+            <ActionPill icon={ArrowLeft} onClick={onContinue} variant="gold">
+              {practice.flashcards.length ? "לכרטיסיות" : "לסיום החלק"}
+            </ActionPill>
+          </div>
         )}
       </div>
+      {challengeError && <p className="text-xs text-accent-family">{challengeError}</p>}
     </div>
   );
 }
@@ -542,6 +595,7 @@ function QuestionCard({ question, onAnswered }: { question: PracticeQuestionView
               {submitting ? "בודק את התשובה…" : "שלח לבדיקה"}
             </ActionPill>
           </div>
+          <HavrutaHint questionId={question.id} draft={answer} />
         </div>
       )}
 

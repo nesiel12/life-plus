@@ -902,3 +902,96 @@ body::before {
 .sefer-spine::after {
   inset-block-end: 12%;
 }
+
+/* ---------------------------------------------------------------------------
+   macOS launch — the CSS twin of lib/motion/macLaunch.ts, for elements that
+   are not framer-motion components. Same numbers: from 95% and transparent,
+   300ms, fast ease-out, opacity + transform only (compositor-only, so it can
+   never reflow layout). `--launch-origin` lets a caller grow the element out
+   of its launcher.
+   --------------------------------------------------------------------------- */
+@keyframes mac-launch {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes mac-close {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.animate-mac-launch {
+  transform-origin: var(--launch-origin, 50% 50%);
+  animation: mac-launch 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-mac-close {
+  transform-origin: var(--launch-origin, 50% 50%);
+  animation: mac-close 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-mac-launch {
+    animation: fade-in 150ms linear both;
+  }
+  .animate-mac-close {
+    animation: fade-out 120ms linear both;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Liquid wave for the water tracker: a double-width wave path drifting one
+   wavelength-period left, forever. Transform-only, so it never repaints the
+   page around it. */
+@keyframes wave-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-140px);
+  }
+}
+
+.animate-wave-slow {
+  animation: wave-drift 4.2s linear infinite;
+}
+
+.animate-wave-fast {
+  animation: wave-drift 2.6s linear infinite reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-wave-slow,
+  .animate-wave-fast {
+    animation: none;
+  }
+}

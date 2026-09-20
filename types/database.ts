@@ -66,7 +66,11 @@ export type ConceptSourceTypeDb = "summary" | "lesson" | "book" | "knowledge_ent
 export type LessonKindDb = "audio" | "youtube" | "pdf";
 export type LessonStatusDb = "uploading" | "pending" | "transcribing" | "analyzing" | "ready" | "failed";
 export type LessonSourceKindDb = "verse" | "talmud" | "halacha" | "book" | "other";
-export type PracticeQuestionKindDb = "scenario" | "application" | "recall" | "compare";
+export type PracticeQuestionKindDb = "scenario" | "application" | "recall" | "compare" | "dilemma" | "counter";
+// 20260921000000_ux_overhaul.sql
+export type MacroSourceDb = "ai" | "preset" | "user";
+export type WorkoutKindDb = "strength" | "cardio" | "hiit" | "yoga" | "walk" | "sport" | "other";
+export type PracticeSessionModeDb = "battle" | "review";
 export type SrsSourceTypeDb =
   | "lesson"
   | "summary"
@@ -350,6 +354,8 @@ export interface Database {
           chronotype_settings: Json;
           core_priorities: Json;
           timezone: string | null;
+          /** 20260921000000 — { calories, proteinG, carbsG, fatG, waterMl }. */
+          health_targets: Json;
           created_at: string;
           updated_at: string;
         },
@@ -368,6 +374,7 @@ export interface Database {
           chronotype_settings?: Json;
           core_priorities?: Json;
           timezone?: string | null;
+          health_targets?: Json;
         },
         {
           user_id?: string;
@@ -384,6 +391,7 @@ export interface Database {
           chronotype_settings?: Json;
           core_priorities?: Json;
           timezone?: string | null;
+          health_targets?: Json;
         }
       >;
       goals: TableDef<
@@ -1053,6 +1061,11 @@ export interface Database {
           description: string;
           eaten_at: string;
           type: MealTypeDb;
+          calories: number | null;
+          protein_g: number | null;
+          carbs_g: number | null;
+          fat_g: number | null;
+          macro_source: MacroSourceDb | null;
           created_at: string;
           updated_at: string;
         },
@@ -1062,6 +1075,11 @@ export interface Database {
           description: string;
           eaten_at?: string;
           type: MealTypeDb;
+          calories?: number | null;
+          protein_g?: number | null;
+          carbs_g?: number | null;
+          fat_g?: number | null;
+          macro_source?: MacroSourceDb | null;
         },
         {
           id?: string;
@@ -1069,6 +1087,11 @@ export interface Database {
           description?: string;
           eaten_at?: string;
           type?: MealTypeDb;
+          calories?: number | null;
+          protein_g?: number | null;
+          carbs_g?: number | null;
+          fat_g?: number | null;
+          macro_source?: MacroSourceDb | null;
         }
       >;
       workouts: TableDef<
@@ -1079,6 +1102,10 @@ export interface Database {
           start_time: string;
           end_time: string | null;
           routine_details: string | null;
+          kind: WorkoutKindDb | null;
+          intensity: number | null;
+          avg_heart_rate: number | null;
+          calories_burned: number | null;
           created_at: string;
           updated_at: string;
         },
@@ -1089,6 +1116,10 @@ export interface Database {
           start_time?: string;
           end_time?: string | null;
           routine_details?: string | null;
+          kind?: WorkoutKindDb | null;
+          intensity?: number | null;
+          avg_heart_rate?: number | null;
+          calories_burned?: number | null;
         },
         {
           id?: string;
@@ -1097,6 +1128,10 @@ export interface Database {
           start_time?: string;
           end_time?: string | null;
           routine_details?: string | null;
+          kind?: WorkoutKindDb | null;
+          intensity?: number | null;
+          avg_heart_rate?: number | null;
+          calories_burned?: number | null;
         }
       >;
       recommendation_events: TableDef<
@@ -1913,6 +1948,60 @@ export interface Database {
           updated_at: string;
         },
         "markdown"
+      >;
+
+      water_logs: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          amount_ml: number;
+          logged_at: string;
+          created_at: string;
+        },
+        "amount_ml"
+      >;
+
+      practice_sessions: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          mode: PracticeSessionModeDb;
+          rounds: number;
+          correct: number;
+          max_combo: number;
+          bonus_xp: number;
+          started_at: string;
+          ended_at: string;
+          created_at: string;
+        },
+        "started_at"
+      >;
+
+      video_checkpoints: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          video_id: string;
+          topic_id: string | null;
+          checkpoints: Json;
+          answers: Json;
+          created_at: string;
+          updated_at: string;
+        },
+        "video_id"
+      >;
+
+      learning_roadmaps: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          topic_id: string;
+          nodes: Json;
+          completed: Json;
+          created_at: string;
+          updated_at: string;
+        },
+        "topic_id"
       >;
 
       contradiction_scan_pairs: GraphTable<

@@ -5,6 +5,13 @@ import type { TranscriptLine } from "@/lib/torah/lessons/transcript";
 export type LessonStatus = "uploading" | "pending" | "transcribing" | "analyzing" | "ready" | "failed";
 export type LessonKind = "audio" | "youtube" | "pdf";
 
+/**
+ * What a practice question asks for. dilemma and counter (20260921000000)
+ * lead generation; recall and compare remain valid for questions written
+ * before them.
+ */
+export type PracticeQuestionKind = "dilemma" | "scenario" | "application" | "counter" | "compare" | "recall";
+
 export interface LessonProgressView {
   phase: "waiting" | "transcribe" | "analyze" | "write" | "done";
   windowsDone: number;
@@ -81,7 +88,7 @@ export interface LessonDetail extends LessonSummary {
 
 export interface PracticeQuestionView {
   id: string;
-  kind: "scenario" | "application" | "recall" | "compare";
+  kind: PracticeQuestionKind;
   prompt: string;
   difficulty: number;
   /** Revealed only once the user has answered. */

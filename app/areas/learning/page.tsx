@@ -10,6 +10,7 @@ import { VideoStudyPanel } from "@/components/features/learning/VideoStudyPanel"
 import { LearningSplitView } from "@/components/features/learning/LearningSplitView";
 import { ContinueLearning } from "@/components/features/learning/ContinueLearning";
 import { BackToHome } from "@/components/layout/BackToHome";
+import { StudyModes } from "@/components/features/learning/StudyModes";
 
 // Learning & Knowledge Space (Phase 7): replaces the previous generic
 // AreaMomentsView placeholder (which just logged free-text "knowledge"
@@ -94,28 +95,34 @@ export default function LearningSpacePage() {
 
       {studyingTopic && (
         <GlassCard className="mb-8">
-          <LearningSplitView
+          <StudyModes
+            topicId={studyingTopic.id}
             topicTitle={studyingTopic.title}
-            videoUrl={
-              learningResources.find((r) => r.topicId === studyingTopic.id && r.type === "youtube" && r.url)?.url
-            }
-            onQuizComplete={() => {
-              // Auto-mark the topic's studied video complete on finishing the
-              // quiz, rather than making the user tick it separately. The
-              // store update is optimistic, so the checklist reflects it
-              // immediately.
-              const resource = learningResources.find(
-                (r) => r.topicId === studyingTopic.id && r.type === "youtube" && !r.isCompleted
-              );
-              if (resource) {
-                updateLearningResource(resource.id, { isCompleted: true }).catch(() => {});
+            videoUrl={learningResources.find((r) => r.topicId === studyingTopic.id && r.type === "youtube" && r.url)?.url}
+          >
+            <LearningSplitView
+              topicTitle={studyingTopic.title}
+              videoUrl={
+                learningResources.find((r) => r.topicId === studyingTopic.id && r.type === "youtube" && r.url)?.url
               }
-            }}
-            onClose={() => setStudyingTopicId(null)}
-          />
-          <div className="mt-5">
-            <ContinueLearning topic={studyingTopic} />
-          </div>
+              onQuizComplete={() => {
+                // Auto-mark the topic's studied video complete on finishing the
+                // quiz, rather than making the user tick it separately. The
+                // store update is optimistic, so the checklist reflects it
+                // immediately.
+                const resource = learningResources.find(
+                  (r) => r.topicId === studyingTopic.id && r.type === "youtube" && !r.isCompleted
+                );
+                if (resource) {
+                  updateLearningResource(resource.id, { isCompleted: true }).catch(() => {});
+                }
+              }}
+              onClose={() => setStudyingTopicId(null)}
+            />
+            <div className="mt-5">
+              <ContinueLearning topic={studyingTopic} />
+            </div>
+          </StudyModes>
         </GlassCard>
       )}
 

@@ -585,6 +585,11 @@ export function toMeal(row: MealRow): Meal {
     description: row.description,
     eatenAt: row.eaten_at,
     type: row.type,
+    calories: row.calories ?? undefined,
+    proteinG: row.protein_g ?? undefined,
+    carbsG: row.carbs_g ?? undefined,
+    fatG: row.fat_g ?? undefined,
+    macroSource: row.macro_source ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -594,6 +599,11 @@ export function toMealPatch(patch: Partial<Meal>): MealUpdate {
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.eatenAt !== undefined) row.eaten_at = patch.eatenAt;
   if (patch.type !== undefined) row.type = patch.type;
+  if (patch.calories !== undefined) row.calories = patch.calories ?? null;
+  if (patch.proteinG !== undefined) row.protein_g = patch.proteinG ?? null;
+  if (patch.carbsG !== undefined) row.carbs_g = patch.carbsG ?? null;
+  if (patch.fatG !== undefined) row.fat_g = patch.fatG ?? null;
+  if (patch.macroSource !== undefined) row.macro_source = patch.macroSource ?? null;
   return row;
 }
 
@@ -604,6 +614,10 @@ export function toWorkout(row: WorkoutRow): Workout {
     startTime: row.start_time,
     endTime: row.end_time ?? undefined,
     routineDetails: row.routine_details ?? undefined,
+    kind: row.kind ?? undefined,
+    intensity: row.intensity ?? undefined,
+    avgHeartRate: row.avg_heart_rate ?? undefined,
+    caloriesBurned: row.calories_burned ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -614,6 +628,10 @@ export function toWorkoutPatch(patch: Partial<Workout>): WorkoutUpdate {
   if (patch.startTime !== undefined) row.start_time = patch.startTime;
   if (patch.endTime !== undefined) row.end_time = patch.endTime ?? null;
   if (patch.routineDetails !== undefined) row.routine_details = patch.routineDetails || null;
+  if (patch.kind !== undefined) row.kind = patch.kind ?? null;
+  if (patch.intensity !== undefined) row.intensity = patch.intensity ?? null;
+  if (patch.avgHeartRate !== undefined) row.avg_heart_rate = patch.avgHeartRate ?? null;
+  if (patch.caloriesBurned !== undefined) row.calories_burned = patch.caloriesBurned ?? null;
   return row;
 }
 

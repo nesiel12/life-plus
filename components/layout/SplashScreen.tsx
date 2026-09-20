@@ -17,6 +17,26 @@ const HOLD_MS = 2100;
 // <Logo> resolves the artwork itself (public/life-plus-mark.png, falling back
 // to the gold SVG) — this shell never needs to change when the final file
 // lands.
+/**
+ * Fired the moment the splash starts leaving, so the app window underneath
+ * can play its macOS-style launch while the splash fades — the window
+ * appears to open out of it rather than waiting behind it.
+ */
+export const APP_LAUNCH_EVENT = "lifeplus:launch";
+
+function announceLaunch() {
+  window.dispatchEvent(new Event(APP_LAUNCH_EVENT));
+}
+
+/** Whether the splash will cover this page load (not yet seen this session). */
+export function splashPending(): boolean {
+  try {
+    return sessionStorage.getItem(SESSION_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+
 export function SplashScreen() {
   const reduceMotion = useReducedMotion();
   const [visible, setVisible] = useState(false);
@@ -38,6 +58,7 @@ export function SplashScreen() {
         /* ignore */
       }
       setVisible(false);
+      announceLaunch();
     };
 
     const timer = window.setTimeout(dismiss, HOLD_MS);
@@ -56,7 +77,15 @@ export function SplashScreen() {
           key="splash"
           role="status"
           aria-label={`${APP_NAME} נטען`}
-          onClick={() => setVisible(false)}
+          onClick={() => {
+            try {
+              sessionStorage.setItem(SESSION_KEY, "1");
+            } catch {
+              /* ignore */
+            }
+            setVisible(false);
+            announceLaunch();
+          }}
           className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-8 bg-background px-6 sm:gap-10"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.55, ease: "easeInOut" } }}

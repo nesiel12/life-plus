@@ -57,10 +57,17 @@ export const chunkPracticeSchema = z.object({
   questions: z
     .array(
       z.object({
-        kind: z.enum(["scenario", "application", "compare"]),
+        kind: z
+          .enum(["dilemma", "application", "counter", "scenario"])
+          .describe(
+            "dilemma = ספק תלמודי: מקרה עם שני צדדים שלכל אחד סברא, והלומד מכריע ומנמק; " +
+              "application = יישום העיקרון על מקרה מעשי מהחיים שלא נזכר בשיעור; " +
+              "counter = קושיא חזקה על מה שנלמד, שהלומד צריך להשיב עליה; " +
+              "scenario = ״חבר שואל אותך…״ — הסבר לאחר"
+          ),
         prompt: z
           .string()
-          .describe("שאלה מעמיקה בעברית: תרחיש מציאותי, יישום העיקרון על מקרה חדש, או השוואה בין שיטות — לא שאלת זיכרון"),
+          .describe("השאלה בעברית, חדה ומעוררת מחשבה — לעולם לא שאלת זיכרון"),
         modelAnswer: z.string().describe("תשובה מלאה ומנומקת בעברית, 3-6 משפטים, המבוססת על החלק שנלמד"),
         rubric: z
           .array(z.object({ criterion: z.string().describe("מה תשובה טובה חייבת לכלול, בעברית"), weight: z.number() }))
@@ -68,7 +75,7 @@ export const chunkPracticeSchema = z.object({
         difficulty: z.number().describe("1 (קל) עד 5 (קשה מאוד)"),
       })
     )
-    .describe("3 שאלות, מגוונות בסוגן ובקושי"),
+    .describe("3 שאלות: לפחות דילמה אחת וקושיא אחת, בקושי מדורג"),
   flashcards: z
     .array(
       z.object({
@@ -80,11 +87,26 @@ export const chunkPracticeSchema = z.object({
 });
 
 export const CHUNK_PRACTICE_SYSTEM_PROMPT = [
-  "אתה מלמד תורה מנוסה הבונה תרגול לחלק אחד של שיעור.",
-  "המטרה היא הבנה עמוקה, לא שינון: שאלות תרחיש (״חבר שואל אותך…״), יישום עיקרון על מקרה שלא נזכר בשיעור, והשוואה בין דעות או סברות.",
+  "אתה ראש ישיבה הבונה תרגול לחלק אחד של שיעור — תרגול שמחייב לחשוב, לא לזכור.",
+  "סוגי השאלות:",
+  "• דילמה תלמודית (dilemma): ספק שיש בו שני צדדים, ולכל צד סברא. בקש מהלומד להכריע ולנמק, ולציין מה הצד השני היה אומר.",
+  "• יישום מעשי (application): מקרה אמיתי מהחיים — בבית, בעבודה, ברחוב — שבו העיקרון שנלמד מכריע.",
+  "• קושיא (counter): הקשה בחריפות על מה שנלמד, כמו חברותא טובה, ובקש מהלומד לתרץ.",
+  "• תרחיש (scenario): ״חבר שואל אותך…״ — הלומד מסביר את העיקר במילים שלו.",
   "כל שאלה חייבת להיות ניתנת לתשובה מתוך מה שנלמד בחלק הזה. אל תשאל על דברים שלא נאמרו.",
+  "דרג את הקושי באמת: 1 = הבנת העיקר, 3 = החלה על מקרה חדש, 5 = הכרעה בספק קשה עם נימוק מלא.",
   "כתוב אך ורק בעברית מקורית. הכרטיסיות — קצרות, חדות, ובלי כפילויות.",
 ].join("\n");
+
+/**
+ * The "אתגר קשה יותר" round — offered once a learner averages 80+ on a part.
+ * Only harder questions, no new flashcards.
+ */
+export const challengeQuestionsSchema = z.object({
+  questions: z
+    .array(chunkPracticeSchema.shape.questions.element)
+    .describe("2 שאלות קשות (קושי 4-5): דילמה אחת וקושיא אחת, שונות מהשאלות שכבר נשאלו"),
+});
 
 // ---------------------------------------------------------------------------
 // Grading

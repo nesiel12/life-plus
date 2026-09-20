@@ -1,7 +1,9 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, type ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { macBackdropVariants, macLaunchVariants } from "@/lib/motion/macLaunch";
 import { cn } from "@/lib/utils";
 
 const FOCUSABLE_SELECTOR =
@@ -32,6 +34,15 @@ interface ModalProps {
   zIndex?: string;
   panelClassName?: string;
   backdropClassName?: string;
+  /** Where a backdropped panel sits: near the top (the default), or dead center. */
+  align?: "top" | "center";
+  /**
+   * CSS transform-origin for the launch animation — see launchOrigin() in
+   * lib/motion/macLaunch.ts, which makes a panel grow out of its launcher.
+   */
+  origin?: string;
+  /** Accessible name for the dialog. */
+  label?: string;
 }
 
 export function Modal({
@@ -44,7 +55,21 @@ export function Modal({
   zIndex = Z_INDEX.modal,
   panelClassName,
   backdropClassName,
+  align = "top",
+  origin,
+  label,
 }: ModalProps) {
+  const reduceMotion = Boolean(useReducedMotion());
+  const panelVariants = macLaunchVariants(reduceMotion);
+
+  // Portalled to <body>. A `position: fixed` element is only fixed to the
+  // viewport when no ancestor has a transform, filter or backdrop-filter —
+  // and the glass sidebar has all three, which is exactly how the
+  // notifications panel ended up clipped to a sliver of the screen. Rendering
+  // at the root makes every modal immune to where its trigger happens to live.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
     if (!open || !closeOnEscape || !onClose) return;
     function handleKeyDown(e: KeyboardEvent) {
@@ -100,8 +125,10 @@ export function Modal({
     };
   }, [open]);
 
+  if (!mounted) return null;
+
   if (!backdrop) {
-    return (
+    return createPortal(
       <AnimatePresence>
         {open && (
           <motion.div
@@ -109,12 +136,14 @@ export function Modal({
             role="dialog"
             aria-modal="true"
             tabIndex={-1}
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.96 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
+            aria-label={label}
+            variants={panelVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            style={{ transformOrigin: origin }}
             className={cn(
-              "focus-ring glass-panel glass-glow fixed rounded-2xl",
+              "focus-ring glass-panel glass-glow fixed rounded-2xl will-change-transform",
               zIndex,
               panelClassName
             )}
@@ -122,19 +151,22 @@ export function Modal({
             {children}
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
     );
   }
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          variants={macBackdropVariants(reduceMotion)}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
           className={cn(
-            "fixed inset-0 flex items-start justify-center bg-black/50 px-6 pt-32 backdrop-blur-sm",
+            "fixed inset-0 flex justify-center bg-black/50 backdrop-blur-sm",
+            align === "center" ? "items-center p-4 sm:p-6" : "items-start px-6 pt-32",
             zIndex,
             backdropClassName
           )}
@@ -145,17 +177,20 @@ export function Modal({
             role="dialog"
             aria-modal="true"
             tabIndex={-1}
-            initial={{ opacity: 0, y: -16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -16, scale: 0.97 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className={cn("focus-ring glass-panel glass-glow w-full rounded-2xl", panelClassName)}
+            aria-label={label}
+            variants={panelVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            style={{ transformOrigin: origin }}
+            className={cn("focus-ring glass-panel glass-glow w-full rounded-2xl will-change-transform", panelClassName)}
             onClick={(e) => e.stopPropagation()}
           >
             {children}
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

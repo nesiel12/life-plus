@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useReducedMotion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { ArrowRight, CalendarCheck, Layers, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarCheck, Layers, Loader2, RefreshCw, Swords } from "lucide-react";
 import { ActionPill, SectionPlaceholder } from "@/components/features/torah/hub/PageSection";
 import { FlashcardDeck, type DeckSummary } from "@/components/features/torah/lessons/FlashcardDeck";
 import { StatsStrip } from "@/components/features/torah/lessons/StatsStrip";
@@ -63,6 +63,19 @@ export function FlashcardReviewPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">חזרה מרווחת</h1>
           <p className="text-sm text-muted">הכרטיסיות מכל השיעורים שהגיע זמנן — כל אחת חוזרת בדיוק כשהזיכרון מתחיל לדעוך.</p>
         </div>
+        <Link
+          href="/areas/torah/practice/battle"
+          className="focus-ring group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-amber-400/40 bg-gradient-to-l from-amber-400/15 to-orange-500/10 p-4 transition-shadow hover:shadow-[0_0_0_4px_rgba(245,158,11,0.15)]"
+        >
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-[0_10px_24px_-10px_rgba(245,158,11,0.9)]" aria-hidden>
+            <Swords size={20} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-foreground">קרב חברותא</span>
+            <span className="block text-xs text-muted">כרטיסיות, דילמות וקושיות ברצף אחד — עם מכפילי קומבו 🔥</span>
+          </span>
+          <ArrowLeft size={16} className="shrink-0 text-muted transition-transform group-hover:-translate-x-1" aria-hidden />
+        </Link>
         <StatsStrip stats={stats} />
       </header>
 

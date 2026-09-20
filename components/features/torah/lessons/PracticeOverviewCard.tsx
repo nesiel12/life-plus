@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Layers } from "lucide-react";
+import { Layers, Swords } from "lucide-react";
 import { StatsStrip } from "@/components/features/torah/lessons/StatsStrip";
 import { usePracticeStats } from "@/components/features/torah/lessons/usePracticeStats";
 
@@ -19,13 +19,22 @@ export function PracticeOverviewCard() {
           </h2>
           <p className="text-xs text-muted">הרמה, הרצף והשליטה שלך בחומר</p>
         </div>
-        <Link
-          href="/areas/torah/practice"
-          className="focus-ring flex items-center gap-1.5 rounded-full bg-gold px-4 py-1.5 text-sm font-medium text-white"
-        >
-          <Layers size={14} aria-hidden />
-          {stats?.dueNow ? `חזרה על ${stats.dueNow} כרטיסיות` : "לחזרה המרווחת"}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/areas/torah/practice/battle"
+            className="focus-ring flex items-center gap-1.5 rounded-full bg-gradient-to-l from-amber-400 to-orange-500 px-4 py-1.5 text-sm font-semibold text-white shadow-[0_8px_20px_-8px_rgba(245,158,11,0.9)]"
+          >
+            <Swords size={14} aria-hidden />
+            קרב חברותא
+          </Link>
+          <Link
+            href="/areas/torah/practice"
+            className="focus-ring flex items-center gap-1.5 rounded-full bg-gold px-4 py-1.5 text-sm font-medium text-white"
+          >
+            <Layers size={14} aria-hidden />
+            {stats?.dueNow ? `חזרה על ${stats.dueNow} כרטיסיות` : "לחזרה המרווחת"}
+          </Link>
+        </div>
       </div>
       <StatsStrip stats={stats} />
     </section>

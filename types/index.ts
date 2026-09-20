@@ -376,8 +376,18 @@ export interface Meal {
   description: string;
   eatenAt: string; // ISO datetime
   type: MealType;
+  /** Estimated or entered nutrition. Absent = unknown, never zero. */
+  calories?: number;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
+  /** Where the numbers came from — an AI guess must not look like a typed value. */
+  macroSource?: MacroSource;
   createdAt: string;
 }
+
+export type MacroSource = "ai" | "preset" | "user";
+export type WorkoutKind = "strength" | "cardio" | "hiit" | "yoga" | "walk" | "sport" | "other";
 
 export interface Workout {
   id: string;
@@ -385,6 +395,12 @@ export interface Workout {
   startTime: string; // ISO datetime
   endTime?: string; // ISO datetime
   routineDetails?: string;
+  kind?: WorkoutKind;
+  /** Perceived exertion, 1 (easy) … 5 (all-out). */
+  intensity?: number;
+  avgHeartRate?: number;
+  /** An estimate (MET × weight × time) unless the user entered it. */
+  caloriesBurned?: number;
   createdAt: string;
 }
 

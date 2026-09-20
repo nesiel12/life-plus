@@ -67,6 +67,8 @@ import {
   deleteWorkoutAction,
   updateMealAction,
   updateWorkoutAction,
+  type NewMealInput,
+  type NewWorkoutInput,
 } from "@/app/actions/health";
 import {
   addManualEventAction,
@@ -101,7 +103,6 @@ import type {
   LifeArea,
   ManualEvent,
   Meal,
-  MealType,
   Moment,
   MomentCategory,
   PersonalDNA,
@@ -307,16 +308,11 @@ interface AtlasState extends HydratedState {
   deleteLearningResource: (resourceId: string) => Promise<void>;
   generateLearningPath: (topicId: string, topicTitle: string) => Promise<void>;
 
-  addMeal: (meal: { description: string; type: MealType; eatenAt?: string }) => Promise<void>;
+  addMeal: (meal: NewMealInput) => Promise<void>;
   updateMeal: (mealId: string, patch: Partial<Meal>) => Promise<void>;
   deleteMeal: (mealId: string) => Promise<void>;
 
-  addWorkout: (workout: {
-    title: string;
-    startTime?: string;
-    endTime?: string;
-    routineDetails?: string;
-  }) => Promise<void>;
+  addWorkout: (workout: NewWorkoutInput) => Promise<void>;
   updateWorkout: (workoutId: string, patch: Partial<Workout>) => Promise<void>;
   deleteWorkout: (workoutId: string) => Promise<void>;
 

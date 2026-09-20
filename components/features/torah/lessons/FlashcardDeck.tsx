@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Layers, RotateCcw } from "lucide-react";
 import { reviewAnswer, type SrsAnswer } from "@/lib/torah/srs";
+import { FlipCard } from "@/components/features/torah/practice/FlipCard";
 import { nextReviewLabel, XP } from "@/lib/torah/practiceStats";
 import type { FlashcardView } from "@/lib/torah/lessons/types";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,8 @@ const ANSWERS: { answer: SrsAnswer; label: string; key: string; tone: string }[]
 /**
  * A spaced-repetition session over a set of cards.
  *
- * Flip with Space or a click, grade with 1–4 or the buttons. Each button shows
+ * Flip with Space or a tap, then grade with 1–4, the buttons, the arrow keys,
+ * or a swipe (right = knew it, left = again). Each button shows
  * when the card will come back under that grade — computed by the same SM-2
  * function the server applies, so the preview is the schedule. A card marked
  * "שוב" returns at the end of this session instead of vanishing until
@@ -120,6 +122,9 @@ export function FlashcardDeck({ cards, labelFor, onFinish }: FlashcardDeckProps)
         event.preventDefault();
         setFlipped((f) => !f);
       }
+      // Arrows mirror the swipe: right = knew it, left = again.
+      if (event.key === "ArrowRight") void grade("good");
+      if (event.key === "ArrowLeft") void grade("again");
       const match = ANSWERS.find((a) => a.key === event.key);
       if (match) void grade(match.answer);
     }
@@ -158,36 +163,25 @@ export function FlashcardDeck({ cards, labelFor, onFinish }: FlashcardDeckProps)
         </span>
       </div>
 
-      <div className="[perspective:1400px]">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.button
-            key={`${card.id}-${summary.reviewed}`}
-            type="button"
-            onClick={() => setFlipped((f) => !f)}
-            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0, rotateY: flipped ? 180 : 0 }}
-            exit={reduceMotion ? undefined : { opacity: 0, y: -12 }}
-            transition={{ duration: reduceMotion ? 0 : 0.45, ease: "easeOut" }}
-            style={{ transformStyle: "preserve-3d" }}
-            aria-label={flipped ? "הצג את השאלה" : "הצג את התשובה"}
-            className="focus-ring relative block min-h-56 w-full rounded-3xl text-center"
-          >
-            <span
-              className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-3xl border border-hairline-card bg-surface p-6 shadow-[0_24px_50px_-32px_rgba(16,16,20,0.5)] [backface-visibility:hidden]"
-            >
-              {label && <span className="text-[0.65rem] text-muted">{label}</span>}
-              <span className="text-lg font-semibold leading-relaxed text-foreground">{card.front}</span>
-              <span className="mt-2 text-[0.7rem] text-muted">לחיצה או רווח — להצגת התשובה</span>
-            </span>
-            <span
-              className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-3xl border border-gold-line bg-gold-soft/70 p-6 shadow-[0_24px_50px_-32px_rgba(135,102,40,0.55)] [backface-visibility:hidden] [transform:rotateY(180deg)]"
-            >
-              <span className="text-xs text-gold-ink">{card.front}</span>
-              <span className="text-base leading-relaxed text-foreground">{card.back}</span>
-            </span>
-          </motion.button>
-        </AnimatePresence>
-      </div>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={`${card.id}-${summary.reviewed}`}
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduceMotion ? undefined : { opacity: 0, y: -12 }}
+          transition={{ duration: 0.22 }}
+        >
+          <FlipCard
+            front={card.front}
+            back={card.back}
+            label={label}
+            flipped={flipped}
+            onFlip={() => setFlipped((f) => !f)}
+            onSwipe={(verdict) => void grade(verdict === "known" ? "good" : "again")}
+            disabled={grading}
+          />
+        </motion.div>
+      </AnimatePresence>
 
       <div className={cn("grid grid-cols-4 gap-2 transition-opacity", flipped ? "opacity-100" : "pointer-events-none opacity-40")}>
         {ANSWERS.map(({ answer, label: text, key, tone }) => (

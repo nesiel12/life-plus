@@ -139,3 +139,19 @@ export const practiceHistoryRepo = {
     return data ?? [];
   },
 };
+
+const sessionsBase = createUserScopedRepo("practice_sessions");
+
+/** Finished "קרב חברותא" sessions — history, from which bonus XP is derived. */
+export const practiceSessionsRepo = {
+  ...sessionsBase,
+
+  async history(userId: string): Promise<{ bonus_xp: number; max_combo: number; ended_at: string }[]> {
+    const { data, error } = await getSupabaseClient()
+      .from("practice_sessions")
+      .select("bonus_xp, max_combo, ended_at")
+      .eq("user_id", userId);
+    if (error) throw error;
+    return data ?? [];
+  },
+};

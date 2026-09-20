@@ -186,7 +186,12 @@ export function normalizeCaptions(segments: CaptionSegment[], durationSeconds?: 
   const inMilliseconds =
     durationSeconds && durationSeconds > 0
       ? maxOffset > durationSeconds * 1.5
-      : allIntegers && medianDuration >= 100;
+      : (allIntegers && medianDuration >= 100) ||
+        // No duration to settle it: a caption stamped beyond four hours, if
+        // read as seconds, would belong to a video longer than almost any that
+        // exist — it is milliseconds. (An 18-minute video's last caption is
+        // ~1,100,000 ms, well past this.)
+        maxOffset > 4 * 3600;
   const scale = inMilliseconds ? 1 / 1000 : 1;
 
   const lines: TranscriptLine[] = [];

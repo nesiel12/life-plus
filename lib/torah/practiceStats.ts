@@ -33,6 +33,12 @@ export interface PracticeStatsInput {
   reviews: StatsReview[];
   attempts: StatsAttempt[];
   completedChunks: number;
+  /**
+   * Finished "קרב חברותא" sessions. Their combo bonus is history too — the
+   * order of answers, which is what a combo is, is not in srs_reviews — so it
+   * is added here rather than stored as a running total.
+   */
+  sessions?: { bonusXp: number; maxCombo: number; endedAt: Date }[];
   now?: Date;
   /** The user's IANA zone, so "today" and the streak follow their calendar. */
   timeZone?: string;
@@ -54,6 +60,10 @@ export interface PracticeStats {
   reviewsToday: number;
   averageScore: number | null;
   completedChunks: number;
+  /** Combo bonus earned in battle sessions, part of `xp`. */
+  sessionBonusXp: number;
+  /** The best combo ever reached — a record to beat. */
+  bestCombo: number;
 }
 
 export const XP = {
@@ -118,7 +128,8 @@ export function computePracticeStats(input: PracticeStatsInput): PracticeStats {
     (sum, attempt) => sum + Math.max(XP.attemptMinimum, Math.round((attempt.score ?? 0) / 10)),
     0
   );
-  const xp = reviewXp + attemptXp + input.completedChunks * XP.chunkCompleted;
+  const sessionXp = (input.sessions ?? []).reduce((sum, s) => sum + Math.max(0, Math.round(s.bonusXp)), 0);
+  const xp = reviewXp + attemptXp + input.completedChunks * XP.chunkCompleted + sessionXp;
 
   const level = levelForXp(xp);
   const floor = xpForLevel(level);
@@ -151,6 +162,8 @@ export function computePracticeStats(input: PracticeStatsInput): PracticeStats {
     averageScore:
       scored.length === 0 ? null : Math.round(scored.reduce((sum, a) => sum + (a.score ?? 0), 0) / scored.length),
     completedChunks: input.completedChunks,
+    sessionBonusXp: sessionXp,
+    bestCombo: (input.sessions ?? []).reduce((best, s) => Math.max(best, s.maxCombo), 0),
   };
 }
 

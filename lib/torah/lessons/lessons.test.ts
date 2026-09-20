@@ -186,6 +186,17 @@ describe("normalizeCaptions", () => {
     expect(lines[0].start).toBe(50);
   });
 
+  it("reads a long video's millisecond offsets even when durations are short and no length is known", () => {
+    // Captured from a real 18-minute video: integer ms offsets, but caption
+    // durations in the tens, which the "median duration ≥ 100" rule alone misses.
+    const lines = normalizeCaptions([
+      { text: "התחלה.", offset: 4220, duration: 60 },
+      { text: "אמצע.", offset: 600_000, duration: 40 },
+      { text: "סוף.", offset: 1_105_100, duration: 54 },
+    ]);
+    expect(lines.map((l) => l.start)).toEqual([4, 600, 1105]);
+  });
+
   it("removes bracketed sound cues", () => {
     expect(normalizeCaptions([{ text: "[מוזיקה] שלום.", offset: 0, duration: 1 }], 10)[0].text).toBe("שלום.");
   });

@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { ProgressRing } from "@/components/ui/ProgressRing";
 import { ResourceLauncher } from "@/components/features/learning/ResourceLauncher";
 import { youtubeSearchUrl } from "@/lib/learning/youtube";
 import { useApiCall } from "@/hooks/useApiCall";
@@ -100,7 +101,10 @@ export function TopicCard({ topic, resources, expanded, onToggleExpanded, onStud
   }
 
   return (
-    <GlassCard delay={delay} className="p-4">
+    <GlassCard
+      delay={delay}
+      className="p-4 transition-shadow duration-300 hover:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent-learning)_12%,transparent),0_18px_40px_-24px_var(--accent-learning)]"
+    >
       {/* A div, not a button, as the clickable header — it contains its own
           nested interactive status chip (cycles status independently via
           stopPropagation), and a <button> element isn't allowed to contain
@@ -117,6 +121,18 @@ export function TopicCard({ topic, resources, expanded, onToggleExpanded, onStud
         }}
         className="focus-ring flex w-full cursor-pointer items-center justify-between gap-2 text-start"
       >
+        <ProgressRing
+          value={resources.length ? resources.filter((r) => r.isCompleted).length / resources.length : 0}
+          size={40}
+          stroke={4}
+          color="var(--accent-learning)"
+          label={`${resources.filter((r) => r.isCompleted).length} מתוך ${resources.length} משאבים הושלמו`}
+          className="me-1"
+        >
+          <span className="ltr text-[0.6rem] font-semibold tabular-nums text-foreground/80">
+            {resources.length ? Math.round((resources.filter((r) => r.isCompleted).length / resources.length) * 100) : 0}%
+          </span>
+        </ProgressRing>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-sm font-medium text-foreground">{topic.title}</span>

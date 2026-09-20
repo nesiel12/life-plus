@@ -10,6 +10,7 @@
 import { HDate, Locale, Sedra } from "@hebcal/core";
 import { clip } from "@/lib/torah/havruta";
 import type { HavrutaInsight } from "@/lib/torah/havruta";
+import type { PracticeQuestionKind } from "@/lib/torah/lessons/types";
 
 // ---------------------------------------------------------------------------
 // The week
@@ -153,7 +154,7 @@ export interface SheetQuestionInput {
   id: string;
   prompt: string;
   modelAnswer: string | null;
-  kind: "scenario" | "application" | "recall" | "compare";
+  kind: PracticeQuestionKind;
   lessonTitle?: string;
   createdAt: string;
 }
@@ -209,7 +210,8 @@ export const SHEET_LIMITS = {
   cards: 12,
 } as const;
 
-const QUESTION_KIND_ORDER = { scenario: 0, application: 1, compare: 2, recall: 3 } as const;
+// A dilemma to argue over at the table beats a recall prompt.
+const QUESTION_KIND_ORDER: Record<PracticeQuestionKind, number> = { dilemma: 0, counter: 1, scenario: 2, application: 3, compare: 4, recall: 5 };
 
 function inWeek(iso: string | null | undefined, week: SheetWeek): boolean {
   if (!iso) return false;

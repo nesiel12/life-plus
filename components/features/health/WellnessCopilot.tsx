@@ -27,7 +27,7 @@ const ACCENT: Record<WellnessKind, string> = {
 // suggestion can carry. No AI call: these render with the page, and the
 // decisions behind them ("no workout logged today", "it's 3pm") are facts
 // already on the client.
-export function WellnessCopilot() {
+export function WellnessCopilot({ exclude = [] }: { exclude?: WellnessKind[] } = {}) {
   const meals = useAtlasStore((s) => s.meals);
   const workouts = useAtlasStore((s) => s.workouts);
   const addManualEvent = useAtlasStore((s) => s.addManualEvent);
@@ -37,10 +37,15 @@ export function WellnessCopilot() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  const suggestions = useMemo(
-    () => buildWellnessSuggestions({ meals, workouts, now: new Date() }).filter((s) => !dismissed.has(s.id)),
-    [meals, workouts, dismissed]
-  );
+  // A string key, so a new array literal from the caller each render does not
+  // recompute the suggestions.
+  const excludeKey = exclude.join(",");
+  const suggestions = useMemo(() => {
+    const excluded = new Set(excludeKey.split(",").filter(Boolean));
+    return buildWellnessSuggestions({ meals, workouts, now: new Date() }).filter(
+      (s) => !dismissed.has(s.id) && !excluded.has(s.kind)
+    );
+  }, [meals, workouts, dismissed, excludeKey]);
 
   async function schedule(suggestion: WellnessSuggestion) {
     if (!suggestion.scheduleMinutes) return;

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import type { ReactNode } from "react";
 import { Sidebar, MobileTabBar } from "@/components/layout/Sidebar";
+import { AppWindow } from "@/components/layout/AppWindow";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { AICompanion } from "@/components/layout/AICompanion";
 import { QuickCapture } from "@/components/features/QuickCapture";
@@ -126,7 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <WelcomeSlides />
           <OnboardingFlow />
         </div>
-        <div className="min-w-0 flex-1 pb-20 sm:pb-0 print:pb-0">{children}</div>
+        <AppWindow className="min-w-0 flex-1 pb-20 sm:pb-0 print:pb-0">{children}</AppWindow>
       </div>
     );
   })();

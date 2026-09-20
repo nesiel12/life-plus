@@ -56,7 +56,12 @@ type UserScopedTableName =
   | "contradiction_scan_pairs"
   // מרחב תורה — universal audio + handwriting scanner (20260920000000).
   | "entity_audio"
-  | "handwriting_scans";
+  | "handwriting_scans"
+  // UX overhaul (20260921000000).
+  | "water_logs"
+  | "practice_sessions"
+  | "video_checkpoints"
+  | "learning_roadmaps";
 
 export function createUserScopedRepo<T extends UserScopedTableName>(table: T) {
   type Row = Database["public"]["Tables"][T]["Row"];
