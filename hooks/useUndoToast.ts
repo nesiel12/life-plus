@@ -11,12 +11,16 @@ export interface UndoToastState {
 }
 
 // How long each state stays up. "idle" is the window in which an undo is
-// possible at all, so it is generous; the result states only need to be read.
-const DISMISS_MS: Record<Exclude<UndoToastStatus, "undoing">, number> = {
-  idle: 8000,
+// possible at all, so it is generous by default; the result states only need
+// to be read. A caller with its own explicit safety window (the Voice
+// Companion's spec calls for exactly 5s on a batch of writes) can override
+// just that one via `idleMs` rather than this module growing a second
+// hook for the same "toast with an undo behind it" shape.
+const DISMISS_MS = (idleMs: number): Record<Exclude<UndoToastStatus, "undoing">, number> => ({
+  idle: idleMs,
   undone: 2500,
   failed: 5000,
-};
+});
 
 /**
  * One toast at a time, with a real undo behind it.
@@ -26,7 +30,7 @@ const DISMISS_MS: Record<Exclude<UndoToastStatus, "undoing">, number> = {
  * than a stack nobody can keep track of. The timer pauses while the toast is
  * hovered or focused, so a keyboard or slow-moving user is not raced.
  */
-export function useUndoToast() {
+export function useUndoToast(idleMs = 8000) {
   const [toast, setToast] = useState<UndoToastState | null>(null);
   const undoRef = useRef<(() => Promise<void>) | null>(null);
   const nextId = useRef(0);
@@ -59,9 +63,9 @@ export function useUndoToast() {
   const toastId = toast?.id;
   useEffect(() => {
     if (status === undefined || status === "undoing" || paused) return;
-    const timer = setTimeout(dismiss, DISMISS_MS[status]);
+    const timer = setTimeout(dismiss, DISMISS_MS(idleMs)[status]);
     return () => clearTimeout(timer);
-  }, [status, toastId, paused, dismiss]);
+  }, [status, toastId, paused, dismiss, idleMs]);
 
   return { toast, show, undo, dismiss, setPaused };
 }

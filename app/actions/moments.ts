@@ -21,3 +21,8 @@ export async function addMomentAction(input: {
   });
   return toMoment(row);
 }
+
+export async function deleteMomentAction(momentId: string) {
+  const userId = await getCurrentUserId();
+  await momentsRepo.remove(userId, momentId);
+}

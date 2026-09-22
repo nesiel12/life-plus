@@ -23,6 +23,7 @@ export const dictionaries = {
     "nav.settings": "הגדרות",
     "nav.signOut": "התנתק",
     "nav.notifications": "התראות",
+    "nav.voiceCompanion": "קומפניון קולי",
 
     "common.save": "שמור",
     "common.cancel": "ביטול",
@@ -82,6 +83,7 @@ export const dictionaries = {
     "nav.settings": "Settings",
     "nav.signOut": "Sign out",
     "nav.notifications": "Notifications",
+    "nav.voiceCompanion": "Voice companion",
 
     "common.save": "Save",
     "common.cancel": "Cancel",

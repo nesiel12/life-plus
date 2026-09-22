@@ -15,6 +15,7 @@ import {
   History,
   Home,
   LogOut,
+  Mic,
   Settings,
   ShieldCheck,
   Wallet,
@@ -27,7 +28,27 @@ import { AnimatedThemeToggler } from "@/components/magicui/animated-theme-toggle
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { APP_NAME } from "@/lib/constants";
 import { useT, type TranslationKey } from "@/lib/i18n/useT";
+import { requestVoiceCompanion } from "@/lib/voice/voiceCompanionEvent";
 import { cn } from "@/lib/utils";
+
+// The Voice Companion's global trigger (components/features/voice/
+// VoiceCompanionModal.tsx, mounted once in AppShell.tsx): a plain button
+// here, not a link, since it opens a modal rather than navigating — kept
+// next to NotificationCenter in both the desktop rail and MobileTabBar so
+// it's reachable from every screen size, the same reasoning that already
+// puts NotificationCenter in both places.
+function VoiceCompanionTrigger({ className }: { className?: string }) {
+  const t = useT();
+  return (
+    <button
+      onClick={requestVoiceCompanion}
+      aria-label={t("nav.voiceCompanion")}
+      className={cn("focus-ring nav-liquid-item glass-control-hover grid size-9 place-items-center rounded-full text-accent-faith transition-colors hover:text-accent-faith", className)}
+    >
+      <Mic size={17} aria-hidden />
+    </button>
+  );
+}
 
 interface NavItem {
   href: string;
@@ -173,6 +194,7 @@ export function Sidebar() {
       {session?.user && (
         <div className="mt-4 flex flex-col gap-2 border-t border-glass-border pt-4">
           <div className="flex items-center justify-center gap-1 lg:justify-start">
+            <VoiceCompanionTrigger />
             <NotificationCenter />
             <Link
               href="/settings"
@@ -268,10 +290,12 @@ export function MobileTabBar() {
         );
       })}
 
-      {/* The sidebar isn't rendered below `sm`, so without this the bell —
-          and with it every proactive notification the app produces — would be
-          unreachable on a phone, which is where they matter most. */}
-      <div className="flex items-center px-1.5">
+      {/* The sidebar isn't rendered below `sm`, so without these the mic and
+          the bell — and with it every proactive notification the app
+          produces — would be unreachable on a phone, which is where a
+          "speak instead of typing" gesture matters most. */}
+      <div className="flex items-center gap-0.5 px-1">
+        <VoiceCompanionTrigger className="size-8" />
         <NotificationCenter />
       </div>
     </nav>

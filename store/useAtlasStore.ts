@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { moveBy, nextOrder } from "@/lib/summaries/ordering";
 import { momentCategoryLabel } from "@/lib/lifeAreas";
-import { addMomentAction } from "@/app/actions/moments";
+import { addMomentAction, deleteMomentAction } from "@/app/actions/moments";
 import {
   addPersonAction,
   logPersonInteractionAction,
@@ -173,7 +173,8 @@ interface AtlasState extends HydratedState {
     title: string;
     content: string;
     personId?: string;
-  }) => Promise<void>;
+  }) => Promise<Moment>;
+  deleteMoment: (momentId: string) => Promise<void>;
   addPerson: (person: {
     name: string;
     hebrewName?: string;
@@ -422,6 +423,12 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   addMoment: async (moment) => {
     const created = await addMomentAction(moment);
     set((state) => ({ moments: [created, ...state.moments] }));
+    return created;
+  },
+
+  deleteMoment: async (momentId) => {
+    await deleteMomentAction(momentId);
+    set((state) => ({ moments: state.moments.filter((m) => m.id !== momentId) }));
   },
 
   addPerson: async (person) => {
