@@ -296,7 +296,9 @@ interface AtlasState extends HydratedState {
   updateManualEvent: (eventId: string, patch: Partial<ManualEvent>) => Promise<void>;
   deleteManualEvent: (eventId: string) => Promise<void>;
 
-  addLearningTopic: (topic: { title: string; category?: string }) => Promise<void>;
+  // Resolves with the created row, so a caller that goes on to add resources to
+  // it (a pasted video becoming a topic) needs no second lookup.
+  addLearningTopic: (topic: { title: string; category?: string }) => Promise<LearningTopic>;
   updateLearningTopic: (topicId: string, patch: Partial<LearningTopic>) => Promise<void>;
   deleteLearningTopic: (topicId: string) => Promise<void>;
 
@@ -306,7 +308,7 @@ interface AtlasState extends HydratedState {
     title: string;
     url?: string;
     notes?: string;
-  }) => Promise<void>;
+  }) => Promise<LearningResource>;
   updateLearningResource: (resourceId: string, patch: Partial<LearningResource>) => Promise<void>;
   deleteLearningResource: (resourceId: string) => Promise<void>;
   generateLearningPath: (topicId: string, topicTitle: string) => Promise<void>;
@@ -883,6 +885,7 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   addLearningTopic: async (topic) => {
     const created = await addLearningTopicAction(topic);
     set((state) => ({ learningTopics: [created, ...state.learningTopics] }));
+    return created;
   },
 
   // Optimistic with rollback (same shape as toggleHabitCompletion above).
@@ -917,6 +920,7 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   addLearningResource: async (resource) => {
     const created = await addLearningResourceAction(resource);
     set((state) => ({ learningResources: [...state.learningResources, created] }));
+    return created;
   },
 
   // Optimistic with rollback. This is the checklist tick: it must flip the

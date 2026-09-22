@@ -4,7 +4,20 @@
 // Cues rise in pitch as the combo grows, so a streak can be *heard* building.
 // Everything is short (<400ms), quiet, and off when the learner mutes it.
 
-export type CueEvent = "correct" | "shaky" | "miss" | "tier-up" | "finish";
+export type CueEvent =
+  | "correct"
+  | "shaky"
+  | "miss"
+  | "tier-up"
+  | "finish"
+  // The learning lab (components/features/learning): a confetti pop, a shuffle
+  // tick that climbs with `step`, a milestone chime, a level-up run, and the
+  // chord the shuffle lands on.
+  | "pop"
+  | "tick"
+  | "chime"
+  | "level-up"
+  | "spotlight";
 
 export interface Note {
   /** Hz */
@@ -44,10 +57,44 @@ export function cuePlan(event: CueEvent, streak = 0): Note[] {
       }));
     case "finish":
       return [0, 2, 4, 7].map((index, i) => ({ freq: LADDER[index], at: i * 0.09, duration: 0.3, gain: 0.07, type: "sine" as const }));
+    case "pop":
+      return [
+        { freq: LADDER[4], at: 0, duration: 0.06, gain: 0.07, type: "sine" },
+        { freq: LADDER[6], at: 0.04, duration: 0.09, gain: 0.06, type: "sine" },
+      ];
+    case "tick":
+      // `streak` is the roll's step here: each tick a little higher than the last.
+      return [{ freq: Math.min(1400, 700 + Math.max(0, streak) * 35), at: 0, duration: 0.035, gain: 0.05, type: "triangle" }];
+    case "chime":
+      return [
+        { freq: LADDER[5], at: 0, duration: 0.18, gain: 0.07, type: "sine" },
+        { freq: LADDER[7], at: 0.1, duration: 0.28, gain: 0.06, type: "sine" },
+      ];
+    case "level-up":
+      return [0, 2, 4, 5, 7].map((index, i) => ({ freq: LADDER[index], at: i * 0.07, duration: 0.22, gain: 0.075, type: "sine" as const }));
+    case "spotlight":
+      return [0, 2, 4].map((index) => ({ freq: LADDER[index], at: 0, duration: 0.35, gain: 0.05, type: "sine" as const }));
   }
 }
 
 let context: AudioContext | null = null;
+
+/**
+ * Creates (and resumes) the audio context inside a user gesture. Browsers keep a
+ * context suspended until one — and a shuffle's ticks fire from timers, long
+ * after the click that started it, so the click has to wake the context first.
+ */
+export function primeAudio(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+    context ??= new Ctor();
+    if (context.state === "suspended") void context.resume();
+  } catch {
+    // Audio is decoration.
+  }
+}
 
 /** Plays a cue. Silently does nothing where Web Audio is unavailable. */
 export function playCue(event: CueEvent, streak = 0): void {
@@ -78,17 +125,17 @@ export function playCue(event: CueEvent, streak = 0): void {
 
 const MUTE_KEY = "lifeplus.practice.muted";
 
-export function readMuted(): boolean {
+export function readMuted(key: string = MUTE_KEY): boolean {
   try {
-    return localStorage.getItem(MUTE_KEY) === "1";
+    return localStorage.getItem(key) === "1";
   } catch {
     return false;
   }
 }
 
-export function writeMuted(muted: boolean): void {
+export function writeMuted(muted: boolean, key: string = MUTE_KEY): void {
   try {
-    localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+    localStorage.setItem(key, muted ? "1" : "0");
   } catch {
     // ignore
   }
