@@ -88,6 +88,12 @@ export type StudyTrackStatusDb = "active" | "paused" | "completed" | "abandoned"
 export type HavrutaSubjectTypeDb = "summary" | "lesson" | "book" | "rabbi" | "concept" | "contradiction";
 export type HavrutaModeDb = "debate" | "clarify" | "contradiction";
 export type ContradictionSideTypeDb = "summary" | "lesson" | "concept";
+// Masterclass & Gaming OS (20260924000000) — mirrors types/learning.ts's
+// UserAgeGroup/TeachingMode exactly; kept as separate Db aliases the same
+// way every other enum-like column here is, rather than importing the
+// domain type into this file.
+export type UserAgeGroupDb = "KIDS_8_12" | "TEENS_13_18" | "ADULTS_19_PLUS";
+export type TeachingModeDb = "STORYTELLING" | "PRACTICAL" | "ANALOGIES" | "SOCRATIC";
 export type ContradictionStatusDb = "open" | "dismissed" | "resolved";
 // 20260920000000_torah_media_scans.sql
 export type AudioEntityTypeDb = "book" | "rabbi" | "lesson" | "concept" | "summary";
@@ -1189,6 +1195,21 @@ export interface Database {
           created_at: string;
         },
         "session_id" | "role" | "content"
+      >;
+      learning_lesson_contents: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          topic_id: string;
+          step_id: string;
+          user_age_group: UserAgeGroupDb;
+          teaching_mode: TeachingModeDb;
+          // lib/validations/learning.ts's LessonBlockContentSchema.
+          content: Json;
+          created_at: string;
+          updated_at: string;
+        },
+        "topic_id" | "step_id" | "user_age_group" | "teaching_mode" | "content"
       >;
       meals: TableDef<
         {
