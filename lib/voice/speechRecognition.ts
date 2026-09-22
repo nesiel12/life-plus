@@ -14,6 +14,8 @@
 // through to the text fallback the Assistant always offers, never a broken
 // control.
 
+import { startSilenceTimer } from "@/lib/voice/silenceTimer";
+
 export interface SpeechRecognitionLike {
   lang: string;
   interimResults: boolean;
@@ -66,15 +68,40 @@ export interface VoiceRecognizer {
   abort: () => void;
 }
 
+// How long to wait, after the last sign the person is still talking, before
+// treating the turn as over and force-finalizing it ourselves. Chrome's own
+// built-in pause detection before it fires `onend` runs several seconds
+// longer than this — noticeable, "is it broken?" dead air in a voice
+// conversation — so this timer, not the browser's, is what actually decides
+// when a turn ends. Two independent signals reset it, either is enough on
+// its own: a new recognition result (interim or final — see onresult below)
+// and, redundantly, the mic's own audio level (see startLevelWatch) for the
+// stretch where the recognizer has gone quiet but the person might still be
+// mid-word.
+const RESULT_SILENCE_MS = 700;
+const AUDIO_LEVEL_THRESHOLD = 0.06;
+const AUDIO_POLL_MS = 100;
+
 /**
  * Starts a continuous, interim-results Hebrew recognition session.
  * onUpdate fires on every partial result (live transcript) and again,
- * isFinal: true, each time a pause finalizes a chunk; onEnd fires when the
- * browser stops listening (silence timeout, stop(), or an error) — never
- * thrown from here, since a dropped connection or denied permission is
- * routine, not exceptional, for a microphone.
+ * isFinal: true, each time a pause finalizes a chunk; onEnd fires exactly
+ * once per session — whether the browser ended it natively (silence
+ * timeout, an error) or this module force-finalized it early — never thrown
+ * from here, since a dropped connection or denied permission is routine,
+ * not exceptional, for a microphone.
+ *
+ * onEnd firing more than once for a single session was a real, live bug:
+ * Chrome routinely fires BOTH `onerror` and `onend` for one terminated
+ * session (an error ends the session, and ending the session fires `onend`
+ * too), and both were wired to the same callback — so a caller that reacts
+ * to "recognition ended" by finalizing and submitting the transcript did
+ * that twice for one utterance. Guarded here, at the source, with a
+ * fire-once latch (`ended`), rather than only downstream — every caller
+ * gets the fix for free instead of each needing its own guard against a
+ * platform quirk that has nothing to do with what they're building.
  */
-export function startVoiceRecognition(onUpdate: (update: TranscriptUpdate) => void, onEnd: (reason: "stopped" | "error") => void): VoiceRecognizer | null {
+export function startVoiceRecognition(onUpdate: (update: TranscriptUpdate) => void, onEnd: (reason: "stopped" | "error" | "silence") => void): VoiceRecognizer | null {
   const Recognition = getRecognitionConstructor();
   if (!Recognition) return null;
 
@@ -85,6 +112,42 @@ export function startVoiceRecognition(onUpdate: (update: TranscriptUpdate) => vo
   recognition.maxAlternatives = 1;
 
   let finalTranscript = "";
+  let ended = false;
+  // Created lazily, on the first sign the person has actually started
+  // talking (the first recognition result, or the first above-threshold mic
+  // level) — not armed at construction. Arming it immediately would mean
+  // "pressed the mic but took a beat before the first word" gets treated as
+  // silence and cut off before anything was even said; before that first
+  // sign of speech, this module leaves the browser's own (much longer,
+  // undisturbed) no-speech handling in charge, same as before this change.
+  // From the first sign onward, either signal — a fresh result, or the mic
+  // level staying above the noise floor — pings it and pushes the deadline
+  // back out.
+  let silence: ReturnType<typeof startSilenceTimer> | null = null;
+  let levelWatch: { stop: () => void } | null = null;
+
+  function pingSilenceTimer() {
+    if (!silence) {
+      silence = startSilenceTimer(RESULT_SILENCE_MS, () => {
+        try {
+          recognition.stop();
+        } catch {
+          // Already stopped/stopping — finish() below is what actually matters.
+        }
+      });
+    } else {
+      silence.ping();
+    }
+  }
+
+  function finish(reason: "stopped" | "error" | "silence") {
+    if (ended) return;
+    ended = true;
+    silence?.cancel();
+    levelWatch?.stop();
+    levelWatch = null;
+    onEnd(reason);
+  }
 
   recognition.onresult = (event) => {
     let interim = "";
@@ -94,15 +157,33 @@ export function startVoiceRecognition(onUpdate: (update: TranscriptUpdate) => vo
       else interim += result[0].transcript;
     }
     onUpdate({ transcript: (finalTranscript + interim).trim(), isFinal: interim.length === 0 && finalTranscript.length > 0 });
+    pingSilenceTimer();
   };
-  recognition.onerror = () => onEnd("error");
-  recognition.onend = () => onEnd("stopped");
+  recognition.onerror = () => finish("error");
+  recognition.onend = () => finish("stopped");
 
   try {
     recognition.start();
   } catch {
     return null;
   }
+
+  // Redundant, audio-level backed silence detection: covers the stretch
+  // where the recognizer hasn't produced a result in a while (mid-word, or
+  // just a slower cadence) but the mic level says the person stopped
+  // talking anyway. A second, independent stream from the one
+  // AudioWaveVisualizer.tsx opens for its own display — browsers allow more
+  // than one concurrent consumer of the same device, and keeping this
+  // module self-contained (it can run with no visualizer mounted at all)
+  // is worth the one extra stream. Best-effort: if the mic can't be opened
+  // a second time for any reason, recognition still works via the
+  // result-based timer above alone.
+  void startLevelWatch(() => pingSilenceTimer())
+    .then((watch) => {
+      if (ended) watch?.stop();
+      else levelWatch = watch;
+    })
+    .catch(() => undefined);
 
   return {
     start: () => recognition.start(),
@@ -111,7 +192,36 @@ export function startVoiceRecognition(onUpdate: (update: TranscriptUpdate) => vo
   };
 }
 
-// --- Mic-level analyser, for AudioWaveVisualizer.tsx ------------------------
+/**
+ * Polls the mic level and calls `onSpeechLike` whenever it's above the noise
+ * floor. There's no separate "below threshold" branch: staying quiet isn't
+ * itself an action, it's the ABSENCE of one — the caller's own silence timer
+ * (armSilenceTimer) already elapses on its own once nothing resets it, from
+ * either this or a fresh recognition result, whichever last happened.
+ * Returns null if the mic can't be opened.
+ */
+async function startLevelWatch(onSpeechLike: () => void): Promise<{ stop: () => void } | null> {
+  let analyser: MicAnalyser;
+  try {
+    analyser = await createMicAnalyser();
+  } catch {
+    return null;
+  }
+
+  const interval = setInterval(() => {
+    const levels = analyser.getLevels(8);
+    if (Math.max(...levels) >= AUDIO_LEVEL_THRESHOLD) onSpeechLike();
+  }, AUDIO_POLL_MS);
+
+  return {
+    stop() {
+      clearInterval(interval);
+      analyser.stop();
+    },
+  };
+}
+
+// --- Mic-level analyser, for AudioWaveVisualizer.tsx and the VAD above ------
 
 export interface MicAnalyser {
   getLevels: (bucketCount: number) => number[];

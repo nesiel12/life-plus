@@ -9,6 +9,7 @@ import { requestCompanionSos } from "@/lib/companion/sosEvent";
 import { playCue, primeAudio } from "@/lib/sound/cues";
 import { speechRecognitionSupported, startVoiceRecognition, type VoiceRecognizer } from "@/lib/voice/speechRecognition";
 import { createSpeechQueue, extractSentences, speechSynthesisSupported, type SpeechQueue } from "@/lib/voice/textToSpeech";
+import { isDuplicateSubmission, type LastSubmission } from "@/lib/voice/submissionDedup";
 import { executeVoiceAction, type ExecutedVoiceAction, type VoiceAssistantActions } from "@/lib/voice/voiceExecutor";
 import { appendVoiceMessageAction, createVoiceSessionAction } from "@/app/actions/voiceHistory";
 import type { VoiceRoutedAction, VoiceUnresolvedItem } from "@/lib/voice/multiIntentParser";
@@ -23,6 +24,11 @@ const VOICE_UNDO_MS = 5000;
 // How many recent turns ride along as conversational context — enough for
 // the reply to track the thread without ballooning every request.
 const HISTORY_TURNS = 10;
+// How long an identical transcript stays rejected as a likely duplicate —
+// long enough to absorb a stray double-fire, short enough that genuinely
+// saying the same short phrase again a few seconds later ("כן", "תודה")
+// still goes through.
+const DUPLICATE_SUBMIT_WINDOW_MS = 4000;
 
 // No separate "unavailable" message here: app/api/voice/chat/route.ts
 // returns a friendly Hebrew sentence as the streamed reply body itself when
@@ -82,6 +88,24 @@ export function useVoiceAssistant(onSos?: () => void) {
   const messagesRef = useRef<VoiceTurn[]>([]);
   const nextKey = useRef(0);
   const undoToast = useUndoToast(VOICE_UNDO_MS);
+
+  // The live transcript, mirrored into a ref alongside the state — read
+  // synchronously by the recognizer's onEnd handler (see startListeningInternal)
+  // instead of the setTranscript-updater-function trick the previous version
+  // used, which ran converse() (a real side effect: network requests, a
+  // store write) *inside* a state updater. React does not guarantee an
+  // updater runs exactly once, and a duplicate run there was one of the
+  // mechanisms behind the double-submission bug.
+  const transcriptRef = useRef("");
+  // Idempotency guards against the double-submission bug's other mechanism:
+  // lib/voice/speechRecognition.ts's onEnd firing twice for one browser
+  // session (Chrome routinely fires both onerror and onend for the same
+  // terminated session) — fixed at the source there, but these stay as a
+  // second, independent layer against any other path that could call
+  // converse() twice for the same utterance (a rapid double-click before a
+  // disabled state re-renders, hands-free auto-restart racing a manual tap).
+  const isSubmittingRef = useRef(false);
+  const lastSubmissionRef = useRef<LastSubmission | null>(null);
 
   const people = useAtlasStore((s) => s.people);
   const addTask = useAtlasStore((s) => s.addTask);
@@ -196,78 +220,118 @@ export function useVoiceAssistant(onSos?: () => void) {
    * doc comment): checked on-device, before either request goes out.
    */
   const converse = useCallback(
-    async (text: string) => {
-      if (isSosMessage(text)) {
-        reset();
-        onSos?.();
-        requestCompanionSos();
+    async (rawText: string) => {
+      const text = rawText.trim();
+      if (!text) {
+        setPhase("idle");
         return;
       }
 
-      addMessage("user", text);
-      setPhase("thinking");
-      setError(null);
+      // Idempotency guards against the double-submission bug: a submission
+      // already being processed, or the exact same text submitted again
+      // within the last few seconds. The mechanism that actually produced
+      // duplicates — SpeechRecognition's onEnd firing twice for one browser
+      // session — is fixed at its source (lib/voice/speechRecognition.ts),
+      // but nothing guarantees that's the only way two calls to converse()
+      // could ever race for the same utterance (a rapid double-tap before a
+      // disabled state re-renders, hands-free auto-restart racing a manual
+      // one), so this stays as a second, independent layer.
+      const now = Date.now();
+      if (
+        isDuplicateSubmission({ text, isSubmitting: isSubmittingRef.current, lastSubmission: lastSubmissionRef.current, now, windowMs: DUPLICATE_SUBMIT_WINDOW_MS })
+      ) {
+        return;
+      }
 
-      void extractActionsInBackground(text);
-
-      // Persistence rides alongside, never awaited before the reply below —
-      // a slow or failed write must not delay or break the spoken answer.
-      const sessionPromise = ensureSession().then((sessionId) => {
-        void appendVoiceMessageAction(sessionId, "user", text).catch(() => undefined);
-        return sessionId;
-      });
-
-      let queueDrained = false;
-      let streamDone = false;
-      const finishIfBothDone = () => {
-        if (queueDrained && streamDone) {
-          reset();
-          if (handsFree && micSupported) startListeningInternal();
-        }
-      };
-      const queue = speak(() => {
-        queueDrained = true;
-        finishIfBothDone();
-      });
+      isSubmittingRef.current = true;
+      lastSubmissionRef.current = { text, at: now };
+      // Cleared immediately, before anything async: if a duplicate finalize
+      // event still reaches startListeningInternal's onEnd handler after
+      // this point, it reads an empty transcriptRef and has nothing left to
+      // resubmit.
+      transcriptRef.current = "";
+      setTranscript("");
 
       try {
-        const historyForApi = messagesRef.current
-          .slice(-HISTORY_TURNS - 1, -1)
-          .map((m) => ({ role: m.role, content: m.content }));
-
-        const res = await fetch("/api/voice/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, history: historyForApi }),
-        });
-        if (!res.ok || !res.body) throw new Error("request failed");
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let full = "";
-        let buffer = "";
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          full += chunk;
-          buffer += chunk;
-          const { complete, remainder } = extractSentences(buffer);
-          for (const sentence of complete) queue.enqueue(sentence);
-          buffer = remainder;
+        if (isSosMessage(text)) {
+          reset();
+          onSos?.();
+          requestCompanionSos();
+          return;
         }
-        if (buffer.trim()) queue.enqueue(buffer);
 
-        const replyText = full.trim() || FRIENDLY_ERROR;
-        addMessage("assistant", replyText);
-        const sessionId = await sessionPromise;
-        void appendVoiceMessageAction(sessionId, "assistant", replyText).catch(() => undefined);
-      } catch {
-        setError(FRIENDLY_ERROR);
-        queue.enqueue(FRIENDLY_ERROR);
+        addMessage("user", text);
+        setPhase("thinking");
+        setError(null);
+
+        void extractActionsInBackground(text);
+
+        // Persistence rides alongside, never awaited before the reply below
+        // — a slow or failed write must not delay or break the spoken answer.
+        const sessionPromise = ensureSession().then((sessionId) => {
+          void appendVoiceMessageAction(sessionId, "user", text).catch(() => undefined);
+          return sessionId;
+        });
+
+        let queueDrained = false;
+        let streamDone = false;
+        const finishIfBothDone = () => {
+          if (queueDrained && streamDone) {
+            reset();
+            if (handsFree && micSupported) startListeningInternal();
+          }
+        };
+        const queue = speak(() => {
+          queueDrained = true;
+          finishIfBothDone();
+        });
+
+        try {
+          const historyForApi = messagesRef.current
+            .slice(-HISTORY_TURNS - 1, -1)
+            .map((m) => ({ role: m.role, content: m.content }));
+
+          const res = await fetch("/api/voice/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text, history: historyForApi }),
+          });
+          if (!res.ok || !res.body) throw new Error("request failed");
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let full = "";
+          let buffer = "";
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            full += chunk;
+            buffer += chunk;
+            const { complete, remainder } = extractSentences(buffer);
+            for (const sentence of complete) queue.enqueue(sentence);
+            buffer = remainder;
+          }
+          if (buffer.trim()) queue.enqueue(buffer);
+
+          const replyText = full.trim() || FRIENDLY_ERROR;
+          addMessage("assistant", replyText);
+          const sessionId = await sessionPromise;
+          void appendVoiceMessageAction(sessionId, "assistant", replyText).catch(() => undefined);
+        } catch {
+          setError(FRIENDLY_ERROR);
+          queue.enqueue(FRIENDLY_ERROR);
+        } finally {
+          streamDone = true;
+          finishIfBothDone();
+        }
       } finally {
-        streamDone = true;
-        finishIfBothDone();
+        // Freed once the request itself is done being processed, not once
+        // the reply finishes being spoken — barge-in (a fresh
+        // startListeningInternal call cancels the speech queue) is allowed
+        // to interrupt a reply that's still playing, and shouldn't be held
+        // hostage by this lock.
+        isSubmittingRef.current = false;
       }
     },
     // startListeningInternal is deliberately not in this array: it depends
@@ -284,22 +348,38 @@ export function useVoiceAssistant(onSos?: () => void) {
   // always recreated together, in the same render, and converse()'s closure
   // never sees a startListeningInternal from an older render.
   const startListeningInternal = useCallback(() => {
+    // Already listening, or a submission is already being processed:
+    // starting a second recognition session here is exactly how the mic/
+    // send button could trigger a second submission underneath the first
+    // (requirement: a click while already processing must be a no-op, not
+    // a race).
+    if (recognizerRef.current || isSubmittingRef.current) return;
+
     speechQueueRef.current?.cancel();
     primeAudio();
     playCue("pop");
+    transcriptRef.current = "";
     setTranscript("");
     setError(null);
     setPhase("listening");
 
     const recognizer = startVoiceRecognition(
-      (update) => setTranscript(update.transcript),
+      (update) => {
+        transcriptRef.current = update.transcript;
+        setTranscript(update.transcript);
+      },
       () => {
         recognizerRef.current = null;
-        setTranscript((current) => {
-          if (current.trim()) void converse(current);
-          else setPhase("idle");
-          return current;
-        });
+        // A plain, synchronous ref read — not the setTranscript-updater-
+        // function trick the previous version used, which ran converse()
+        // (a real side effect) *inside* a state updater. React does not
+        // guarantee an updater runs exactly once, and a duplicate run
+        // there was one of the mechanisms behind the double-submission bug
+        // (the other was in lib/voice/speechRecognition.ts — see its own
+        // comment).
+        const finalText = transcriptRef.current;
+        if (finalText.trim()) void converse(finalText);
+        else setPhase("idle");
       }
     );
 
