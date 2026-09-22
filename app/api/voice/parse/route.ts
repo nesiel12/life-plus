@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   // the dashboard's UniversalInputBar): a distress message is caught before
   // the rate limiter, the database, the AI actor or a model ever see it, and
   // produces no log line. The client already checks this before the request
-  // is even sent (hooks/useVoiceCompanion.ts) — this is the backstop.
+  // is even sent (hooks/useVoiceAssistant.ts) — this is the backstop.
   if (isSosMessage(text)) {
     return NextResponse.json({ mode: "sos" as const });
   }

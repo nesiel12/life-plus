@@ -1,9 +1,9 @@
-// Web Speech API wrapper for the Voice Companion, plus a mic analyser for
+// Web Speech API wrapper for עוזר קולי, plus a mic analyser for
 // AudioWaveVisualizer.tsx. A separate module from hooks/useVoiceInput.ts
 // (used by the AI Command Panel's mic button) rather than an extension of
 // it: that hook is deliberately minimal — final results only, appended to an
 // existing text field, never auto-sent — because it augments a text input
-// that already has its own submit step. The Companion IS the input: it needs
+// that already has its own submit step. The Assistant IS the input: it needs
 // interim (in-progress) results to show live "…as I speak" transcription,
 // and a raw mic stream to drive the wave visualizer, neither of which the
 // simpler hook has any reason to grow.
@@ -11,7 +11,7 @@
 // Progressive enhancement only: SpeechRecognition is Chrome/Edge-only today,
 // so supported() gates whether the mic path renders at all — everywhere the
 // mic isn't available (Firefox/Safari, no permission, no device) falls
-// through to the text fallback the Companion always offers, never a broken
+// through to the text fallback the Assistant always offers, never a broken
 // control.
 
 export interface SpeechRecognitionLike {
@@ -48,7 +48,7 @@ function getRecognitionConstructor(): SpeechRecognitionConstructor | null {
   return SpeechRecognition ?? webkitSpeechRecognition ?? null;
 }
 
-/** Whether the browser can attempt live speech recognition at all — gates whether the Companion's mic button renders as active or as a straight-to-text-fallback control. */
+/** Whether the browser can attempt live speech recognition at all — gates whether the Assistant's mic button renders as active or as a straight-to-text-fallback control. */
 export function speechRecognitionSupported(): boolean {
   return getRecognitionConstructor() !== null;
 }

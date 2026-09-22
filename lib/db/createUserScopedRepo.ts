@@ -65,7 +65,10 @@ type UserScopedTableName =
   // Learning OS (20260922000000).
   | "learning_books"
   | "learning_quotes"
-  | "learning_quiz_attempts";
+  | "learning_quiz_attempts"
+  // עוזר קולי — voice history (20260923000000).
+  | "voice_sessions"
+  | "voice_messages";
 
 export function createUserScopedRepo<T extends UserScopedTableName>(table: T) {
   type Row = Database["public"]["Tables"][T]["Row"];

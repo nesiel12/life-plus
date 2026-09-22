@@ -1169,6 +1169,27 @@ export interface Database {
           questions?: unknown;
         }
       >;
+      voice_sessions: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          title: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        never
+      >;
+      voice_messages: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          session_id: string;
+          role: "user" | "assistant";
+          content: string;
+          created_at: string;
+        },
+        "session_id" | "role" | "content"
+      >;
       meals: TableDef<
         {
           id: string;

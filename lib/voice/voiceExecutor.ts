@@ -1,14 +1,14 @@
 import { describeVoiceAction, type VoiceRoutedAction } from "@/lib/voice/multiIntentParser";
 
 // Turns one routed action into a real write and the means of undoing it —
-// the Voice Companion's analogue of lib/ai/quickLog.ts's executeAutoAction,
+// the עוזר קולי's analogue of lib/ai/quickLog.ts's executeAutoAction,
 // pulled into its own module for the same reason: every "how do we take this
 // back" decision lives here, injected rather than importing the store
 // directly, so it is unit-testable with plain fakes and hooks/
-// useVoiceCompanion.ts (the only real caller) supplies the actual store
+// useVoiceAssistant.ts (the only real caller) supplies the actual store
 // actions.
 
-export interface VoiceCompanionActions {
+export interface VoiceAssistantActions {
   addTask(input: { title: string; dueDate?: string; isHighPriority?: boolean }): Promise<{ id: string }>;
   deleteTask(id: string): Promise<void>;
   addTransaction(input: { amount: number; type: "expense"; title: string; category: string }): Promise<{ id: string }>;
@@ -35,7 +35,7 @@ export interface ExecutedVoiceAction {
  * resource left, so there is no write and correspondingly no undo — rather
  * than writing something fabricated just to have an id to remove.
  */
-export async function executeVoiceAction(action: VoiceRoutedAction, actions: VoiceCompanionActions): Promise<ExecutedVoiceAction | null> {
+export async function executeVoiceAction(action: VoiceRoutedAction, actions: VoiceAssistantActions): Promise<ExecutedVoiceAction | null> {
   const summary = describeVoiceAction(action);
 
   switch (action.intent) {

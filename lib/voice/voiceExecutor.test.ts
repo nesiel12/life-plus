@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { executeVoiceAction, type VoiceCompanionActions } from "@/lib/voice/voiceExecutor";
+import { executeVoiceAction, type VoiceAssistantActions } from "@/lib/voice/voiceExecutor";
 import type { VoiceRoutedAction } from "@/lib/voice/multiIntentParser";
 
-function fakeActions(overrides: Partial<VoiceCompanionActions> = {}): { [K in keyof VoiceCompanionActions]: VoiceCompanionActions[K] & ReturnType<typeof vi.fn> } {
+function fakeActions(overrides: Partial<VoiceAssistantActions> = {}): { [K in keyof VoiceAssistantActions]: VoiceAssistantActions[K] & ReturnType<typeof vi.fn> } {
   return {
     addTask: vi.fn().mockResolvedValue({ id: "task-1" }),
     deleteTask: vi.fn().mockResolvedValue(undefined),

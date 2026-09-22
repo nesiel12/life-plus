@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { EXPENSE_KEYS, categoryLabelFor, type ExpenseCategoryKey } from "@/lib/finances/categories";
 
-// The Voice Companion's vocabulary — deliberately separate from
-// lib/ai/fabIntents.ts rather than an extension of it. The FAB classifies one
-// short line into ONE of a handful of intents; the Companion decomposes one
-// stream-of-consciousness utterance into SEVERAL simultaneous intents across
+// עוזר קולי's vocabulary — deliberately separate from lib/ai/fabIntents.ts
+// rather than an extension of it. The FAB classifies one short line into ONE
+// of a handful of intents; the Assistant decomposes one stream-of-
+// consciousness utterance into SEVERAL simultaneous intents across
 // modules ("למדתי פרק, הוצאתי 50 שקל, ותזכיר לי..."). Sharing a single
 // {intent, payload} shape between "exactly one" and "zero or more, in
 // parallel" would force one of the two call sites to bend around the other's
@@ -13,7 +13,7 @@ import { EXPENSE_KEYS, categoryLabelFor, type ExpenseCategoryKey } from "@/lib/f
 // category vocabulary and the quota/actor/rate-limit plumbing — is imported,
 // not re-typed. lib/ai/fabRouter.ts is "server-only", so its normalizeDueAt
 // is NOT imported here even though the logic is near-identical: this module
-// must stay importable from the client (hooks/useVoiceCompanion.ts needs the
+// must stay importable from the client (hooks/useVoiceAssistant.ts needs the
 // same result types and describeVoiceAction() to render the breakdown before
 // anything is written), and "server-only" poisons every module that imports
 // it, client or not.

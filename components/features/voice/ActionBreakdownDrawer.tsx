@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AlertCircle, Banknote, BookOpen, CalendarClock, HeartHandshake, Loader2, Sparkles, StickyNote, X } from "lucide-react";
 import { VOICE_MODULE_META, type VoiceIntentType, type VoiceUnresolvedItem } from "@/lib/voice/multiIntentParser";
-import type { VoiceCompanionAction } from "@/hooks/useVoiceCompanion";
+import type { VoiceAssistantAction } from "@/hooks/useVoiceAssistant";
 import { cn } from "@/lib/utils";
 
 const INTENT_ICON: Record<VoiceIntentType, typeof Sparkles> = {
@@ -16,7 +16,7 @@ const INTENT_ICON: Record<VoiceIntentType, typeof Sparkles> = {
 };
 
 interface ActionBreakdownDrawerProps {
-  actions: VoiceCompanionAction[];
+  actions: VoiceAssistantAction[];
   unresolved: VoiceUnresolvedItem[];
   committing: boolean;
   onRemove: (key: string) => void;
@@ -24,12 +24,19 @@ interface ActionBreakdownDrawerProps {
 }
 
 /**
- * The reviewable breakdown of what the model heard: one color-coded Bento
- * chip per recognized action (green finance, blue learning, the app's own
- * per-life-area accent tokens — see VOICE_MODULE_META), each removable
- * before anything is written, plus a single "בצע הכל" that commits the
- * whole surviving list at once. Nothing here writes on its own — that's
+ * The reviewable breakdown of what was heard: one color-coded Bento chip per
+ * recognized action (green finance, blue learning, the app's own per-life-
+ * area accent tokens — see VOICE_MODULE_META), each removable before
+ * anything is written, plus a single "בצע הכל" that commits the whole
+ * surviving list at once. Nothing here writes on its own — that's
  * executeAll, called only from the button below.
+ *
+ * Populated by a background extraction call that runs independently of the
+ * conversation (hooks/useVoiceAssistant.ts's extractActionsInBackground) —
+ * this can appear, and grow, while the assistant is still mid-reply or
+ * already listening again. It never blocks or gates the conversation; the
+ * caller (VoiceAssistantModal) renders it alongside the call interface, not
+ * instead of it.
  */
 export function ActionBreakdownDrawer({ actions, unresolved, committing, onRemove, onExecuteAll }: ActionBreakdownDrawerProps) {
   const reduce = Boolean(useReducedMotion());
