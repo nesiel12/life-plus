@@ -2,54 +2,79 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
-import { ArrowUp, LayoutGrid, List, Network, Volume2, VolumeX, type LucideIcon } from "lucide-react";
+import {
+  BookOpen,
+  Brain,
+  Lightbulb,
+  Map as MapIcon,
+  Sparkles,
+  Volume2,
+  VolumeX,
+  type LucideIcon,
+} from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { useInsights } from "@/hooks/useInsights";
 import { useLearningAudio } from "@/hooks/useLearningAudio";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { NumberTicker } from "@/components/magicui/number-ticker";
-import { CuriosityRadar } from "@/components/features/learning/CuriosityRadar";
-import { KnowledgeGraph } from "@/components/features/learning/KnowledgeGraph";
+import { TopicsMapTab } from "@/components/features/learning/TopicsMapTab";
+import { DiscoveryTab } from "@/components/features/learning/DiscoveryTab";
+import { LibraryTab } from "@/components/features/learning/LibraryTab";
+import { MasteryTab } from "@/components/features/learning/MasteryTab";
+import { FeynmanTab } from "@/components/features/learning/FeynmanTab";
 import { TopicCanvasModal } from "@/components/features/learning/TopicCanvasModal";
-import { TopicGrid, TopicList } from "@/components/features/learning/TopicGrid";
-import { VideoStudyPanel } from "@/components/features/learning/VideoStudyPanel";
 import { fireCelebration } from "@/components/features/learning/lab/fx";
 import { XpPops, type XpPop } from "@/components/features/learning/lab/FloatingXp";
+import { Portal } from "@/components/features/learning/lab/Portal";
 import { LabContext, type LabApi, type Point } from "@/components/features/learning/lab/LabContext";
 import { StreakFlame } from "@/components/features/learning/lab/StreakFlame";
 import { useLabReducedMotion } from "@/components/features/learning/lab/useLabMotion";
-import { buildRoll, pickSurpriseTopic } from "@/lib/learning/surprise";
-import { filterTopics } from "@/lib/learning/topicSearch";
 import { labStats, type Celebration } from "@/lib/learning/xp";
 import type { LearningInsights } from "@/lib/learning/types";
 import { cn } from "@/lib/utils";
 
-type View = "grid" | "graph" | "list";
+export type LabTab = "map" | "discovery" | "library" | "mastery" | "feynman";
 
-const VIEWS: { key: View; label: string; icon: LucideIcon }[] = [
-  { key: "grid", label: "רשת", icon: LayoutGrid },
-  { key: "graph", label: "מפת ידע", icon: Network },
-  { key: "list", label: "רשימה", icon: List },
+const TABS: { key: LabTab; label: string; icon: LucideIcon }[] = [
+  { key: "map", label: "מפת ידע ונושאים", icon: MapIcon },
+  { key: "discovery", label: "הצעות למידה", icon: Sparkles },
+  { key: "library", label: "ספרייה וספרים", icon: BookOpen },
+  { key: "mastery", label: "מבחנים ושליטה", icon: Brain },
+  { key: "feynman", label: "מעבדת פיינמן", icon: Lightbulb },
 ];
 
-const VIEW_KEY = "lifeplus.learning.view";
+const TAB_KEY = "lifeplus.learning.tab";
 const FALLBACK_INSIGHTS: LearningInsights = { streakDays: 0, topicFocus: null, cadencePerWeek: null, nextReview: null, entries: [] };
-/** How long the shuffle's chosen topic stays in the spotlight before it opens. */
-const SPOTLIGHT_MS = 1700;
 const POP_LIFETIME_MS = 1700;
+
+function readInitialTab(): LabTab {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    // A deep link always wins: someone followed a QR code or a link to a
+    // specific topic, they did not ask to browse the tab they last left open.
+    if (params.get("open")) return "map";
+    const saved = localStorage.getItem(TAB_KEY);
+    if (TABS.some((t) => t.key === saved)) return saved as LabTab;
+  } catch {
+    // The default tab is fine.
+  }
+  return "map";
+}
 
 /**
  * מעבדת ידע — the learning space, as one place to explore.
  *
- * It owns the state the parts share (what is searched, which view, which topic is
- * open, what the shuffle is on) and the celebration layer (sound, confetti and
- * the floating "+N XP"), which the parts trigger through LabContext. The three
- * views — grid, map, list — are the same topics in different shapes, tied
- * together by shared layout ids so switching glides rather than cuts.
+ * It owns the state every tab shares (XP/level/streak, the celebration layer,
+ * which topic canvas is open) through LabContext, and the top-level tab bar
+ * that switches between the five specialised spaces. Each tab owns only its
+ * own content; none of them re-derives XP, re-plays a sound, or re-implements
+ * the topic canvas.
  *
- * Everything here is derived from the topics and resources already in the store:
- * XP and level are computed, the streak comes from the existing insights route,
- * and nothing new is stored.
+ * Everything here is derived from data already in the store or fetched on
+ * demand: XP and level are computed, the streak comes from the existing
+ * insights route, and nothing new about the *lab itself* is stored — only the
+ * new entities each tab introduces (books, quotes, quiz history, flashcards)
+ * are real, persisted rows (see lib/db/learningBooks.ts and friends).
  */
 export function LearningHub() {
   const topics = useAtlasStore((s) => s.learningTopics);
@@ -59,41 +84,38 @@ export function LearningHub() {
   const { data: insights } = useInsights<LearningInsights>("/api/torah/insights", FALLBACK_INSIGHTS);
   const streak = insights?.streakDays ?? 0;
 
-  const [query, setQuery] = useState("");
-  const [view, setView] = useState<View>("grid");
+  const [tab, setTab] = useState<LabTab>("map");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [litId, setLitId] = useState<string | null>(null);
-  const [rolling, setRolling] = useState(false);
   const [pops, setPops] = useState<XpPop[]>([]);
-  const [showFreeVideo, setShowFreeVideo] = useState(false);
   const popId = useRef(0);
   const timers = useRef<number[]>([]);
 
   const stats = useMemo(() => labStats(topics, resources), [topics, resources]);
-  const visible = useMemo(() => filterTopics(topics, resources, query), [topics, resources, query]);
 
   const schedule = useCallback((fn: () => void, ms: number) => {
     timers.current.push(window.setTimeout(fn, ms));
   }, []);
 
-  // The saved view is read after mount (localStorage is browser-only) and kept.
+  // The saved tab (or a deep link's ?open=<topicId>) is read after mount —
+  // both need the browser (localStorage, location.search).
   useEffect(() => {
+    setTab(readInitialTab());
     try {
-      const saved = localStorage.getItem(VIEW_KEY);
-      if (saved === "grid" || saved === "graph" || saved === "list") setView(saved);
+      const openParam = new URLSearchParams(window.location.search).get("open");
+      if (openParam) setOpenId(openParam);
     } catch {
-      // The default view is fine.
+      // No deep link to honour.
     }
     const pending = timers.current;
     return () => pending.forEach((id) => window.clearTimeout(id));
   }, []);
 
-  function changeView(next: View) {
-    setView(next);
+  function changeTab(next: LabTab) {
+    setTab(next);
     try {
-      localStorage.setItem(VIEW_KEY, next);
+      localStorage.setItem(TAB_KEY, next);
     } catch {
-      // Not remembering the view is harmless.
+      // Not remembering the tab is harmless.
     }
   }
 
@@ -118,49 +140,6 @@ export function LearningHub() {
     () => ({ audio, stats, reduceMotion: reduce, celebrate, openTopic: setOpenId }),
     [audio, stats, reduce, celebrate]
   );
-
-  // The slot-machine shuffle: pick the topic first, then roll across the visible
-  // cards so the roll can only ever end where the answer is.
-  const surprise = useCallback(() => {
-    if (rolling || openId || visible.length === 0) return;
-    const targetId = pickSurpriseTopic(visible, resources);
-    if (!targetId) return;
-
-    audio.prime();
-    setRolling(true);
-
-    const land = () => {
-      setLitId(targetId);
-      audio.play("spotlight");
-      setRolling(false);
-      // Hold the spotlight a moment, then dig in.
-      schedule(() => {
-        setLitId(null);
-        setOpenId(targetId);
-      }, SPOTLIGHT_MS);
-    };
-
-    // Reduced motion gets the answer without the flicker of a roll.
-    if (reduce) {
-      land();
-      return;
-    }
-
-    const steps = buildRoll(
-      visible.length,
-      visible.findIndex((t) => t.id === targetId)
-    );
-    let i = 0;
-    const tick = () => {
-      const step = steps[i];
-      setLitId(visible[step.index].id);
-      audio.play("tick", i);
-      i++;
-      if (i >= steps.length) land();
-      else schedule(tick, step.delayMs);
-    };
-    tick();
-  }, [rolling, openId, visible, resources, audio, reduce, schedule]);
 
   const closeCanvas = useCallback(() => setOpenId(null), []);
 
@@ -228,80 +207,52 @@ export function LearningHub() {
             </div>
           </motion.header>
 
-          <CuriosityRadar
-            query={query}
-            onQueryChange={setQuery}
-            matches={visible}
-            onSurprise={surprise}
-            rolling={rolling}
-            canSurprise={visible.length > 0}
-          />
+          <nav
+            role="tablist"
+            aria-label="מרחבי הלמידה"
+            className="mb-8 flex flex-wrap gap-1.5 rounded-2xl border border-hairline-card bg-surface/70 p-1.5"
+          >
+            {TABS.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => changeTab(key)}
+                className={cn(
+                  "focus-ring relative flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:px-4",
+                  tab === key ? "text-background" : "text-muted hover:text-foreground"
+                )}
+              >
+                {tab === key && (
+                  <motion.span
+                    layoutId="lab-tab-pill"
+                    className="absolute inset-0 rounded-xl bg-accent-learning"
+                    transition={{ type: "spring", visualDuration: 0.4, bounce: 0.2 }}
+                  />
+                )}
+                <span className="relative flex items-center gap-1.5">
+                  <Icon size={15} aria-hidden />
+                  <span className="whitespace-nowrap">{label}</span>
+                </span>
+              </button>
+            ))}
+          </nav>
 
-          <div className="mb-5 mt-7 flex flex-wrap items-center justify-between gap-3">
-            <div role="tablist" aria-label="תצוגה" className="flex gap-1 rounded-2xl bg-fill-subtle p-1">
-              {VIEWS.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  role="tab"
-                  aria-selected={view === key}
-                  onClick={() => changeView(key)}
-                  className={cn(
-                    "focus-ring relative flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm transition-colors",
-                    view === key ? "text-foreground" : "text-muted hover:text-foreground"
-                  )}
-                >
-                  {view === key && (
-                    <motion.span
-                      layoutId="lab-view-pill"
-                      className="absolute inset-0 rounded-xl bg-surface shadow-sm"
-                      transition={{ type: "spring", visualDuration: 0.35, bounce: 0.2 }}
-                    />
-                  )}
-                  <span className="relative flex items-center gap-1.5">
-                    <Icon size={15} aria-hidden />
-                    {label}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted">
-              {query ? `${visible.length} מתוך ${topics.length} נושאים` : `${topics.length} נושאים · ${stats.completedResources}/${stats.totalResources} שלבים`}
-            </p>
-          </div>
-
-          {topics.length === 0 ? (
-            <EmptyState reduce={reduce} />
-          ) : visible.length === 0 ? (
-            <p className="rounded-3xl border border-dashed border-hairline-card p-10 text-center text-sm text-muted">
-              לא נמצאו נושאים תואמים ל&quot;{query}&quot;. לחץ Enter כדי להוסיף אותו כנושא חדש.
-            </p>
-          ) : (
-            <div className="relative">
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.div key={view} exit={{ opacity: 0, transition: { duration: 0.18 } }}>
-                  {view === "grid" && <TopicGrid topics={visible} resources={resources} litId={litId} onOpen={setOpenId} />}
-                  {view === "list" && <TopicList topics={visible} resources={resources} litId={litId} onOpen={setOpenId} />}
-                  {view === "graph" && <KnowledgeGraph topics={visible} resources={resources} litId={litId} onOpen={setOpenId} />}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          )}
-
-          {/* The old "watch and study a video" panel, kept for a video that isn't a topic. */}
-          <div className="mt-12 border-t border-hairline-card pt-5">
-            <button
-              onClick={() => setShowFreeVideo((v) => !v)}
-              aria-expanded={showFreeVideo}
-              className="focus-ring rounded-lg px-1 text-sm font-medium text-muted transition-colors hover:text-foreground"
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: { duration: 0.15 } }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
             >
-              {showFreeVideo ? "הסתר" : "צפה ולמד סרטון בלי לשמור אותו כנושא"}
-            </button>
-            {showFreeVideo && (
-              <div className="mt-4">
-                <VideoStudyPanel />
-              </div>
-            )}
-          </div>
+              {tab === "map" && <TopicsMapTab topics={topics} resources={resources} />}
+              {tab === "discovery" && <DiscoveryTab topics={topics} resources={resources} />}
+              {tab === "library" && <LibraryTab topics={topics} />}
+              {tab === "mastery" && <MasteryTab topics={topics} resources={resources} />}
+              {tab === "feynman" && <FeynmanTab topics={topics} />}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         <AnimatePresence>{openId && <TopicCanvasModal key={openId} topicId={openId} onClose={closeCanvas} />}</AnimatePresence>
@@ -311,42 +262,114 @@ export function LearningHub() {
   );
 }
 
-/** Two slow-drifting glows behind the page. Gradients, not blur, and only transforms. */
-function Ambient({ reduce }: { reduce: boolean }) {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-24 -z-10 h-[34rem] overflow-hidden">
-      <motion.div
-        className="absolute -start-32 top-0 size-[30rem] rounded-full"
-        style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--accent-learning) 22%, transparent), transparent 68%)" }}
-        animate={reduce ? undefined : { x: [0, 60, 0], y: [0, 30, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <motion.div
-        className="absolute -end-24 top-20 size-[26rem] rounded-full"
-        style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--gold) 20%, transparent), transparent 68%)" }}
-        animate={reduce ? undefined : { x: [0, -50, 0], y: [0, -24, 0] }}
-        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-      />
-    </div>
-  );
+// One orb of the mesh: a blurred, softly-edged sphere that drifts slowly and
+// breathes (a gentle scale/opacity pulse), independently of the others so the
+// mesh never looks like it is repeating on a beat.
+interface OrbSpec {
+  className: string;
+  color: string;
+  drift: { x: number[]; y: number[] };
+  driftSeconds: number;
+  pulseSeconds: number;
+  pulseDelay: number;
 }
 
-function EmptyState({ reduce }: { reduce: boolean }) {
+const ORBS: OrbSpec[] = [
+  {
+    className: "-start-40 top-[-8rem] size-[34rem]",
+    color: "var(--accent-learning)",
+    drift: { x: [0, 70, 0], y: [0, 40, 0] },
+    driftSeconds: 19,
+    pulseSeconds: 7,
+    pulseDelay: 0,
+  },
+  {
+    className: "-end-32 top-[6rem] size-[30rem]",
+    color: "var(--gold)",
+    drift: { x: [0, -60, 0], y: [0, -28, 0] },
+    driftSeconds: 23,
+    pulseSeconds: 8.5,
+    pulseDelay: 1.2,
+  },
+  {
+    className: "-start-24 top-[46rem] size-[28rem]",
+    color: "var(--accent-career)",
+    drift: { x: [0, 50, 0], y: [0, -36, 0] },
+    driftSeconds: 26,
+    pulseSeconds: 9,
+    pulseDelay: 2.4,
+  },
+  {
+    className: "-end-20 top-[78rem] size-[26rem]",
+    color: "var(--accent-fitness)",
+    drift: { x: [0, -44, 0], y: [0, 32, 0] },
+    driftSeconds: 21,
+    pulseSeconds: 7.8,
+    pulseDelay: 3.6,
+  },
+];
+
+/**
+ * The lab's full-page atmosphere: a handful of blurred, glowing spheres fixed
+ * to the viewport, drifting and softly pulsing behind everything.
+ *
+ * Portalled to <body> rather than rendered in place, and for the exact reason
+ * Modal and every other full-screen overlay in this app are (see
+ * components/ui/Modal.tsx and TopicCanvasModal): AppWindow opens the page with
+ * a scale transform (lib/motion/macLaunch.ts), and a transformed ancestor
+ * becomes the containing block for its `position: fixed` descendants — inside
+ * it, "fixed to the viewport" quietly becomes "fixed to that box" instead,
+ * which is a smaller, scrollable region, not the screen. That is what clipped
+ * this to a ~34rem band tied to the search row before: the old version was
+ * `absolute` inside the hub's own `position: relative` wrapper, sized to an
+ * arbitrary height, with `overflow-hidden` cutting anything past it.
+ *
+ * `z-index: -10` is deliberate, not decorative: negative z-index paints behind
+ * ordinary (auto/positive) content regardless of DOM order, which is what
+ * keeps this behind the hub's cards without needing to sit first in the tree —
+ * portals always mount last. It still paints in front of the app's own base
+ * texture (globals.css `body::before`, z-index -1, rendered as body's
+ * first child): body itself creates no stacking context, so both are
+ * negative-z-index layers of the same root context, and the later-attached
+ * one (this) paints on top of the earlier one (the pseudo-element).
+ */
+function Ambient({ reduce }: { reduce: boolean }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-hairline-card px-6 py-14 text-center"
-    >
-      <motion.span
-        className="grid size-12 place-items-center rounded-full bg-accent-learning/15 text-accent-learning"
-        animate={reduce ? undefined : { y: [0, -8, 0] }}
-        transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+    <Portal>
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+        style={{ contain: "strict" }}
       >
-        <ArrowUp size={22} aria-hidden />
-      </motion.span>
-      <p className="text-base font-medium text-foreground">המעבדה ריקה — בוא נתחיל</p>
-      <p className="max-w-sm text-sm text-muted">כתוב נושא ברדאר למעלה, או הדבק קישור ל-YouTube, והוא יהפוך לנושא לימוד עם מסלול משלו.</p>
-    </motion.div>
+        {ORBS.map((orb, i) => (
+          <motion.div
+            key={i}
+            className={cn("absolute rounded-full blur-3xl", orb.className)}
+            style={{ background: `radial-gradient(circle, color-mix(in srgb, ${orb.color} 24%, transparent), transparent 70%)` }}
+            initial={{ opacity: 0.55, scale: 1 }}
+            animate={
+              reduce
+                ? { opacity: 0.5 }
+                : {
+                    x: orb.drift.x,
+                    y: orb.drift.y,
+                    scale: [1, 1.16, 1],
+                    opacity: [0.42, 0.62, 0.42],
+                  }
+            }
+            transition={
+              reduce
+                ? { duration: 0.4 }
+                : {
+                    x: { duration: orb.driftSeconds, repeat: Infinity, ease: "easeInOut" },
+                    y: { duration: orb.driftSeconds, repeat: Infinity, ease: "easeInOut" },
+                    scale: { duration: orb.pulseSeconds, repeat: Infinity, ease: "easeInOut", delay: orb.pulseDelay },
+                    opacity: { duration: orb.pulseSeconds, repeat: Infinity, ease: "easeInOut", delay: orb.pulseDelay },
+                  }
+            }
+          />
+        ))}
+      </div>
+    </Portal>
   );
 }

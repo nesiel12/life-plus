@@ -17,6 +17,9 @@ import type {
   HabitLog,
   Insight,
   KnowledgeEntry,
+  LearningBook,
+  LearningQuizAttempt,
+  LearningQuote,
   LearningResource,
   LearningTopic,
   LifeArea,
@@ -73,6 +76,10 @@ type LearningTopicRow = Database["public"]["Tables"]["learning_topics"]["Row"];
 type LearningTopicUpdate = Database["public"]["Tables"]["learning_topics"]["Update"];
 type LearningResourceRow = Database["public"]["Tables"]["learning_resources"]["Row"];
 type LearningResourceUpdate = Database["public"]["Tables"]["learning_resources"]["Update"];
+type LearningBookRow = Database["public"]["Tables"]["learning_books"]["Row"];
+type LearningBookUpdate = Database["public"]["Tables"]["learning_books"]["Update"];
+type LearningQuoteRow = Database["public"]["Tables"]["learning_quotes"]["Row"];
+type LearningQuizAttemptRow = Database["public"]["Tables"]["learning_quiz_attempts"]["Row"];
 type MealRow = Database["public"]["Tables"]["meals"]["Row"];
 type MealUpdate = Database["public"]["Tables"]["meals"]["Update"];
 type WorkoutRow = Database["public"]["Tables"]["workouts"]["Row"];
@@ -577,6 +584,70 @@ export function toLearningResourcePatch(patch: Partial<LearningResource>): Learn
   if (patch.notes !== undefined) row.notes = patch.notes || null;
   if (patch.isCompleted !== undefined) row.is_completed = patch.isCompleted;
   return row;
+}
+
+export function toLearningBook(row: LearningBookRow): LearningBook {
+  return {
+    id: row.id,
+    topicId: row.topic_id ?? undefined,
+    kind: row.kind,
+    title: row.title,
+    author: row.author ?? undefined,
+    category: row.category ?? undefined,
+    coverImageUrl: row.cover_image_url ?? undefined,
+    unitLabel: row.unit_label,
+    totalUnits: row.total_units,
+    progressUnits: row.progress_units,
+    status: row.status,
+    notes: row.notes ?? undefined,
+    startedAt: row.started_at ?? undefined,
+    finishedAt: row.finished_at ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export function toLearningBookPatch(patch: Partial<LearningBook>): LearningBookUpdate {
+  const row: LearningBookUpdate = {};
+  if (patch.topicId !== undefined) row.topic_id = patch.topicId || null;
+  if (patch.kind !== undefined) row.kind = patch.kind;
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.author !== undefined) row.author = patch.author || null;
+  if (patch.category !== undefined) row.category = patch.category || null;
+  if (patch.coverImageUrl !== undefined) row.cover_image_url = patch.coverImageUrl || null;
+  if (patch.unitLabel !== undefined) row.unit_label = patch.unitLabel;
+  if (patch.totalUnits !== undefined) row.total_units = patch.totalUnits;
+  if (patch.progressUnits !== undefined) row.progress_units = patch.progressUnits;
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.notes !== undefined) row.notes = patch.notes || null;
+  if (patch.startedAt !== undefined) row.started_at = patch.startedAt || null;
+  if (patch.finishedAt !== undefined) row.finished_at = patch.finishedAt || null;
+  return row;
+}
+
+export function toLearningQuote(row: LearningQuoteRow): LearningQuote {
+  return {
+    id: row.id,
+    bookId: row.book_id,
+    text: row.quote_text,
+    note: row.note ?? undefined,
+    chapterLabel: row.chapter_label ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+// jsonb round-trips as `unknown` in types/database.ts (Postgres does not
+// type its contents); QuizQuestionRecord's shape is only ever written by
+// lib/learning/quiz.ts, so a cast here is honest — this is not reading
+// arbitrary external JSON.
+export function toLearningQuizAttempt(row: LearningQuizAttemptRow): LearningQuizAttempt {
+  return {
+    id: row.id,
+    topicId: row.topic_id,
+    score: row.score,
+    total: row.total,
+    questions: Array.isArray(row.questions) ? (row.questions as LearningQuizAttempt["questions"]) : [],
+    createdAt: row.created_at,
+  };
 }
 
 export function toMeal(row: MealRow): Meal {

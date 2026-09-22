@@ -16,6 +16,7 @@ import { TutorBox } from "@/components/features/learning/TutorBox";
 import { STATUS_CYCLE, STATUS_LABEL } from "@/components/features/learning/lab/labels";
 import { useLabReducedMotion } from "@/components/features/learning/lab/useLabMotion";
 import { useResourceCompletion } from "@/components/features/learning/lab/useResourceCompletion";
+import { GoalTaskLink } from "@/components/features/learning/lab/GoalTaskLink";
 import { parseVideoInput } from "@/lib/learning/youtubeInput";
 import { topicProgress, topicXp } from "@/lib/learning/xp";
 import { cn } from "@/lib/utils";
@@ -200,6 +201,10 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7">
+              <div className="mb-5">
+                <GoalTaskLink topicTitle={topic.title} nextStepTitle={resources.find((r) => !r.isCompleted)?.title} />
+              </div>
+
               <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
                 {video && playing && (
                   <motion.div layout={!reduce} transition={{ type: "spring", bounce: 0.1, duration: 0.5 }} className={cn(theater && "lg:col-span-2")}>

@@ -1,0 +1,104 @@
+/*
+ * The Learning lab's printable study sheet — the same paper-on-screen /
+ * paper-as-the-page-in-print approach as the Torah Shabbat sheet
+ * (app/areas/torah/shabbat-print/print.css), with its own smaller, plainer
+ * palette (this is study notes, not a table-side pamphlet).
+ */
+
+.study-sheet {
+  --sheet-ink: #1a1c22;
+  --sheet-muted: #5a6070;
+  --sheet-rule: #c7cee0;
+  --sheet-accent: #2f6f5e;
+  color: var(--sheet-ink);
+  background: #ffffff;
+  line-height: 1.7;
+}
+
+.study-sheet h1,
+.study-sheet h2,
+.study-sheet h3 {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.sheet-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 1rem;
+  color: var(--sheet-accent);
+  margin-bottom: 0.6rem;
+}
+
+.sheet-section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to left, var(--sheet-rule), transparent);
+}
+
+.sheet-step {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.sheet-qr {
+  flex: none;
+  width: 84px;
+  margin: 0;
+  text-align: center;
+}
+
+.sheet-qr-code {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sheet-qr figcaption {
+  margin-top: 0.15rem;
+  font-size: 0.6rem;
+  line-height: 1.3;
+  color: var(--sheet-muted);
+}
+
+@page {
+  size: A4;
+  margin: 18mm 16mm 16mm;
+  @bottom-center {
+    content: counter(page, hebrew);
+    font-size: 10pt;
+    color: var(--sheet-accent, #2f6f5e);
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .study-sheet {
+    background: #fff;
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    font-size: 11pt;
+  }
+
+  .study-sheet a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .sheet-qr {
+    width: 24mm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

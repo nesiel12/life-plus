@@ -369,6 +369,62 @@ export interface LearningResource {
   createdAt: string;
 }
 
+// --- Learning OS (Library, Mastery) ---------------------------------------
+// supabase/migrations/20260922000000_learning_os.sql. Flashcards deliberately
+// have no entity here: they are srs_cards rows (lib/db/srsCards.ts), mapped to
+// LearningFlashcard in lib/learning/flashcards.ts rather than duplicated as a
+// second domain type.
+
+export type LearningBookKind = "book" | "article";
+export type LearningBookUnit = "page" | "chapter";
+export type LearningBookStatus = "to_read" | "reading" | "finished";
+
+export interface LearningBook {
+  id: string;
+  /** Absent for a book not tied to any topic — the shelf is not required to be organised. */
+  topicId?: string;
+  kind: LearningBookKind;
+  title: string;
+  author?: string;
+  category?: string;
+  coverImageUrl?: string;
+  unitLabel: LearningBookUnit;
+  totalUnits: number;
+  progressUnits: number;
+  status: LearningBookStatus;
+  notes?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  createdAt: string;
+}
+
+export interface LearningQuote {
+  id: string;
+  bookId: string;
+  text: string;
+  note?: string;
+  chapterLabel?: string;
+  createdAt: string;
+}
+
+export interface QuizQuestionRecord {
+  prompt: string;
+  kind: "mcq" | "short";
+  options?: string[];
+  correctAnswer: string;
+  userAnswer: string;
+  correct: boolean;
+}
+
+export interface LearningQuizAttempt {
+  id: string;
+  topicId: string;
+  score: number;
+  total: number;
+  questions: QuizQuestionRecord[];
+  createdAt: string;
+}
+
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack" | "post-workout";
 
 export interface Meal {

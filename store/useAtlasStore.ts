@@ -81,7 +81,7 @@ import {
   saveOnboardingWizardAction,
   type OnboardingWizardPayload,
 } from "@/app/actions/onboarding";
-import { addGoalAction, toggleMilestoneAction, removeGoalAction } from "@/app/actions/goals";
+import { addGoalAction, toggleMilestoneAction, removeGoalAction, addMilestoneAction } from "@/app/actions/goals";
 import { addUpcomingEventAction } from "@/app/actions/upcomingEvents";
 import { setTodayIntentionAction } from "@/app/actions/dailyIntention";
 import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations";
@@ -103,6 +103,7 @@ import type {
   LifeArea,
   ManualEvent,
   Meal,
+  Milestone,
   Moment,
   MomentCategory,
   PersonalDNA,
@@ -338,6 +339,9 @@ interface AtlasState extends HydratedState {
     options?: { targetDate?: string; personId?: string }
   ) => Promise<void>;
   toggleMilestone: (goalId: string, milestoneId: string) => Promise<void>;
+  /** Appends a milestone to an existing goal — returns it so a caller (the
+   *  Learning tab's "link to goal" flow) can confirm what landed. */
+  addMilestone: (goalId: string, title: string) => Promise<Milestone>;
   removeGoal: (goalId: string) => Promise<void>;
 
   setSuggestedActions: (actions: SuggestedAction[]) => void;
@@ -1041,6 +1045,14 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
       ),
     }));
     await toggleMilestoneAction(goalId, milestoneId);
+  },
+
+  addMilestone: async (goalId, title) => {
+    const created = await addMilestoneAction(goalId, title);
+    set((state) => ({
+      goals: state.goals.map((g) => (g.id === goalId ? { ...g, milestones: [...g.milestones, created] } : g)),
+    }));
+    return created;
   },
 
   removeGoal: async (goalId) => {

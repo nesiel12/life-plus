@@ -119,4 +119,41 @@ export const goalsRepo = {
 
     return updated;
   },
+
+  /**
+   * Appends one milestone to an existing goal — the write side of "link a
+   * learning topic to an active goal" (the Learning OS's goal synergy):
+   * turning a topic into real progress toward something the user already
+   * committed to, rather than a second, disconnected tracker. Positioned
+   * after every existing milestone, undated (distributeMilestoneDates only
+   * applies at goal creation, when every milestone's date is being decided
+   * at once — appending one later has no timeline to redistribute against).
+   */
+  async addMilestone(userId: string, goalId: string, title: string): Promise<MilestoneRow> {
+    const client = getSupabaseClient();
+
+    const { data: goal, error: goalError } = await client
+      .from("goals")
+      .select("id")
+      .eq("id", goalId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (goalError) throw goalError;
+    if (!goal) throw new Error("Goal not found or not owned by this user");
+
+    const { count, error: countError } = await client
+      .from("milestones")
+      .select("id", { count: "exact", head: true })
+      .eq("goal_id", goalId);
+    if (countError) throw countError;
+
+    const { data: created, error: insertError } = await client
+      .from("milestones")
+      .insert({ goal_id: goalId, title, position: count ?? 0, due_date: null })
+      .select()
+      .single();
+    if (insertError) throw insertError;
+
+    return created;
+  },
 };

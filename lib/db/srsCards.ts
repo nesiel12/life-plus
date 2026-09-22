@@ -2,7 +2,7 @@ import "server-only";
 import { createUserScopedRepo } from "@/lib/db/createUserScopedRepo";
 import { getSupabaseClient } from "@/lib/supabase";
 import { review, type SrsGrade, type SrsState } from "@/lib/torah/srs";
-import type { Database } from "@/types/database";
+import type { Database, SrsSourceTypeDb } from "@/types/database";
 
 type CardRow = Database["public"]["Tables"]["srs_cards"]["Row"];
 type CardInsert = Database["public"]["Tables"]["srs_cards"]["Insert"];
@@ -63,6 +63,48 @@ export const srsCardsRepo = {
       .lte("due_at", now.toISOString());
     if (filter.lessonId) query = query.eq("source_type", "lesson").eq("source_id", filter.lessonId);
     const { data, error } = await query.order("due_at", { ascending: true }).limit(filter.limit ?? 30);
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  /**
+   * Every card (due or not, but never suspended) from one polymorphic source —
+   * the Learning lab's deck for a topic (source_type "learning_topic",
+   * source_id the topic's id). Unlike listDueFiltered this is not limited to
+   * what is due right now: the mastery index needs the whole deck's state
+   * (lib/learning/mastery.ts deckProgress), not just today's queue.
+   */
+  async listBySource(userId: string, sourceType: SrsSourceTypeDb, sourceId: string): Promise<CardRow[]> {
+    const { data, error } = await getSupabaseClient()
+      .from("srs_cards")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("source_type", sourceType)
+      .eq("source_id", sourceId)
+      .is("suspended_at", null)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  /** The subset of listBySource that is actually due, soonest first. */
+  async listDueBySource(
+    userId: string,
+    sourceType: SrsSourceTypeDb,
+    sourceId: string,
+    limit = 30,
+    now: Date = new Date()
+  ): Promise<CardRow[]> {
+    const { data, error } = await getSupabaseClient()
+      .from("srs_cards")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("source_type", sourceType)
+      .eq("source_id", sourceId)
+      .is("suspended_at", null)
+      .lte("due_at", now.toISOString())
+      .order("due_at", { ascending: true })
+      .limit(limit);
     if (error) throw error;
     return data ?? [];
   },

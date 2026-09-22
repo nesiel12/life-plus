@@ -15,6 +15,9 @@ export type TaskStatusDb = "todo" | "in-progress" | "done";
 export type TransactionTypeDb = "income" | "expense";
 export type LearningTopicStatusDb = "planning" | "active" | "completed";
 export type LearningResourceTypeDb = "youtube" | "podcast" | "article" | "equipment" | "summary";
+export type LearningBookKindDb = "book" | "article";
+export type LearningBookUnitDb = "page" | "chapter";
+export type LearningBookStatusDb = "to_read" | "reading" | "finished";
 export type MealTypeDb = "breakfast" | "lunch" | "dinner" | "snack" | "post-workout";
 export type JobRunStatusDb = "running" | "succeeded" | "failed" | "skipped";
 export type RecoveryEventKindDb = "relapse" | "urge" | "note";
@@ -77,7 +80,10 @@ export type SrsSourceTypeDb =
   | "book"
   | "knowledge_entry"
   | "concept"
-  | "manual";
+  | "manual"
+  // The Learning lab's Anki-style flashcards (supabase/migrations/
+  // 20260922000000_learning_os.sql) — source_id is the learning_topics id.
+  | "learning_topic";
 export type StudyTrackStatusDb = "active" | "paused" | "completed" | "abandoned";
 export type HavrutaSubjectTypeDb = "summary" | "lesson" | "book" | "rabbi" | "concept" | "contradiction";
 export type HavrutaModeDb = "debate" | "clarify" | "contradiction";
@@ -1052,6 +1058,115 @@ export interface Database {
           url?: string | null;
           notes?: string | null;
           is_completed?: boolean;
+        }
+      >;
+      learning_books: TableDef<
+        {
+          id: string;
+          user_id: string;
+          topic_id: string | null;
+          kind: LearningBookKindDb;
+          title: string;
+          author: string | null;
+          category: string | null;
+          cover_image_url: string | null;
+          unit_label: LearningBookUnitDb;
+          total_units: number;
+          progress_units: number;
+          status: LearningBookStatusDb;
+          notes: string | null;
+          started_at: string | null;
+          finished_at: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          topic_id?: string | null;
+          kind?: LearningBookKindDb;
+          title: string;
+          author?: string | null;
+          category?: string | null;
+          cover_image_url?: string | null;
+          unit_label?: LearningBookUnitDb;
+          total_units?: number;
+          progress_units?: number;
+          status?: LearningBookStatusDb;
+          notes?: string | null;
+          started_at?: string | null;
+          finished_at?: string | null;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          topic_id?: string | null;
+          kind?: LearningBookKindDb;
+          title?: string;
+          author?: string | null;
+          category?: string | null;
+          cover_image_url?: string | null;
+          unit_label?: LearningBookUnitDb;
+          total_units?: number;
+          progress_units?: number;
+          status?: LearningBookStatusDb;
+          notes?: string | null;
+          started_at?: string | null;
+          finished_at?: string | null;
+        }
+      >;
+      learning_quotes: TableDef<
+        {
+          id: string;
+          user_id: string;
+          book_id: string;
+          quote_text: string;
+          note: string | null;
+          chapter_label: string | null;
+          created_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          book_id: string;
+          quote_text: string;
+          note?: string | null;
+          chapter_label?: string | null;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          book_id?: string;
+          quote_text?: string;
+          note?: string | null;
+          chapter_label?: string | null;
+        }
+      >;
+      learning_quiz_attempts: TableDef<
+        {
+          id: string;
+          user_id: string;
+          topic_id: string;
+          score: number;
+          total: number;
+          questions: unknown;
+          created_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          topic_id: string;
+          score: number;
+          total: number;
+          questions?: unknown;
+        },
+        {
+          id?: string;
+          user_id?: string;
+          topic_id?: string;
+          score?: number;
+          total?: number;
+          questions?: unknown;
         }
       >;
       meals: TableDef<
