@@ -1,17 +1,17 @@
 "use client";
 
 import { Component, useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Lightbulb, Mic, PartyPopper, PlayCircle, RotateCcw, Sparkles } from "lucide-react";
+import { AlertTriangle, Lightbulb, Mic, PlayCircle, RotateCcw, Sparkles, X } from "lucide-react";
 import { LessonViewportSkeleton } from "@/components/features/learning/LessonViewportSkeleton";
 import { LessonContentRenderer } from "@/components/features/learning/LessonContentRenderer";
 import { InAppVideoPlayer } from "@/components/features/learning/InAppVideoPlayer";
 import { InterviewAudioVault } from "@/components/features/learning/InterviewAudioVault";
 import { PioneerProfileDrawer } from "@/components/features/learning/PioneerProfileDrawer";
 import { TopicBloopersBox } from "@/components/features/learning/TopicBloopersBox";
-import { useLab, originOf, type Point } from "@/components/features/learning/lab/LabContext";
-import { useResourceCompletion } from "@/components/features/learning/lab/useResourceCompletion";
+import { originOf, type Point } from "@/components/features/learning/lab/LabContext";
 import { getCheckpointAnswersAction, submitCheckpointAnswerAction, type CheckpointAnswerState } from "@/app/actions/masterclassProgress";
 import { CHECKPOINT_XP, checkpointCelebrationFor } from "@/lib/learning/masterclassXp";
+import { useLab } from "@/components/features/learning/lab/LabContext";
 import type { LessonGenerateResponse } from "@/app/api/learning/lesson/generate/route";
 import { TEACHING_MODES, USER_AGE_GROUPS, type InlineCheckpoint, type LessonBlockContent, type TeachingMode, type UserAgeGroup } from "@/types/learning";
 import type { LearningResource, LearningTopic } from "@/types";
@@ -111,7 +111,7 @@ function LessonErrorState({ onRetry, message }: { onRetry: () => void; message?:
   );
 }
 
-// --- Age group / teaching mode picker ---------------------------------
+// --- Age group / teaching mode / custom-focus picker ---------------------
 
 function SegmentedPicker<T extends string>({ value, options, labels, onChange }: { value: T; options: readonly T[]; labels: Record<T, string>; onChange: (v: T) => void }) {
   return (
@@ -134,19 +134,33 @@ function SegmentedPicker<T extends string>({ value, options, labels, onChange }:
   );
 }
 
-function LessonSettingsBar({
+function LessonSettingsPanel({
   ageGroup,
   teachingMode,
+  customEmphasis,
   onChangeAgeGroup,
   onChangeTeachingMode,
+  onChangeCustomEmphasis,
+  onApplyCustomEmphasis,
+  onClose,
 }: {
   ageGroup: UserAgeGroup;
   teachingMode: TeachingMode;
+  customEmphasis: string;
   onChangeAgeGroup: (v: UserAgeGroup) => void;
   onChangeTeachingMode: (v: TeachingMode) => void;
+  onChangeCustomEmphasis: (v: string) => void;
+  onApplyCustomEmphasis: () => void;
+  onClose: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-hairline-card bg-fill-subtle/40 p-3">
+    <div dir="rtl" className="flex flex-col gap-3 rounded-2xl border border-hairline-card bg-fill-subtle/40 p-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-foreground">התאמה אישית</h3>
+        <button onClick={onClose} aria-label="סגור התאמה אישית" className="focus-ring rounded-full p-1 text-muted transition-colors hover:text-foreground">
+          <X size={14} aria-hidden />
+        </button>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[11px] font-medium text-muted">קהל יעד:</span>
         <SegmentedPicker value={ageGroup} options={USER_AGE_GROUPS} labels={AGE_GROUP_LABEL} onChange={onChangeAgeGroup} />
@@ -154,6 +168,25 @@ function LessonSettingsBar({
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[11px] font-medium text-muted">סגנון הוראה:</span>
         <SegmentedPicker value={teachingMode} options={TEACHING_MODES} labels={TEACHING_MODE_LABEL} onChange={onChangeTeachingMode} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[11px] font-medium text-muted">דגשים מותאמים אישית:</span>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={customEmphasis}
+            onChange={(e) => onChangeCustomEmphasis(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && onApplyCustomEmphasis()}
+            placeholder='למשל: "שים דגש על אבטחת מידע", "תסביר בגובה העיניים"'
+            className="focus-ring min-w-0 flex-1 rounded-xl border border-hairline-card bg-surface px-3 py-1.5 text-xs text-foreground placeholder:text-muted"
+          />
+          <button
+            onClick={onApplyCustomEmphasis}
+            className="focus-ring shrink-0 rounded-xl bg-accent-learning/15 px-3 py-1.5 text-xs font-medium text-accent-learning transition-opacity hover:opacity-80"
+          >
+            החל
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -164,12 +197,13 @@ function LessonSettingsBar({
 export interface LessonViewportProps {
   topic: LearningTopic;
   resource: LearningResource;
-  customEmphasis?: string;
+  settingsOpen: boolean;
+  onCloseSettings: () => void;
 }
 
 type LoadState = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ready"; content: LessonBlockContent; cached: boolean };
 
-export function LessonViewport({ topic, resource, customEmphasis }: LessonViewportProps) {
+export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings }: LessonViewportProps) {
   const topicId = topic.id;
   const stepId = resource.id;
 
@@ -186,13 +220,17 @@ export function LessonViewport({ topic, resource, customEmphasis }: LessonViewpo
   // SSR, where localStorage doesn't exist.
   const [ageGroup, setAgeGroup] = useState<UserAgeGroup>(() => readStored(AGE_GROUP_KEY, USER_AGE_GROUPS, "ADULTS_19_PLUS"));
   const [teachingMode, setTeachingMode] = useState<TeachingMode>(() => readStored(TEACHING_MODE_KEY, TEACHING_MODES, "STORYTELLING"));
+  // Not persisted, unlike the two above: a custom focus prompt is specific
+  // to the lesson it was written for, not a general standing preference to
+  // remember app-wide.
+  const [customEmphasisInput, setCustomEmphasisInput] = useState("");
+  const [appliedCustomEmphasis, setAppliedCustomEmphasis] = useState<string | undefined>(undefined);
 
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [retryToken, setRetryToken] = useState(0);
   const [answers, setAnswers] = useState<Record<string, CheckpointAnswerState>>({});
 
   const lab = useLab();
-  const complete = useResourceCompletion();
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });
@@ -200,7 +238,7 @@ export function LessonViewport({ topic, resource, customEmphasis }: LessonViewpo
       const res = await fetch("/api/learning/lesson/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topicId, stepId, userAgeGroup: ageGroup, teachingMode, customEmphasis }),
+        body: JSON.stringify({ topicId, stepId, userAgeGroup: ageGroup, teachingMode, customEmphasis: appliedCustomEmphasis }),
       });
       const body = (await res.json().catch(() => null)) as (LessonGenerateResponse & { error?: string }) | null;
       if (!res.ok || !body || !body.content) {
@@ -211,7 +249,7 @@ export function LessonViewport({ topic, resource, customEmphasis }: LessonViewpo
     } catch {
       setState({ kind: "error", message: GENERIC_ERROR });
     }
-  }, [topicId, stepId, ageGroup, teachingMode, customEmphasis]);
+  }, [topicId, stepId, ageGroup, teachingMode, appliedCustomEmphasis]);
 
   useEffect(() => {
     void load();
@@ -244,6 +282,9 @@ export function LessonViewport({ topic, resource, customEmphasis }: LessonViewpo
     setTeachingMode(v);
     writeStored(TEACHING_MODE_KEY, v);
   }, []);
+  const applyCustomEmphasis = useCallback(() => {
+    setAppliedCustomEmphasis(customEmphasisInput.trim() || undefined);
+  }, [customEmphasisInput]);
 
   const handleCheckpointAnswered = useCallback(
     (checkpoint: InlineCheckpoint, selectedIndex: number, origin: Point | undefined) => {
@@ -269,54 +310,45 @@ export function LessonViewport({ topic, resource, customEmphasis }: LessonViewpo
     [answers, lab, topicId, stepId, ageGroup, teachingMode]
   );
 
-  const finishLesson = useCallback(
-    async (e: MouseEvent<HTMLButtonElement>) => {
-      await complete(resource, true, originOf(e.currentTarget));
-    },
-    [complete, resource]
-  );
-
   return (
     <div dir="rtl" className="flex flex-col gap-4">
-      <LessonSettingsBar ageGroup={ageGroup} teachingMode={teachingMode} onChangeAgeGroup={changeAgeGroup} onChangeTeachingMode={changeTeachingMode} />
+      {settingsOpen && (
+        <LessonSettingsPanel
+          ageGroup={ageGroup}
+          teachingMode={teachingMode}
+          customEmphasis={customEmphasisInput}
+          onChangeAgeGroup={changeAgeGroup}
+          onChangeTeachingMode={changeTeachingMode}
+          onChangeCustomEmphasis={setCustomEmphasisInput}
+          onApplyCustomEmphasis={applyCustomEmphasis}
+          onClose={onCloseSettings}
+        />
+      )}
 
       {state.kind === "loading" && <LessonViewportSkeleton />}
       {state.kind === "error" && <LessonErrorState onRetry={retry} message={state.message} />}
       {state.kind === "ready" && (
         <LessonErrorBoundary onRetry={retry}>
-          <div className="flex flex-col gap-6">
-            <LessonContent
-              content={state.content}
-              answers={answers}
-              onCheckpointAnswered={handleCheckpointAnswered}
-              topicId={topicId}
-              stepId={stepId}
-              userAgeGroup={ageGroup}
-              teachingMode={teachingMode}
-            />
-            {!resource.isCompleted && (
-              <button
-                onClick={(e) => void finishLesson(e)}
-                className="focus-ring flex items-center justify-center gap-2 self-center rounded-2xl bg-accent-learning px-6 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-              >
-                <PartyPopper size={16} aria-hidden />
-                סיימתי את השיעור
-              </button>
-            )}
-            {resource.isCompleted && (
-              <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-accent-learning">
-                <CheckCircle2 size={16} aria-hidden />
-                השיעור הזה כבר סומן כהושלם
-              </p>
-            )}
-          </div>
+          <LessonContent content={state.content} answers={answers} onCheckpointAnswered={handleCheckpointAnswered} topicId={topicId} stepId={stepId} userAgeGroup={ageGroup} teachingMode={teachingMode} />
         </LessonErrorBoundary>
       )}
     </div>
   );
 }
 
-// --- Content sections ------------------------------------------------------
+// --- Content zones -----------------------------------------------------
+
+function ClassroomZone({ icon, title, children }: { icon: string; title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-4">
+      <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+        <span aria-hidden>{icon}</span>
+        {title}
+      </h2>
+      <div className="flex flex-col gap-6">{children}</div>
+    </section>
+  );
+}
 
 function LessonContent({
   content,
@@ -337,26 +369,56 @@ function LessonContent({
 }) {
   const hasAudio = (content.inAppMedia.audioSnippets?.length ?? 0) > 0;
   return (
-    <div className="flex flex-col gap-6">
-      <OriginStorySection originStory={content.originStory} />
-      {content.pioneers.length > 0 && (
-        <PioneersSection pioneers={content.pioneers} topicId={topicId} stepId={stepId} userAgeGroup={userAgeGroup} teachingMode={teachingMode} />
+    <div className="flex flex-col gap-10">
+      <ClassroomZone icon="📖" title="היסטוריה, בסיס ודמויות מפתח">
+        <OriginStorySection originStory={content.originStory} />
+        {content.pioneers.length > 0 && (
+          <PioneersSection pioneers={content.pioneers} topicId={topicId} stepId={stepId} userAgeGroup={userAgeGroup} teachingMode={teachingMode} />
+        )}
+      </ClassroomZone>
+
+      <ClassroomZone icon="📚" title="ליבת החומר והסברים מעמיקים">
+        <CoreContentSection coreContent={content.coreContent} />
+        {content.blooperOrDisaster && <TopicBloopersBox text={content.blooperOrDisaster} />}
+        {content.mindBlowingTrivia.length > 0 && <TriviaSection items={content.mindBlowingTrivia} />}
+        {content.memeData.jokeText && <MemeSection meme={content.memeData} />}
+        {content.inAppMedia.youtubeVideoId && (
+          <SectionCard title="לצפייה" icon={<PlayCircle size={15} className="text-accent-learning" aria-hidden />}>
+            <InAppVideoPlayer videoId={content.inAppMedia.youtubeVideoId} title="סרטון השיעור" chapters={content.inAppMedia.videoChapters} />
+          </SectionCard>
+        )}
+        {hasAudio && (
+          <SectionCard title="קטעי שמע" icon={<Mic size={15} className="text-accent-learning" aria-hidden />}>
+            <InterviewAudioVault snippets={content.inAppMedia.audioSnippets ?? []} />
+          </SectionCard>
+        )}
+      </ClassroomZone>
+
+      {content.inlineCheckpoints.length > 0 && (
+        <ClassroomZone icon="✍️" title="תרגול אינטראקטיבי ומעבדה">
+          <CheckpointsSection checkpoints={content.inlineCheckpoints} answers={answers} onAnswered={onCheckpointAnswered} />
+        </ClassroomZone>
       )}
-      <CoreContentSection coreContent={content.coreContent} />
-      {content.blooperOrDisaster && <TopicBloopersBox text={content.blooperOrDisaster} />}
-      {content.mindBlowingTrivia.length > 0 && <TriviaSection items={content.mindBlowingTrivia} />}
-      {content.memeData.jokeText && <MemeSection meme={content.memeData} />}
-      {content.inAppMedia.youtubeVideoId && (
-        <SectionCard title="לצפייה" icon={<PlayCircle size={15} className="text-accent-learning" aria-hidden />}>
-          <InAppVideoPlayer videoId={content.inAppMedia.youtubeVideoId} title="סרטון השיעור" chapters={content.inAppMedia.videoChapters} />
-        </SectionCard>
-      )}
-      {hasAudio && (
-        <SectionCard title="קטעי שמע" icon={<Mic size={15} className="text-accent-learning" aria-hidden />}>
-          <InterviewAudioVault snippets={content.inAppMedia.audioSnippets ?? []} />
-        </SectionCard>
-      )}
-      {content.inlineCheckpoints.length > 0 && <CheckpointsSection checkpoints={content.inlineCheckpoints} answers={answers} onAnswered={onCheckpointAnswered} />}
+
+      <ClassroomZone icon="📝" title="מבחן שליטה מסכם">
+        <MasterySummary checkpoints={content.inlineCheckpoints} answers={answers} />
+      </ClassroomZone>
+    </div>
+  );
+}
+
+function MasterySummary({ checkpoints, answers }: { checkpoints: InlineCheckpoint[]; answers: Record<string, CheckpointAnswerState> }) {
+  if (checkpoints.length === 0) {
+    return <p className="rounded-2xl border border-hairline-card bg-surface p-4 text-sm text-muted">אין שאלות בדיקה בשלב הזה — אפשר לסמן אותו כהושלם מהסרגל למטה כשמוכנים להמשיך.</p>;
+  }
+  const answered = checkpoints.filter((c) => answers[c.id]).length;
+  const correct = checkpoints.filter((c) => answers[c.id]?.isCorrect).length;
+  return (
+    <div className="rounded-2xl border border-hairline-card bg-surface p-4">
+      <p className="text-sm font-medium text-foreground">
+        {answered === 0 ? "עוד לא ענית על שאלות הבדיקה למעלה" : `ענית נכון על ${correct} מתוך ${answered} שאלות שנענו (מתוך ${checkpoints.length} בסך הכול)`}
+      </p>
+      <p className="mt-1 text-xs text-muted">אפשר לסמן את השלב כהושלם מהסרגל למטה בכל שלב.</p>
     </div>
   );
 }

@@ -23,7 +23,7 @@ interface SyllabusQuestProps {
   /** The resource whose video is showing in the cinema, if any. */
   playingId: string | null;
   onPlayVideo: (resource: LearningResource) => void;
-  /** Opens the Masterclass & Gaming OS lesson for this step (MasterclassLessonDrawer, owned by TopicCanvasModal). */
+  /** Opens the Masterclass & Gaming OS classroom for this step (ClassroomViewport, owned by TopicCanvasModal). */
   onOpenLesson: (resource: LearningResource) => void;
 }
 
