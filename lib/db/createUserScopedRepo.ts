@@ -72,7 +72,12 @@ type UserScopedTableName =
   // Masterclass & Gaming OS (20260924000000, 20260925000000, 20260926000000).
   | "learning_lesson_contents"
   | "learning_checkpoint_answers"
-  | "pioneer_easter_egg_claims";
+  | "pioneer_easter_egg_claims"
+  // XP Shop (20260927000000). learning_active_cosmetics is not here — its
+  // primary key is user_id itself, not a generated id, so it doesn't fit
+  // this factory's shape (see lib/db/learningActiveCosmetics.ts).
+  | "learning_purchases"
+  | "learning_streak_shield_consumptions";
 
 export function createUserScopedRepo<T extends UserScopedTableName>(table: T) {
   type Row = Database["public"]["Tables"][T]["Row"];

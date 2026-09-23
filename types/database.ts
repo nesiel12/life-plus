@@ -1277,6 +1277,46 @@ export interface Database {
           key_paragraph_notes?: Json;
         }
       >;
+      // XP Shop (20260927000000).
+      learning_purchases: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          item_id: string;
+          cost_xp: number;
+          purchased_at: string;
+        },
+        "item_id" | "cost_xp"
+      >;
+      // Not a GraphTable: primary key is user_id itself (one row per user),
+      // not a generated id — same "doesn't fit the factory's shape" reason
+      // article_extracts gets its own repo module instead of the factory.
+      learning_active_cosmetics: TableDef<
+        {
+          user_id: string;
+          active_theme: string | null;
+          active_particle_trail: string | null;
+          updated_at: string;
+        },
+        {
+          user_id: string;
+          active_theme?: string | null;
+          active_particle_trail?: string | null;
+        },
+        {
+          active_theme?: string | null;
+          active_particle_trail?: string | null;
+        }
+      >;
+      learning_streak_shield_consumptions: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          covers_date: string;
+          consumed_at: string;
+        },
+        "covers_date"
+      >;
       meals: TableDef<
         {
           id: string;

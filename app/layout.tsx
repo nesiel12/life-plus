@@ -5,6 +5,7 @@ import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { ThemeProvider, themeInitScript } from "@/components/providers/ThemeProvider";
+import { ActiveSkinProvider } from "@/components/providers/ActiveSkinProvider";
 import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
 
 const heebo = Heebo({
@@ -47,7 +48,9 @@ export default function RootLayout({
           <ThemeProvider>
             <PreferencesProvider>
               <AuthProvider>
-                <AppShell>{children}</AppShell>
+                <ActiveSkinProvider>
+                  <AppShell>{children}</AppShell>
+                </ActiveSkinProvider>
               </AuthProvider>
             </PreferencesProvider>
           </ThemeProvider>

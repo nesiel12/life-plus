@@ -7,6 +7,7 @@ import {
   Brain,
   Lightbulb,
   Map as MapIcon,
+  ShoppingBag,
   Sparkles,
   Volume2,
   VolumeX,
@@ -29,6 +30,10 @@ import { Portal } from "@/components/features/learning/lab/Portal";
 import { LabContext, type LabApi, type Point } from "@/components/features/learning/lab/LabContext";
 import { StreakFlame } from "@/components/features/learning/lab/StreakFlame";
 import { useLabReducedMotion } from "@/components/features/learning/lab/useLabMotion";
+import { LifePlusShopModal } from "@/components/features/learning/shop/LifePlusShopModal";
+import { ParticleTrailCanvas } from "@/components/features/learning/shop/ParticleTrailCanvas";
+import { getShopStateAction } from "@/app/actions/xpShop";
+import { shopItemById } from "@/lib/learning/xpShop";
 import { labStats, type Celebration } from "@/lib/learning/xp";
 import type { LearningInsights } from "@/lib/learning/types";
 import { cn } from "@/lib/utils";
@@ -89,6 +94,21 @@ export function LearningHub() {
   const [pops, setPops] = useState<XpPop[]>([]);
   const popId = useRef(0);
   const timers = useRef<number[]>([]);
+
+  // The XP Shop's owned/equipped state — fetched once here (not per-tab)
+  // since the badge chips and the particle trail canvas both live at this
+  // level, above every tab. purchaseItemAction/setActiveParticleTrailAction
+  // (called from the shop modal) are what actually keep this in sync; this
+  // effect only covers the initial load.
+  const [shopOpen, setShopOpen] = useState(false);
+  const [ownedBadgeNames, setOwnedBadgeNames] = useState<string[]>([]);
+  const [activeTrail, setActiveTrail] = useState<string | null>(null);
+  useEffect(() => {
+    void getShopStateAction().then((state) => {
+      setOwnedBadgeNames(state.ownedItemIds.map((id) => shopItemById(id)).filter((item) => item?.category === "badge").map((item) => item!.name));
+      setActiveTrail(state.activeParticleTrail);
+    });
+  }, []);
 
   const stats = useMemo(() => labStats(topics, resources), [topics, resources]);
 
@@ -158,10 +178,29 @@ export function LearningHub() {
             <div>
               <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">מעבדת ידע</h1>
               <p className="mt-1 max-w-md text-sm text-muted">חפש, גלה ולמד — כל צעד צובר XP, ורצף הלמידה שלך עולה באש.</p>
+              {ownedBadgeNames.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {ownedBadgeNames.map((name) => (
+                    <span key={name} className="rounded-full bg-gold-soft px-2 py-0.5 text-[10px] font-medium text-gold-ink">
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-6">
               <StreakFlame days={streak} />
+
+              <button
+                onClick={() => setShopOpen(true)}
+                aria-label="חנות Life Plus"
+                title="חנות Life Plus"
+                className="focus-ring flex items-center gap-1.5 rounded-full border border-hairline-card px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-accent-learning/30 hover:text-foreground"
+              >
+                <ShoppingBag size={14} aria-hidden />
+                חנות
+              </button>
 
               <div className="flex items-center gap-3">
                 <ProgressRing
@@ -257,6 +296,22 @@ export function LearningHub() {
 
         <AnimatePresence>{openId && <TopicCanvasModal key={openId} topicId={openId} onClose={closeCanvas} />}</AnimatePresence>
         <XpPops pops={pops} />
+        <ParticleTrailCanvas activeTrailId={activeTrail} />
+        {shopOpen && (
+          <LifePlusShopModal
+            onClose={() => {
+              setShopOpen(false);
+              // Buying a badge or a theme doesn't change activeTrail, but
+              // re-syncing the badge chips on close is cheap and keeps them
+              // honest without threading a second callback through every
+              // purchase path in the modal.
+              void getShopStateAction().then((state) =>
+                setOwnedBadgeNames(state.ownedItemIds.map((id) => shopItemById(id)).filter((item) => item?.category === "badge").map((item) => item!.name))
+              );
+            }}
+            onActiveTrailChange={setActiveTrail}
+          />
+        )}
       </LayoutGroup>
     </LabContext.Provider>
   );

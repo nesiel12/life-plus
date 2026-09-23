@@ -12,8 +12,11 @@ import { fetchMemoryCandidates, rankMemoryCandidates } from "@/lib/memory/retrie
 import { rankByRelevance, tokenize, type MemoryCandidate } from "@/lib/memory/rankRelevance";
 import { createRecommendationEvent, indexPendingEventsByKey } from "@/lib/intelligence/recommendations";
 import { MIN_CONFIDENCE_TO_SURFACE } from "@/lib/intelligence/personalDNA/confidence";
-import { computeStudyStreak } from "@/lib/learning/computeStudyStreak";
 import { pickNextReview } from "@/lib/learning/pickNextReview";
+import { computeStudyStreakWithShields, decideShieldConsumption } from "@/lib/learning/streakShield";
+import { learningPurchasesRepo } from "@/lib/db/learningPurchases";
+import { streakShieldConsumptionsRepo } from "@/lib/db/streakShieldConsumptions";
+import { shieldInventory } from "@/lib/learning/xpShop";
 import type { EntryInsight, LearningInsights } from "@/lib/learning/types";
 
 export const runtime = "nodejs";
@@ -44,12 +47,14 @@ export async function GET() {
     return NextResponse.json({ streakDays: 0, topicFocus: null, cadencePerWeek: null, nextReview: null, entries: [] });
   }
 
-  const [entryRows, goalRows, patternRows, recommendationEvents, memoryCandidates] = await Promise.all([
+  const [entryRows, goalRows, patternRows, recommendationEvents, memoryCandidates, purchaseRows, shieldedDates] = await Promise.all([
     knowledgeEntriesRepo.list(user.id),
     goalsRepo.listWithMilestones(user.id),
     personalPatternsRepo.list(user.id),
     recommendationEventsRepo.list(user.id),
     fetchMemoryCandidates(user.id),
+    learningPurchasesRepo.list(user.id),
+    streakShieldConsumptionsRepo.listDates(user.id),
   ]);
 
   const entries = entryRows.map(toKnowledgeEntry);
@@ -65,7 +70,23 @@ export async function GET() {
     (p) => p.category === "learning" && p.pattern_type === "learningCadence" && p.confidence >= MIN_CONFIDENCE_TO_SURFACE
   );
 
-  const streakDays = computeStudyStreak(entries.map((e) => e.date));
+  // The streak shown here is the one streak — shared with the Learning
+  // Hub, same computeStudyStreak-shaped logic — and a Streak Shield bought
+  // in the Life Plus XP Shop protects it wherever it's shown, not a
+  // Learning-only fork of the concept. Checked fresh on every read, not by
+  // a cron: if yesterday is the one gap right at the edge of today's
+  // streak and a shield is still unspent, one gets consumed right here
+  // (idempotent — the table's own unique key makes a repeat check for the
+  // same day a no-op) before the final streak number is computed.
+  const sessionDates = entries.map((e) => e.date);
+  const purchases = purchaseRows.map((row) => ({ itemId: row.item_id, costXp: row.cost_xp }));
+  const availableShields = shieldInventory(purchases, shieldedDates.length);
+  const dateToShield = decideShieldConsumption({ sessionDates, shieldedDates, availableShields, now: Date.now() });
+  if (dateToShield) {
+    await streakShieldConsumptionsRepo.consume(user.id, dateToShield);
+    shieldedDates.push(dateToShield);
+  }
+  const streakDays = computeStudyStreakWithShields(sessionDates, shieldedDates);
 
   // Recommendation Intelligence reuse: don't spawn a fresh `pending`
   // learning_next_review event on every page view — reuse the existing

@@ -94,6 +94,190 @@
   color-scheme: light;
 }
 
+/* ── XP Shop purchased themes ────────────────────────────────────────────
+   A second, orthogonal attribute — [data-skin] — layered on top of
+   [data-theme], not a replacement for it: the light/dark pair above is
+   this app's core, accessibility-considered default and stays completely
+   untouched (no [data-skin] at all, the default, renders pixel-identical
+   to before this feature existed). Each purchased skin (lib/learning/
+   xpShop.ts's theme_* items) redefines the same structural/brand tokens
+   the base pair does — background, surface, foreground, the gold family,
+   fills, glass — in both a light and dark variant, following the base
+   pair's own lightness relationships (foreground far from background,
+   muted roughly mid-way, an "ink" accent readable at small sizes) rather
+   than a bespoke contrast model per skin.
+
+   Deliberately NOT touched here: the nine --accent-* life-area colors
+   (faith/family/health/career/…). Those carry meaning across the whole
+   app — the calendar, tasks, health, every module — not just Learning;
+   re-tinting them per cosmetic skin would make color-coding elsewhere
+   inconsistent for the sake of a shop item. A skin changes the chrome,
+   not what a color means. */
+
+:root[data-skin="theme_cyberpunk"]:not([data-theme="dark"]) {
+  --background: #f2f0ff;
+  --surface: #ffffff;
+  --surface-sunken: #e8e4fb;
+  --foreground: #16021f;
+  --muted: #6b5b8a;
+  --hairline: #ddd4f5;
+  --hairline-card: rgba(22, 2, 31, 0.09);
+  --gold: #d6009e;
+  --gold-ink: #a3007a;
+  --gold-soft: #fbe0f4;
+  --gold-line: #f0b8e2;
+  --ink: #0d0113;
+  --fill-subtle: rgba(22, 2, 31, 0.04);
+  --fill: rgba(22, 2, 31, 0.07);
+  --fill-strong: rgba(22, 2, 31, 0.11);
+  --glass-bg: #ffffff;
+  --glass-bg-strong: #ffffff;
+  --glass-border: var(--hairline);
+}
+:root[data-skin="theme_cyberpunk"][data-theme="dark"] {
+  --background: #0a0014;
+  --surface: #150a24;
+  --surface-sunken: #0d0518;
+  --foreground: #f2eaff;
+  --muted: #a693c9;
+  --hairline: #2a1f42;
+  --hairline-card: rgba(255, 255, 255, 0.08);
+  --gold: #00e5ff;
+  --gold-ink: #5df1ff;
+  --gold-soft: rgba(0, 229, 255, 0.14);
+  --gold-line: rgba(0, 229, 255, 0.3);
+  --ink: #f2eaff;
+  --fill-subtle: rgba(255, 255, 255, 0.05);
+  --fill: rgba(255, 255, 255, 0.09);
+  --fill-strong: rgba(255, 255, 255, 0.14);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-strong: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(0, 229, 255, 0.2);
+}
+
+:root[data-skin="theme_royal_gold"]:not([data-theme="dark"]) {
+  --background: #fbf6e8;
+  --surface: #ffffff;
+  --surface-sunken: #f5ecd2;
+  --foreground: #241305;
+  --muted: #7a6a45;
+  --hairline: #ecdfb8;
+  --hairline-card: rgba(36, 19, 5, 0.09);
+  --gold: #a8791f;
+  --gold-ink: #7a5714;
+  --gold-soft: #f7ecd0;
+  --gold-line: #e9d29a;
+  --ink: #1c0f03;
+  --fill-subtle: rgba(36, 19, 5, 0.04);
+  --fill: rgba(36, 19, 5, 0.07);
+  --fill-strong: rgba(36, 19, 5, 0.11);
+  --glass-bg: #ffffff;
+  --glass-bg-strong: #ffffff;
+  --glass-border: var(--hairline);
+}
+:root[data-skin="theme_royal_gold"][data-theme="dark"] {
+  --background: #140b02;
+  --surface: #241407;
+  --surface-sunken: #180d03;
+  --foreground: #f7e9c8;
+  --muted: #b89e6e;
+  --hairline: #3a2610;
+  --hairline-card: rgba(255, 255, 255, 0.08);
+  --gold: #f0c05a;
+  --gold-ink: #f7d585;
+  --gold-soft: rgba(240, 192, 90, 0.15);
+  --gold-line: rgba(240, 192, 90, 0.32);
+  --ink: #f7e9c8;
+  --fill-subtle: rgba(255, 255, 255, 0.05);
+  --fill: rgba(255, 255, 255, 0.09);
+  --fill-strong: rgba(255, 255, 255, 0.14);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-strong: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(240, 192, 90, 0.22);
+}
+
+:root[data-skin="theme_retro_parchment"]:not([data-theme="dark"]) {
+  --background: #efe4c8;
+  --surface: #f8f1de;
+  --surface-sunken: #e5d6ac;
+  --foreground: #3b2a17;
+  --muted: #7c6644;
+  --hairline: #d9c69a;
+  --hairline-card: rgba(59, 42, 23, 0.1);
+  --gold: #96631f;
+  --gold-ink: #6e4813;
+  --gold-soft: #ecdbb2;
+  --gold-line: #d9bd84;
+  --ink: #2a1c0d;
+  --fill-subtle: rgba(59, 42, 23, 0.05);
+  --fill: rgba(59, 42, 23, 0.08);
+  --fill-strong: rgba(59, 42, 23, 0.12);
+  --glass-bg: #f8f1de;
+  --glass-bg-strong: #f8f1de;
+  --glass-border: var(--hairline);
+}
+:root[data-skin="theme_retro_parchment"][data-theme="dark"] {
+  --background: #201509;
+  --surface: #2e2110;
+  --surface-sunken: #1a1106;
+  --foreground: #ecdcb6;
+  --muted: #b39c73;
+  --hairline: #453214;
+  --hairline-card: rgba(255, 255, 255, 0.07);
+  --gold: #d9a955;
+  --gold-ink: #e8c17f;
+  --gold-soft: rgba(217, 169, 85, 0.14);
+  --gold-line: rgba(217, 169, 85, 0.3);
+  --ink: #ecdcb6;
+  --fill-subtle: rgba(255, 255, 255, 0.045);
+  --fill: rgba(255, 255, 255, 0.08);
+  --fill-strong: rgba(255, 255, 255, 0.13);
+  --glass-bg: rgba(255, 255, 255, 0.045);
+  --glass-bg-strong: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(217, 169, 85, 0.2);
+}
+
+:root[data-skin="theme_neon_dark"]:not([data-theme="dark"]) {
+  --background: #f5eefc;
+  --surface: #ffffff;
+  --surface-sunken: #ece0fa;
+  --foreground: #140a1f;
+  --muted: #6e6285;
+  --hairline: #e2d3f5;
+  --hairline-card: rgba(20, 10, 31, 0.09);
+  --gold: #4fbf26;
+  --gold-ink: #2f8f12;
+  --gold-soft: #e4f7dc;
+  --gold-line: #bdeaa8;
+  --ink: #0f0817;
+  --fill-subtle: rgba(20, 10, 31, 0.04);
+  --fill: rgba(20, 10, 31, 0.07);
+  --fill-strong: rgba(20, 10, 31, 0.11);
+  --glass-bg: #ffffff;
+  --glass-bg-strong: #ffffff;
+  --glass-border: var(--hairline);
+}
+:root[data-skin="theme_neon_dark"][data-theme="dark"] {
+  --background: #060608;
+  --surface: #121014;
+  --surface-sunken: #0a090c;
+  --foreground: #f2f0ff;
+  --muted: #9a94b0;
+  --hairline: #24202c;
+  --hairline-card: rgba(255, 255, 255, 0.08);
+  --gold: #d4ff3d;
+  --gold-ink: #e3ff85;
+  --gold-soft: rgba(212, 255, 61, 0.14);
+  --gold-line: rgba(212, 255, 61, 0.3);
+  --ink: #f2f0ff;
+  --fill-subtle: rgba(255, 255, 255, 0.05);
+  --fill: rgba(255, 255, 255, 0.09);
+  --fill-strong: rgba(255, 255, 255, 0.14);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-strong: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(212, 255, 61, 0.22);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
