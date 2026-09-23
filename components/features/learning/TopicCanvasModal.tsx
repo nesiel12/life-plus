@@ -10,6 +10,7 @@ import { NumberTicker } from "@/components/magicui/number-ticker";
 import { ContinueLearning } from "@/components/features/learning/ContinueLearning";
 import { EmbeddedCinema } from "@/components/features/learning/EmbeddedCinema";
 import { LearningSplitView } from "@/components/features/learning/LearningSplitView";
+import { MasterclassLessonDrawer } from "@/components/features/learning/MasterclassLessonDrawer";
 import { StudyModes } from "@/components/features/learning/StudyModes";
 import { SyllabusQuest } from "@/components/features/learning/SyllabusQuest";
 import { TutorBox } from "@/components/features/learning/TutorBox";
@@ -58,6 +59,8 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
   const [deepStudy, setDeepStudy] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lessonResourceId, setLessonResourceId] = useState<string | null>(null);
+  const lessonResource = resources.find((r) => r.id === lessonResourceId) ?? null;
 
   // If the video that was playing goes away (deleted), fall back to another.
   const playing: LearningResource | null = resources.find((r) => r.id === playingId && r.url && parseVideoInput(r.url)) ?? firstVideo;
@@ -221,7 +224,13 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
                 )}
 
                 <motion.div layout={!reduce} className={cn("flex flex-col gap-6", !video && "lg:order-2")}>
-                  <SyllabusQuest topic={topic} resources={resources} playingId={playing?.id ?? null} onPlayVideo={(r) => setPlayingId(r.id)} />
+                  <SyllabusQuest
+                    topic={topic}
+                    resources={resources}
+                    playingId={playing?.id ?? null}
+                    onPlayVideo={(r) => setPlayingId(r.id)}
+                    onOpenLesson={(r) => setLessonResourceId(r.id)}
+                  />
                 </motion.div>
 
                 <motion.div layout={!reduce} className={cn(!video && "lg:order-1")}>
@@ -278,6 +287,8 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
           </motion.div>
         </motion.div>
       </div>
+
+      {lessonResource && <MasterclassLessonDrawer topic={topic} resource={lessonResource} onClose={() => setLessonResourceId(null)} />}
     </>,
     document.body
   );

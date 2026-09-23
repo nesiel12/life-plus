@@ -1211,6 +1211,26 @@ export interface Database {
         },
         "topic_id" | "step_id" | "user_age_group" | "teaching_mode" | "content"
       >;
+      learning_checkpoint_answers: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          topic_id: string;
+          step_id: string;
+          user_age_group: UserAgeGroupDb;
+          teaching_mode: TeachingModeDb;
+          // InlineCheckpoint.id (types/learning.ts) — model-chosen, unique
+          // only within one generated lesson variant, hence the full
+          // (step_id, user_age_group, teaching_mode, checkpoint_id) key.
+          checkpoint_id: string;
+          selected_index: number;
+          is_correct: boolean;
+          attempts: number;
+          created_at: string;
+          updated_at: string;
+        },
+        "topic_id" | "step_id" | "user_age_group" | "teaching_mode" | "checkpoint_id" | "selected_index" | "is_correct"
+      >;
       meals: TableDef<
         {
           id: string;

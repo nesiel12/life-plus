@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type MouseEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Play, Search, Sparkles, Trash2 } from "lucide-react";
+import { GraduationCap, Loader2, Play, Search, Sparkles, Trash2 } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { NumberTicker } from "@/components/magicui/number-ticker";
@@ -23,6 +23,8 @@ interface SyllabusQuestProps {
   /** The resource whose video is showing in the cinema, if any. */
   playingId: string | null;
   onPlayVideo: (resource: LearningResource) => void;
+  /** Opens the Masterclass & Gaming OS lesson for this step (MasterclassLessonDrawer, owned by TopicCanvasModal). */
+  onOpenLesson: (resource: LearningResource) => void;
 }
 
 /**
@@ -35,7 +37,7 @@ interface SyllabusQuestProps {
  * runs through useResourceCompletion, so a video watched to the end reacts
  * exactly as a tick does.
  */
-export function SyllabusQuest({ topic, resources, playingId, onPlayVideo }: SyllabusQuestProps) {
+export function SyllabusQuest({ topic, resources, playingId, onPlayVideo, onOpenLesson }: SyllabusQuestProps) {
   const reduce = useLabReducedMotion();
   const complete = useResourceCompletion();
   const removeResource = useAtlasStore((s) => s.deleteLearningResource);
@@ -214,6 +216,13 @@ export function SyllabusQuest({ topic, resources, playingId, onPlayVideo }: Syll
                       </button>
                     )}
                     {!isVideo && resource.url && <ResourceLauncher url={resource.url} title={resource.title} />}
+                    <button
+                      onClick={() => onOpenLesson(resource)}
+                      className="focus-ring flex items-center gap-1 rounded-lg border border-accent-learning/30 px-2.5 py-1 text-xs font-medium text-accent-learning transition-colors hover:bg-accent-learning/10"
+                    >
+                      <GraduationCap size={11} aria-hidden />
+                      שיעור אמן
+                    </button>
                     {!resource.url && resource.type === "youtube" && (
                       // A generated video row is a search term, not a link — say where to look.
                       <a

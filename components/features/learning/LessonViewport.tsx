@@ -1,13 +1,50 @@
 "use client";
 
-import { Component, useCallback, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, ExternalLink, Lightbulb, PlayCircle, Quote, RotateCcw, Sparkles } from "lucide-react";
+import { Component, useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, ExternalLink, Lightbulb, PartyPopper, PlayCircle, Quote, RotateCcw, Sparkles } from "lucide-react";
 import { LessonViewportSkeleton } from "@/components/features/learning/LessonViewportSkeleton";
+import { LessonContentRenderer } from "@/components/features/learning/LessonContentRenderer";
+import { useLab, originOf, type Point } from "@/components/features/learning/lab/LabContext";
+import { useResourceCompletion } from "@/components/features/learning/lab/useResourceCompletion";
+import { getCheckpointAnswersAction, submitCheckpointAnswerAction, type CheckpointAnswerState } from "@/app/actions/masterclassProgress";
+import { CHECKPOINT_XP, checkpointCelebrationFor } from "@/lib/learning/masterclassXp";
 import type { LessonGenerateResponse } from "@/app/api/learning/lesson/generate/route";
-import type { InlineCheckpoint, LessonBlockContent, TeachingMode, UserAgeGroup } from "@/types/learning";
+import { TEACHING_MODES, USER_AGE_GROUPS, type InlineCheckpoint, type LessonBlockContent, type TeachingMode, type UserAgeGroup } from "@/types/learning";
+import type { LearningResource, LearningTopic } from "@/types";
 import { cn } from "@/lib/utils";
 
 const GENERIC_ERROR = "משהו השתבש ביצירת השיעור — נסה שוב";
+
+const AGE_GROUP_LABEL: Record<UserAgeGroup, string> = {
+  KIDS_8_12: "ילדים (8-12)",
+  TEENS_13_18: "נוער (13-18)",
+  ADULTS_19_PLUS: "מבוגרים (19+)",
+};
+const TEACHING_MODE_LABEL: Record<TeachingMode, string> = {
+  STORYTELLING: "סיפורי",
+  PRACTICAL: "מעשי",
+  ANALOGIES: "אנלוגיות",
+  SOCRATIC: "סוקרטי",
+};
+
+const AGE_GROUP_KEY = "lifeplus.masterclass.ageGroup";
+const TEACHING_MODE_KEY = "lifeplus.masterclass.teachingMode";
+
+function readStored<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return (allowed as readonly string[]).includes(raw ?? "") ? (raw as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writeStored(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // ignore — the picker still works for this session, just not remembered
+  }
+}
 
 // --- Error boundary ----------------------------------------------------
 //
@@ -70,22 +107,81 @@ function LessonErrorState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+// --- Age group / teaching mode picker ---------------------------------
+
+function SegmentedPicker<T extends string>({ value, options, labels, onChange }: { value: T; options: readonly T[]; labels: Record<T, string>; onChange: (v: T) => void }) {
+  return (
+    <div role="radiogroup" className="flex flex-wrap gap-1.5">
+      {options.map((option) => (
+        <button
+          key={option}
+          role="radio"
+          aria-checked={value === option}
+          onClick={() => onChange(option)}
+          className={cn(
+            "focus-ring rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+            value === option ? "bg-accent-learning text-background" : "bg-fill-subtle text-muted hover:text-foreground"
+          )}
+        >
+          {labels[option]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LessonSettingsBar({
+  ageGroup,
+  teachingMode,
+  onChangeAgeGroup,
+  onChangeTeachingMode,
+}: {
+  ageGroup: UserAgeGroup;
+  teachingMode: TeachingMode;
+  onChangeAgeGroup: (v: UserAgeGroup) => void;
+  onChangeTeachingMode: (v: TeachingMode) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl border border-hairline-card bg-fill-subtle/40 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-medium text-muted">קהל יעד:</span>
+        <SegmentedPicker value={ageGroup} options={USER_AGE_GROUPS} labels={AGE_GROUP_LABEL} onChange={onChangeAgeGroup} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-medium text-muted">סגנון הוראה:</span>
+        <SegmentedPicker value={teachingMode} options={TEACHING_MODES} labels={TEACHING_MODE_LABEL} onChange={onChangeTeachingMode} />
+      </div>
+    </div>
+  );
+}
+
 // --- Viewport ------------------------------------------------------------
 
 export interface LessonViewportProps {
-  topicId: string;
-  stepId: string;
-  userAgeGroup: UserAgeGroup;
-  teachingMode: TeachingMode;
+  topic: LearningTopic;
+  resource: LearningResource;
   customEmphasis?: string;
 }
 
 type LoadState = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ready"; content: LessonBlockContent; cached: boolean };
 
-export function LessonViewport(props: LessonViewportProps) {
+export function LessonViewport({ topic, resource, customEmphasis }: LessonViewportProps) {
+  const topicId = topic.id;
+  const stepId = resource.id;
+
+  const [ageGroup, setAgeGroup] = useState<UserAgeGroup>("ADULTS_19_PLUS");
+  const [teachingMode, setTeachingMode] = useState<TeachingMode>("STORYTELLING");
+  useEffect(() => {
+    setAgeGroup(readStored(AGE_GROUP_KEY, USER_AGE_GROUPS, "ADULTS_19_PLUS"));
+    setTeachingMode(readStored(TEACHING_MODE_KEY, TEACHING_MODES, "STORYTELLING"));
+  }, []);
+
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [retryToken, setRetryToken] = useState(0);
-  const { topicId, stepId, userAgeGroup, teachingMode, customEmphasis } = props;
+  const [answers, setAnswers] = useState<Record<string, CheckpointAnswerState>>({});
+
+  const lab = useLab();
+  const complete = useResourceCompletion();
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });
@@ -93,7 +189,7 @@ export function LessonViewport(props: LessonViewportProps) {
       const res = await fetch("/api/learning/lesson/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topicId, stepId, userAgeGroup, teachingMode, customEmphasis }),
+        body: JSON.stringify({ topicId, stepId, userAgeGroup: ageGroup, teachingMode, customEmphasis }),
       });
       const body = (await res.json().catch(() => null)) as (LessonGenerateResponse & { error?: string }) | null;
       if (!res.ok || !body || !body.content) {
@@ -104,7 +200,7 @@ export function LessonViewport(props: LessonViewportProps) {
     } catch {
       setState({ kind: "error", message: GENERIC_ERROR });
     }
-  }, [topicId, stepId, userAgeGroup, teachingMode, customEmphasis]);
+  }, [topicId, stepId, ageGroup, teachingMode, customEmphasis]);
 
   useEffect(() => {
     void load();
@@ -112,23 +208,108 @@ export function LessonViewport(props: LessonViewportProps) {
     // changing any of the actual request parameters above.
   }, [load, retryToken]);
 
+  // Prior checkpoint answers for this exact generated variant, fetched once
+  // the content itself has loaded — pre-fills each CheckpointCard so
+  // reopening a lesson shows what was last answered instead of resetting.
+  useEffect(() => {
+    if (state.kind !== "ready") return;
+    let cancelled = false;
+    void getCheckpointAnswersAction(topicId, stepId, ageGroup, teachingMode).then((rows) => {
+      if (cancelled) return;
+      setAnswers(Object.fromEntries(rows.map((row) => [row.checkpointId, row])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [state.kind, topicId, stepId, ageGroup, teachingMode]);
+
   const retry = useCallback(() => setRetryToken((t) => t + 1), []);
 
-  if (state.kind === "loading") return <LessonViewportSkeleton />;
-  if (state.kind === "error") return <LessonErrorState onRetry={retry} />;
+  const changeAgeGroup = useCallback((v: UserAgeGroup) => {
+    setAgeGroup(v);
+    writeStored(AGE_GROUP_KEY, v);
+  }, []);
+  const changeTeachingMode = useCallback((v: TeachingMode) => {
+    setTeachingMode(v);
+    writeStored(TEACHING_MODE_KEY, v);
+  }, []);
+
+  const handleCheckpointAnswered = useCallback(
+    (checkpoint: InlineCheckpoint, selectedIndex: number, origin: Point | undefined) => {
+      const isCorrect = selectedIndex === checkpoint.correctIndex;
+      const wasCorrectBefore = answers[checkpoint.id]?.isCorrect ?? false;
+
+      setAnswers((current) => ({
+        ...current,
+        [checkpoint.id]: { checkpointId: checkpoint.id, selectedIndex, isCorrect, attempts: (current[checkpoint.id]?.attempts ?? 0) + 1 },
+      }));
+
+      if (checkpointCelebrationFor({ wasCorrectBefore, isCorrectNow: isCorrect }) === "correct") {
+        lab.celebrate("milestone", CHECKPOINT_XP, origin);
+        lab.audio.play("chime");
+      }
+
+      void submitCheckpointAnswerAction(topicId, stepId, checkpoint.id, ageGroup, teachingMode, selectedIndex, isCorrect).catch(() => {
+        // Best-effort persistence: the local answer state above already
+        // reflects the attempt, so a failed write here loses only the
+        // cross-session memory of it, not the immediate feedback.
+      });
+    },
+    [answers, lab, topicId, stepId, ageGroup, teachingMode]
+  );
+
+  const finishLesson = useCallback(
+    async (e: MouseEvent<HTMLButtonElement>) => {
+      await complete(resource, true, originOf(e.currentTarget));
+    },
+    [complete, resource]
+  );
 
   return (
-    <LessonErrorBoundary onRetry={retry}>
-      <LessonContent content={state.content} />
-    </LessonErrorBoundary>
+    <div dir="rtl" className="flex flex-col gap-4">
+      <LessonSettingsBar ageGroup={ageGroup} teachingMode={teachingMode} onChangeAgeGroup={changeAgeGroup} onChangeTeachingMode={changeTeachingMode} />
+
+      {state.kind === "loading" && <LessonViewportSkeleton />}
+      {state.kind === "error" && <LessonErrorState onRetry={retry} />}
+      {state.kind === "ready" && (
+        <LessonErrorBoundary onRetry={retry}>
+          <div className="flex flex-col gap-6">
+            <LessonContent content={state.content} answers={answers} onCheckpointAnswered={handleCheckpointAnswered} />
+            {!resource.isCompleted && (
+              <button
+                onClick={(e) => void finishLesson(e)}
+                className="focus-ring flex items-center justify-center gap-2 self-center rounded-2xl bg-accent-learning px-6 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+              >
+                <PartyPopper size={16} aria-hidden />
+                סיימתי את השיעור
+              </button>
+            )}
+            {resource.isCompleted && (
+              <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-accent-learning">
+                <CheckCircle2 size={16} aria-hidden />
+                השיעור הזה כבר סומן כהושלם
+              </p>
+            )}
+          </div>
+        </LessonErrorBoundary>
+      )}
+    </div>
   );
 }
 
 // --- Content sections ------------------------------------------------------
 
-function LessonContent({ content }: { content: LessonBlockContent }) {
+function LessonContent({
+  content,
+  answers,
+  onCheckpointAnswered,
+}: {
+  content: LessonBlockContent;
+  answers: Record<string, CheckpointAnswerState>;
+  onCheckpointAnswered: (checkpoint: InlineCheckpoint, selectedIndex: number, origin: Point | undefined) => void;
+}) {
   return (
-    <div dir="rtl" className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <OriginStorySection originStory={content.originStory} />
       {content.pioneers.length > 0 && <PioneersSection pioneers={content.pioneers} />}
       <CoreContentSection coreContent={content.coreContent} />
@@ -136,7 +317,7 @@ function LessonContent({ content }: { content: LessonBlockContent }) {
       {content.mindBlowingTrivia.length > 0 && <TriviaSection items={content.mindBlowingTrivia} />}
       {content.memeData.jokeText && <MemeSection meme={content.memeData} />}
       {content.inAppMedia.youtubeVideoId && <MediaSection media={content.inAppMedia} />}
-      {content.inlineCheckpoints.length > 0 && <CheckpointsSection checkpoints={content.inlineCheckpoints} />}
+      {content.inlineCheckpoints.length > 0 && <CheckpointsSection checkpoints={content.inlineCheckpoints} answers={answers} onAnswered={onCheckpointAnswered} />}
     </div>
   );
 }
@@ -221,11 +402,7 @@ function PioneerCard({ pioneer }: { pioneer: LessonBlockContent["pioneers"][numb
 function CoreContentSection({ coreContent }: { coreContent: string }) {
   return (
     <SectionCard title="להבין לעומק" icon={<Lightbulb size={15} className="text-accent-learning" aria-hidden />}>
-      {/* Plain text, not rendered Markdown — Phase 1 keeps this dependency-
-          free; a real Markdown renderer (code blocks, headings) is a later
-          phase's concern. whitespace-pre-wrap alone keeps the model's own
-          paragraph breaks intact. */}
-      <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{coreContent}</p>
+      <LessonContentRenderer content={coreContent} />
     </SectionCard>
   );
 }
@@ -294,21 +471,50 @@ function MediaSection({ media }: { media: LessonBlockContent["inAppMedia"] }) {
   );
 }
 
-function CheckpointsSection({ checkpoints }: { checkpoints: InlineCheckpoint[] }) {
+function CheckpointsSection({
+  checkpoints,
+  answers,
+  onAnswered,
+}: {
+  checkpoints: InlineCheckpoint[];
+  answers: Record<string, CheckpointAnswerState>;
+  onAnswered: (checkpoint: InlineCheckpoint, selectedIndex: number, origin: Point | undefined) => void;
+}) {
   return (
     <div className="flex flex-col gap-3">
       <h3 className="text-sm font-semibold text-foreground">בדיקת הבנה</h3>
       {checkpoints.map((checkpoint) => (
-        <CheckpointCard key={checkpoint.id} checkpoint={checkpoint} />
+        <CheckpointCard key={checkpoint.id} checkpoint={checkpoint} priorAnswer={answers[checkpoint.id]} onAnswered={onAnswered} />
       ))}
     </div>
   );
 }
 
-function CheckpointCard({ checkpoint }: { checkpoint: InlineCheckpoint }) {
-  const [selected, setSelected] = useState<number | null>(null);
+function CheckpointCard({
+  checkpoint,
+  priorAnswer,
+  onAnswered,
+}: {
+  checkpoint: InlineCheckpoint;
+  priorAnswer: CheckpointAnswerState | undefined;
+  onAnswered: (checkpoint: InlineCheckpoint, selectedIndex: number, origin: Point | undefined) => void;
+}) {
+  const [selected, setSelected] = useState<number | null>(priorAnswer?.selectedIndex ?? null);
+  // A prior answer arriving after first render (the fetch in LessonViewport
+  // resolves after content is already on screen) should still pre-fill —
+  // but never override a choice the person has made in this session.
+  useEffect(() => {
+    if (priorAnswer && selected === null) setSelected(priorAnswer.selectedIndex);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priorAnswer]);
+
   const answered = selected !== null;
   const correct = selected === checkpoint.correctIndex;
+
+  function choose(index: number, e: MouseEvent<HTMLButtonElement>) {
+    setSelected(index);
+    onAnswered(checkpoint, index, originOf(e.currentTarget));
+  }
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-hairline-card bg-surface p-4">
@@ -319,7 +525,7 @@ function CheckpointCard({ checkpoint }: { checkpoint: InlineCheckpoint }) {
           return (
             <button
               key={i}
-              onClick={() => setSelected(i)}
+              onClick={(e) => choose(i, e)}
               disabled={answered}
               className={cn(
                 "focus-ring rounded-xl border px-3 py-2 text-start text-sm transition-colors disabled:cursor-default",
@@ -335,10 +541,18 @@ function CheckpointCard({ checkpoint }: { checkpoint: InlineCheckpoint }) {
         })}
       </div>
       {answered && (
-        <p className="text-xs leading-relaxed text-foreground/90">
-          {!correct && checkpoint.funnyDistractor && <span className="mb-1 block font-medium text-accent-family">{checkpoint.funnyDistractor}</span>}
-          {checkpoint.explanation}
-        </p>
+        <>
+          <p className="text-xs leading-relaxed text-foreground/90">
+            {!correct && checkpoint.funnyDistractor && <span className="mb-1 block font-medium text-accent-family">{checkpoint.funnyDistractor}</span>}
+            {checkpoint.explanation}
+          </p>
+          {!correct && (
+            <button onClick={() => setSelected(null)} className="focus-ring flex w-fit items-center gap-1.5 text-xs font-medium text-accent-learning hover:opacity-80">
+              <RotateCcw size={12} aria-hidden />
+              נסה שוב
+            </button>
+          )}
+        </>
       )}
     </div>
   );

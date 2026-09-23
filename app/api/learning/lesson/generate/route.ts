@@ -116,16 +116,32 @@ export async function POST(request: NextRequest) {
     }
 
     const content = result.data;
-    await learningLessonContentsRepo.insert({
-      user_id: user.id,
-      topic_id: topicId,
-      step_id: stepId,
-      user_age_group: userAgeGroup,
-      teaching_mode: teachingMode,
-      // Already validated by LessonBlockContentSchema.safeParse above —
-      // see the read side's matching comment for why the cast is safe.
-      content: content as unknown as Json,
-    });
+    try {
+      await learningLessonContentsRepo.insert({
+        user_id: user.id,
+        topic_id: topicId,
+        step_id: stepId,
+        user_age_group: userAgeGroup,
+        teaching_mode: teachingMode,
+        // Already validated by LessonBlockContentSchema.safeParse above —
+        // see the read side's matching comment for why the cast is safe.
+        content: content as unknown as Json,
+      });
+    } catch (insertErr) {
+      // 23505 = unique_violation on the cache key. The findCached() check
+      // above and this insert aren't atomic, so two requests for the same
+      // never-before-generated (topic, step, age group, teaching mode) —
+      // a double-click, or the mic/tap racing itself — can both miss the
+      // cache and both reach here; only one insert wins. Rather than fail
+      // the loser outright (it did real, valid generation work, just lost a
+      // race to write it down), fall back to the row the winner just wrote
+      // — the two are for the identical key, so either is a correct answer
+      // to return.
+      if ((insertErr as { code?: string }).code !== "23505") throw insertErr;
+      const winner = await learningLessonContentsRepo.findCached(user.id, topicId, stepId, userAgeGroup, teachingMode);
+      if (!winner) throw insertErr;
+      return NextResponse.json({ content: winner.content as unknown as LessonBlockContent, cached: true } satisfies LessonGenerateResponse);
+    }
 
     return NextResponse.json({ content, cached: false } satisfies LessonGenerateResponse);
   } catch (err) {
