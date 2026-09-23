@@ -30,3 +30,19 @@ export function checkpointCelebrationFor(input: { wasCorrectBefore: boolean; isC
   if (!input.wasCorrectBefore && input.isCorrectNow) return "correct";
   return "none";
 }
+
+/** The pioneer-avatar easter egg's one-time reveal bonus (PioneerProfileDrawer.tsx). */
+export const PIONEER_EASTER_EGG_XP = 10;
+
+export type EasterEggCelebration = "none" | "claimed";
+
+/**
+ * Unlike a checkpoint's right/wrong transition, an easter egg has no
+ * "state" to compare — it's binary, seen or not. `alreadyClaimed` comes
+ * from whether lib/db/pioneerEasterEggClaims.ts's claim() actually inserted
+ * a row (first time) or hit the unique-key conflict and returned nothing
+ * (every time after).
+ */
+export function easterEggCelebrationFor(input: { alreadyClaimed: boolean }): EasterEggCelebration {
+  return input.alreadyClaimed ? "none" : "claimed";
+}

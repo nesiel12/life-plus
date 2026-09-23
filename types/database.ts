@@ -1231,6 +1231,52 @@ export interface Database {
         },
         "topic_id" | "step_id" | "user_age_group" | "teaching_mode" | "checkpoint_id" | "selected_index" | "is_correct"
       >;
+      pioneer_easter_egg_claims: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          topic_id: string;
+          step_id: string;
+          user_age_group: UserAgeGroupDb;
+          teaching_mode: TeachingModeDb;
+          // PioneerProfile.id (types/learning.ts) — model-chosen, unique
+          // only within one generated lesson variant.
+          pioneer_id: string;
+          created_at: string;
+        },
+        "topic_id" | "step_id" | "user_age_group" | "teaching_mode" | "pioneer_id"
+      >;
+      // Deliberately not a GraphTable: no user_id at all — see this
+      // migration's own comment for why (a public webpage's extracted
+      // text is the same for every reader, not per-user data).
+      article_extracts: TableDef<
+        {
+          id: string;
+          url_hash: string;
+          source_url: string;
+          title: string | null;
+          paragraphs: Json;
+          key_paragraph_indices: Json;
+          key_paragraph_notes: Json;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          url_hash: string;
+          source_url: string;
+          title?: string | null;
+          paragraphs: Json;
+          key_paragraph_indices?: Json;
+          key_paragraph_notes?: Json;
+        },
+        {
+          title?: string | null;
+          paragraphs?: Json;
+          key_paragraph_indices?: Json;
+          key_paragraph_notes?: Json;
+        }
+      >;
       meals: TableDef<
         {
           id: string;

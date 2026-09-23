@@ -99,3 +99,30 @@ export const LessonGenerateRequestSchema: z.ZodType<LessonGenerateRequest> = z.o
   teachingMode: TeachingModeSchema,
   customEmphasis: z.string().trim().min(1).max(300).optional(),
 });
+
+// EmbeddedArticleReader.tsx's in-app reader — a distinct, smaller domain
+// from the masterclass lesson block above, but kept in this same file
+// rather than a new one: two short schemas, not worth splitting out.
+
+export const ArticleExtractRequestSchema = z.object({
+  url: z.string().trim().url(),
+});
+
+/** What app/api/learning/article/extract/route.ts asks the model to pick, given a numbered list of the article's own paragraphs. */
+export const ArticleKeyParagraphsSchema = z.object({
+  keyParagraphs: z
+    .array(
+      z.object({
+        /** Index into the paragraphs array handed to the model — validated in range by lib/learning/articleExtract.ts's clampKeyParagraphs, not trusted as-is. */
+        index: z.number().int().min(0),
+        /** Hebrew, RTL — one line on why this paragraph matters. */
+        note: z.string().trim().min(1).max(200),
+      })
+    )
+    .max(4),
+});
+
+export const ArticleExplainRequestSchema = z.object({
+  url: z.string().trim().url(),
+  paragraph: z.string().trim().min(1).max(4000),
+});

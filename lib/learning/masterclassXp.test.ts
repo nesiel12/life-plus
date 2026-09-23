@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHECKPOINT_XP, checkpointCelebrationFor } from "@/lib/learning/masterclassXp";
+import { CHECKPOINT_XP, PIONEER_EASTER_EGG_XP, checkpointCelebrationFor, easterEggCelebrationFor } from "@/lib/learning/masterclassXp";
 
 describe("CHECKPOINT_XP", () => {
   it("is a positive reward", () => {
@@ -22,5 +22,21 @@ describe("checkpointCelebrationFor", () => {
 
   it("does not celebrate a correct answer changed to wrong on retry", () => {
     expect(checkpointCelebrationFor({ wasCorrectBefore: true, isCorrectNow: false })).toBe("none");
+  });
+});
+
+describe("PIONEER_EASTER_EGG_XP", () => {
+  it("is a positive reward", () => {
+    expect(PIONEER_EASTER_EGG_XP).toBeGreaterThan(0);
+  });
+});
+
+describe("easterEggCelebrationFor", () => {
+  it("celebrates the first claim", () => {
+    expect(easterEggCelebrationFor({ alreadyClaimed: false })).toBe("claimed");
+  });
+
+  it("does not re-celebrate a repeat claim", () => {
+    expect(easterEggCelebrationFor({ alreadyClaimed: true })).toBe("none");
   });
 });

@@ -1,9 +1,13 @@
 "use client";
 
 import { Component, useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, ExternalLink, Lightbulb, PartyPopper, PlayCircle, Quote, RotateCcw, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lightbulb, Mic, PartyPopper, PlayCircle, RotateCcw, Sparkles } from "lucide-react";
 import { LessonViewportSkeleton } from "@/components/features/learning/LessonViewportSkeleton";
 import { LessonContentRenderer } from "@/components/features/learning/LessonContentRenderer";
+import { InAppVideoPlayer } from "@/components/features/learning/InAppVideoPlayer";
+import { InterviewAudioVault } from "@/components/features/learning/InterviewAudioVault";
+import { PioneerProfileDrawer } from "@/components/features/learning/PioneerProfileDrawer";
+import { TopicBloopersBox } from "@/components/features/learning/TopicBloopersBox";
 import { useLab, originOf, type Point } from "@/components/features/learning/lab/LabContext";
 import { useResourceCompletion } from "@/components/features/learning/lab/useResourceCompletion";
 import { getCheckpointAnswersAction, submitCheckpointAnswerAction, type CheckpointAnswerState } from "@/app/actions/masterclassProgress";
@@ -91,11 +95,11 @@ class LessonErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-function LessonErrorState({ onRetry }: { onRetry: () => void }) {
+function LessonErrorState({ onRetry, message }: { onRetry: () => void; message?: string }) {
   return (
     <div dir="rtl" className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-hairline-card p-10 text-center">
       <AlertTriangle size={28} className="text-accent-family" aria-hidden />
-      <p className="text-sm text-foreground">{GENERIC_ERROR}</p>
+      <p className="text-sm text-foreground">{message || GENERIC_ERROR}</p>
       <button
         onClick={onRetry}
         className="focus-ring flex items-center gap-1.5 rounded-xl bg-accent-learning/15 px-4 py-2 text-sm font-medium text-accent-learning transition-opacity hover:opacity-80"
@@ -169,12 +173,19 @@ export function LessonViewport({ topic, resource, customEmphasis }: LessonViewpo
   const topicId = topic.id;
   const stepId = resource.id;
 
-  const [ageGroup, setAgeGroup] = useState<UserAgeGroup>("ADULTS_19_PLUS");
-  const [teachingMode, setTeachingMode] = useState<TeachingMode>("STORYTELLING");
-  useEffect(() => {
-    setAgeGroup(readStored(AGE_GROUP_KEY, USER_AGE_GROUPS, "ADULTS_19_PLUS"));
-    setTeachingMode(readStored(TEACHING_MODE_KEY, TEACHING_MODES, "STORYTELLING"));
-  }, []);
+  // Lazy initializers, not a post-mount effect: reading localStorage here
+  // means the very first render already has the person's remembered
+  // picker choice, so `load` below never fires with the wrong (default)
+  // params and then immediately fires again once an effect corrects them.
+  // That double-fire was a real, confirmed bug for any returning user who
+  // had ever changed a picker — two concurrent /api/learning/lesson/generate
+  // calls per open, each independently charging AI quota and racing on the
+  // cache insert (the unique-violation fallback added earlier papered over
+  // the race's failure mode without addressing why two requests fired at
+  // all). readStored's own try/catch already makes it safe to call during
+  // SSR, where localStorage doesn't exist.
+  const [ageGroup, setAgeGroup] = useState<UserAgeGroup>(() => readStored(AGE_GROUP_KEY, USER_AGE_GROUPS, "ADULTS_19_PLUS"));
+  const [teachingMode, setTeachingMode] = useState<TeachingMode>(() => readStored(TEACHING_MODE_KEY, TEACHING_MODES, "STORYTELLING"));
 
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [retryToken, setRetryToken] = useState(0);
@@ -270,11 +281,19 @@ export function LessonViewport({ topic, resource, customEmphasis }: LessonViewpo
       <LessonSettingsBar ageGroup={ageGroup} teachingMode={teachingMode} onChangeAgeGroup={changeAgeGroup} onChangeTeachingMode={changeTeachingMode} />
 
       {state.kind === "loading" && <LessonViewportSkeleton />}
-      {state.kind === "error" && <LessonErrorState onRetry={retry} />}
+      {state.kind === "error" && <LessonErrorState onRetry={retry} message={state.message} />}
       {state.kind === "ready" && (
         <LessonErrorBoundary onRetry={retry}>
           <div className="flex flex-col gap-6">
-            <LessonContent content={state.content} answers={answers} onCheckpointAnswered={handleCheckpointAnswered} />
+            <LessonContent
+              content={state.content}
+              answers={answers}
+              onCheckpointAnswered={handleCheckpointAnswered}
+              topicId={topicId}
+              stepId={stepId}
+              userAgeGroup={ageGroup}
+              teachingMode={teachingMode}
+            />
             {!resource.isCompleted && (
               <button
                 onClick={(e) => void finishLesson(e)}
@@ -303,20 +322,40 @@ function LessonContent({
   content,
   answers,
   onCheckpointAnswered,
+  topicId,
+  stepId,
+  userAgeGroup,
+  teachingMode,
 }: {
   content: LessonBlockContent;
   answers: Record<string, CheckpointAnswerState>;
   onCheckpointAnswered: (checkpoint: InlineCheckpoint, selectedIndex: number, origin: Point | undefined) => void;
+  topicId: string;
+  stepId: string;
+  userAgeGroup: UserAgeGroup;
+  teachingMode: TeachingMode;
 }) {
+  const hasAudio = (content.inAppMedia.audioSnippets?.length ?? 0) > 0;
   return (
     <div className="flex flex-col gap-6">
       <OriginStorySection originStory={content.originStory} />
-      {content.pioneers.length > 0 && <PioneersSection pioneers={content.pioneers} />}
+      {content.pioneers.length > 0 && (
+        <PioneersSection pioneers={content.pioneers} topicId={topicId} stepId={stepId} userAgeGroup={userAgeGroup} teachingMode={teachingMode} />
+      )}
       <CoreContentSection coreContent={content.coreContent} />
-      {content.blooperOrDisaster && <BlooperSection text={content.blooperOrDisaster} />}
+      {content.blooperOrDisaster && <TopicBloopersBox text={content.blooperOrDisaster} />}
       {content.mindBlowingTrivia.length > 0 && <TriviaSection items={content.mindBlowingTrivia} />}
       {content.memeData.jokeText && <MemeSection meme={content.memeData} />}
-      {content.inAppMedia.youtubeVideoId && <MediaSection media={content.inAppMedia} />}
+      {content.inAppMedia.youtubeVideoId && (
+        <SectionCard title="לצפייה" icon={<PlayCircle size={15} className="text-accent-learning" aria-hidden />}>
+          <InAppVideoPlayer videoId={content.inAppMedia.youtubeVideoId} title="סרטון השיעור" chapters={content.inAppMedia.videoChapters} />
+        </SectionCard>
+      )}
+      {hasAudio && (
+        <SectionCard title="קטעי שמע" icon={<Mic size={15} className="text-accent-learning" aria-hidden />}>
+          <InterviewAudioVault snippets={content.inAppMedia.audioSnippets ?? []} />
+        </SectionCard>
+      )}
       {content.inlineCheckpoints.length > 0 && <CheckpointsSection checkpoints={content.inlineCheckpoints} answers={answers} onAnswered={onCheckpointAnswered} />}
     </div>
   );
@@ -344,58 +383,93 @@ function OriginStorySection({ originStory }: { originStory: string }) {
   );
 }
 
-function PioneersSection({ pioneers }: { pioneers: LessonBlockContent["pioneers"] }) {
+function PioneersSection({
+  pioneers,
+  topicId,
+  stepId,
+  userAgeGroup,
+  teachingMode,
+}: {
+  pioneers: LessonBlockContent["pioneers"];
+  topicId: string;
+  stepId: string;
+  userAgeGroup: UserAgeGroup;
+  teachingMode: TeachingMode;
+}) {
   return (
     <div>
       <h3 className="mb-3 text-sm font-semibold text-foreground">האנשים מאחורי הרעיון</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {pioneers.map((pioneer) => (
-          <PioneerCard key={pioneer.id} pioneer={pioneer} />
+          <PioneerCard key={pioneer.id} pioneer={pioneer} topicId={topicId} stepId={stepId} userAgeGroup={userAgeGroup} teachingMode={teachingMode} />
         ))}
       </div>
     </div>
   );
 }
 
-function PioneerCard({ pioneer }: { pioneer: LessonBlockContent["pioneers"][number] }) {
+function PioneerCard({
+  pioneer,
+  topicId,
+  stepId,
+  userAgeGroup,
+  teachingMode,
+}: {
+  pioneer: LessonBlockContent["pioneers"][number];
+  topicId: string;
+  stepId: string;
+  userAgeGroup: UserAgeGroup;
+  teachingMode: TeachingMode;
+}) {
+  const [open, setOpen] = useState(false);
+  // A light pointer-tilt on hover — perspective + rotate driven by pointer
+  // position within the card, not framer-motion's spring machinery
+  // (Flashcard3D.tsx's click-triggered flip and MagneticButton.tsx's
+  // whole-element lean are both shaped for a different interaction; this
+  // card just wants to feel alive on hover, then open the full profile on
+  // click, so a plain CSS transform is the lighter-weight fit).
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  function onPointerMove(e: MouseEvent<HTMLButtonElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ x: py * -6, y: px * 6 });
+  }
+
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-hairline-card bg-surface p-4 transition-colors hover:border-accent-learning/30">
-      <div>
-        <p className="text-sm font-semibold text-foreground">{pioneer.name}</p>
-        <p className="text-xs text-muted">
-          {pioneer.role} · {pioneer.historicalEra}
-        </p>
-      </div>
-      <p className="text-xs leading-relaxed text-foreground/90">{pioneer.bio}</p>
-      {pioneer.famousQuote && (
-        <p className="flex items-start gap-1.5 text-xs italic text-accent-learning">
-          <Quote size={12} className="mt-0.5 shrink-0" aria-hidden />
-          &ldquo;{pioneer.famousQuote}&rdquo;
-        </p>
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        onMouseMove={onPointerMove}
+        onMouseLeave={() => setTilt({ x: 0, y: 0 })}
+        style={{ perspective: 800 }}
+        className="focus-ring block text-start"
+      >
+        <span
+          className="flex flex-col gap-2 rounded-2xl border border-hairline-card bg-surface p-4 transition-[border-color,transform] duration-150 hover:border-accent-learning/30"
+          style={{ transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`, transformStyle: "preserve-3d" }}
+        >
+          <span className="block">
+            <span className="block text-sm font-semibold text-foreground">{pioneer.name}</span>
+            <span className="block text-xs text-muted">
+              {pioneer.role} · {pioneer.historicalEra}
+            </span>
+          </span>
+          <span className="block text-xs leading-relaxed text-foreground/90">{pioneer.bio}</span>
+          {pioneer.unusualFact && (
+            <span className="block rounded-lg bg-fill-subtle px-2.5 py-1.5 text-xs text-foreground/80">
+              <span className="font-medium text-accent-fitness">עובדה משעשעת: </span>
+              {pioneer.unusualFact}
+            </span>
+          )}
+        </span>
+      </button>
+
+      {open && (
+        <PioneerProfileDrawer pioneer={pioneer} topicId={topicId} stepId={stepId} userAgeGroup={userAgeGroup} teachingMode={teachingMode} onClose={() => setOpen(false)} />
       )}
-      {pioneer.unusualFact && (
-        <p className="rounded-lg bg-fill-subtle px-2.5 py-1.5 text-xs text-foreground/80">
-          <span className="font-medium text-accent-fitness">עובדה משעשעת: </span>
-          {pioneer.unusualFact}
-        </p>
-      )}
-      {pioneer.externalLinks.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {pioneer.externalLinks.map((link, i) => (
-            <a
-              key={i}
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="focus-ring flex items-center gap-1 rounded-full border border-hairline-card px-2 py-0.5 text-[10px] text-muted transition-colors hover:text-foreground"
-            >
-              {link.title}
-              <ExternalLink size={9} aria-hidden />
-            </a>
-          ))}
-        </div>
-      )}
-    </div>
+    </>
   );
 }
 
@@ -403,14 +477,6 @@ function CoreContentSection({ coreContent }: { coreContent: string }) {
   return (
     <SectionCard title="להבין לעומק" icon={<Lightbulb size={15} className="text-accent-learning" aria-hidden />}>
       <LessonContentRenderer content={coreContent} />
-    </SectionCard>
-  );
-}
-
-function BlooperSection({ text }: { text: string }) {
-  return (
-    <SectionCard title="כשלא הלך כמתוכנן" className="bg-accent-family/5">
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{text}</p>
     </SectionCard>
   );
 }
@@ -438,35 +504,6 @@ function MemeSection({ meme }: { meme: LessonBlockContent["memeData"] }) {
         <img src={meme.imageUrl} alt="" className="mb-3 w-full rounded-xl object-cover" />
       )}
       <p className="text-sm font-medium text-foreground">{meme.jokeText}</p>
-    </SectionCard>
-  );
-}
-
-function MediaSection({ media }: { media: LessonBlockContent["inAppMedia"] }) {
-  if (!media.youtubeVideoId) return null;
-  return (
-    <SectionCard title="לצפייה" icon={<PlayCircle size={15} className="text-accent-learning" aria-hidden />}>
-      <div className="aspect-video w-full overflow-hidden rounded-xl">
-        <iframe
-          src={`https://www.youtube.com/embed/${media.youtubeVideoId}`}
-          title="סרטון השיעור"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          className="size-full"
-        />
-      </div>
-      {media.videoChapters && media.videoChapters.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-1">
-          {media.videoChapters.map((chapter, i) => (
-            <li key={i} className="flex items-center gap-2 text-xs text-muted">
-              <span className="tabular-nums text-accent-learning">
-                {Math.floor(chapter.time / 60)}:{(chapter.time % 60).toString().padStart(2, "0")}
-              </span>
-              {chapter.label}
-            </li>
-          ))}
-        </ul>
-      )}
     </SectionCard>
   );
 }

@@ -3,6 +3,7 @@
 import { getCurrentUserId } from "@/lib/currentUser";
 import { learningResourcesRepo, learningTopicsRepo } from "@/lib/db/learning";
 import { learningCheckpointAnswersRepo } from "@/lib/db/learningCheckpointAnswers";
+import { pioneerEasterEggClaimsRepo } from "@/lib/db/pioneerEasterEggClaims";
 import type { UserAgeGroup, TeachingMode } from "@/types/learning";
 
 export interface CheckpointAnswerState {
@@ -60,4 +61,33 @@ export async function submitCheckpointAnswerAction(
     isCorrect,
   });
   return { checkpointId: row.checkpoint_id, selectedIndex: row.selected_index, isCorrect: row.is_correct, attempts: row.attempts };
+}
+
+/** Every pioneer joke already claimed for this generated lesson variant — what PioneerProfileDrawer checks before showing the reveal as new or already-seen. */
+export async function getPioneerEasterEggClaimsAction(topicId: string, stepId: string, userAgeGroup: UserAgeGroup, teachingMode: TeachingMode): Promise<string[]> {
+  const userId = await getCurrentUserId();
+  await verifyStepOfTopic(userId, topicId, stepId);
+
+  const rows = await pioneerEasterEggClaimsRepo.findForStep(userId, stepId, userAgeGroup, teachingMode);
+  return rows.map((row) => row.pioneer_id);
+}
+
+/**
+ * Claims one pioneer's joke reveal. Returns whether this claim was new
+ * (`claimed: true`, first time — the caller celebrates) or the person had
+ * already claimed it before (`claimed: false` — same content shown again,
+ * no XP, no re-celebration).
+ */
+export async function claimPioneerEasterEggAction(
+  topicId: string,
+  stepId: string,
+  pioneerId: string,
+  userAgeGroup: UserAgeGroup,
+  teachingMode: TeachingMode
+): Promise<{ claimed: boolean }> {
+  const userId = await getCurrentUserId();
+  await verifyStepOfTopic(userId, topicId, stepId);
+
+  const row = await pioneerEasterEggClaimsRepo.claim({ userId, topicId, stepId, userAgeGroup, teachingMode, pioneerId });
+  return { claimed: row !== null };
 }
