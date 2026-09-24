@@ -20,7 +20,7 @@ import { COMPANION_SOS_EVENT } from "@/lib/companion/sosEvent";
 import { decodeBasedOnHeader } from "@/lib/api/basedOnHeader";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types";
-import { readAiError } from "@/lib/api/aiClient";
+import { AiFetchError, throwAiError } from "@/lib/api/aiClient";
 
 interface Briefing {
   signals: BriefingSignal[];
@@ -182,13 +182,12 @@ export function AICompanion() {
         body: JSON.stringify({ message, history }),
         signal: controller.signal,
       });
-      if (!res.ok) {
-        // Read the body rather than throwing a generic failure: this is the
-        // route a user is most likely to exhaust their quota on, and the
-        // server's explanation was being discarded here.
-        const info = await readAiError(res, "Chat request failed");
-        throw new Error(info.message);
-      }
+      // AiFetchError, not a plain Error: the catch below tells a real,
+      // safe-to-show server message (a quota explanation, its real reset
+      // time) apart from an opaque network/abort error — see aiClient.ts's
+      // own comment for the exact bug this fixed (the quota message was
+      // being computed correctly here and then discarded below anyway).
+      if (!res.ok) await throwAiError(res, "Chat request failed");
       if (!res.body) throw new Error("Chat request failed");
 
       const basedOn = decodeBasedOnHeader(res.headers.get("x-atlas-based-on"));
@@ -223,9 +222,13 @@ export function AICompanion() {
       // branch above already turned into an Error, a network drop, the
       // fetch throwing on abort) was discarded here with zero trace, the
       // one thing that made this class of bug invisible from the browser
-      // console too, not just the server's.
+      // console too, not just the server's. AiFetchError's message is
+      // always safe to show directly (a real quota explanation with its
+      // real reset time, e.g.) — anything else (a network drop, an abort)
+      // falls back to the generic friendly text, same as before.
       console.error("[AICompanion] chat request failed:", err);
-      await addChatMessage({ role: "assistant", content: FRIENDLY_ERROR });
+      const message = err instanceof AiFetchError ? err.message : FRIENDLY_ERROR;
+      await addChatMessage({ role: "assistant", content: message });
     } finally {
       // Clearing the timer here matters as much as setting it: a timer left
       // armed after a successful reply would abort the *next* request.

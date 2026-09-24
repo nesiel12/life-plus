@@ -68,7 +68,11 @@ export class AiQuotaExceededError extends Error {
  * System actors are exempt: the Proactive Engine's per-user jobs are the
  * owner's own scheduled work, not something the user asked for, and charging
  * them would let a nightly cron quietly eat the allowance someone was about
- * to use.
+ * to use. "exempt" actors (lib/ai/quota.ts's isQuotaExemptEmail, resolved by
+ * lib/ai/actor.ts's currentUserActor) are the same idea for a live person
+ * instead of a cron job — the app owner's own account(s), explicitly
+ * opted in by email, not every authenticated user (this app has open
+ * sign-up).
  *
  * The quota is charged *before* the model call, not after. Charging on
  * success would let a user fire unlimited requests that fail — and every one
@@ -79,7 +83,7 @@ async function chargeQuota(
   operation: AiOperation,
   audioMinutes = 0
 ): Promise<void> {
-  if (actor.kind === "system") return;
+  if (actor.kind === "system" || actor.kind === "exempt") return;
 
   const now = new Date();
   const budgets = budgetsFor(operation, now, quotaLimits(), audioMinutes);

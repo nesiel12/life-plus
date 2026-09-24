@@ -27,9 +27,48 @@ export type AiOperation =
  */
 export type AiActor =
   | { kind: "user"; userId: string }
-  | { kind: "system"; job: string };
+  | { kind: "system"; job: string }
+  | { kind: "exempt"; userId: string; email: string };
 
-export const DEFAULT_REQUESTS_PER_DAY = 40;
+/**
+ * Emails exempt from the daily/burst quota entirely (lib/ai/service.ts's
+ * chargeQuota treats this the same as the "system" actor: no charge, no
+ * DB round trip). Deliberately an explicit, opt-in email list, not "any
+ * authenticated user" or a role flag — this app has OPEN sign-up (see
+ * lib/auth.ts: "any Google account may authenticate"), and the quota
+ * exists specifically to stand between an authenticated stranger and the
+ * owner's own provider bill. A blanket bypass for "logged in" would
+ * remove exactly the protection this system is for; this is for the
+ * owner's own account(s) specifically.
+ *
+ * Comma-separated, case-insensitive. Unset (the default) exempts no one —
+ * this must never silently become "everyone" the way a malformed numeric
+ * limit must never silently become 0 (see envInt's own comment).
+ */
+export function quotaExemptEmails(): string[] {
+  const raw = process.env.AI_QUOTA_UNLIMITED_EMAILS;
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isQuotaExemptEmail(email: string): boolean {
+  return quotaExemptEmails().includes(email.trim().toLowerCase());
+}
+
+// Raised from 40 → 80 on 2026-09-25: 40 was sized before this app grew the
+// learning module's course-module/step-brief generation (3 units each) and
+// the chat router's own per-turn classification call, both of which now run
+// on top of ordinary chat use — real, non-abusive daily-driver use of the
+// app's own owner was hitting this. Still bounded, and still overridable
+// via FREE_AI_REQUESTS_PER_DAY — this is a "was clearly too tight" fix, not
+// "remove the ceiling"; the ceiling is what stands between an authenticated
+// stranger (this app has open sign-up, see lib/auth.ts) and the owner's own
+// provider bill. See isQuotaExemptEmail below for exempting the owner
+// specifically instead of raising the limit for anyone who signs up.
+export const DEFAULT_REQUESTS_PER_DAY = 80;
 export const DEFAULT_TRANSCRIPTION_MINUTES_PER_DAY = 10;
 export const DEFAULT_REQUESTS_PER_MINUTE = 6;
 

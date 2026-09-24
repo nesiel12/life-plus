@@ -8,7 +8,7 @@ import { peopleRepo } from "@/lib/db/people";
 import { findAnniversaries } from "@/lib/memories/anniversary";
 import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
 import { AiQuotaExceededError } from "@/lib/ai/service";
-import type { AiActor } from "@/lib/ai/quota";
+import { currentUserActor } from "@/lib/ai/actor";
 import { createFanOutBudget } from "@/lib/ai/fanOut";
 import {
   MEMORIES_AGENT_SYSTEM,
@@ -41,7 +41,11 @@ export async function GET() {
 
   const userId = await getCurrentUserId();
   // Same server-resolved identity the rest of the route is scoped to.
-  const actor: AiActor = { kind: "user", userId };
+  // Through currentUserActor(), not a local `{ kind: "user", userId }`
+  // literal — that skipped lib/ai/actor.ts's quota-exemption check
+  // (AI_QUOTA_UNLIMITED_EMAILS) entirely, the one AI call site in the app
+  // that would have.
+  const actor = await currentUserActor();
   const [corpus, credentials] = await Promise.all([
     photoMemoriesRepo.listMeta(userId),
     googlePhotosCredentialsRepo.get(userId),

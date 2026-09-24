@@ -7,7 +7,9 @@ import {
   budgetsFor,
   dayWindow,
   estimatedAudioMinutes,
+  isQuotaExemptEmail,
   minuteWindow,
+  quotaExemptEmails,
   quotaLimits,
   quotaMessage,
   resetAt,
@@ -18,6 +20,7 @@ const ENV_KEYS = [
   "FREE_AI_REQUESTS_PER_DAY",
   "FREE_AI_TRANSCRIPTION_MINUTES_PER_DAY",
   "FREE_AI_REQUESTS_PER_MINUTE",
+  "AI_QUOTA_UNLIMITED_EMAILS",
 ] as const;
 
 const saved: Record<string, string | undefined> = {};
@@ -222,5 +225,38 @@ describe("quotaMessage", () => {
       quotaMessage("transcribe_day", at),
     ]);
     expect(msgs.size).toBe(3);
+  });
+});
+
+describe("quotaExemptEmails / isQuotaExemptEmail", () => {
+  it("exempts no one when unset", () => {
+    delete process.env.AI_QUOTA_UNLIMITED_EMAILS;
+    expect(quotaExemptEmails()).toEqual([]);
+    expect(isQuotaExemptEmail("anyone@example.com")).toBe(false);
+  });
+
+  it("parses a comma-separated list, trimmed and lowercased", () => {
+    process.env.AI_QUOTA_UNLIMITED_EMAILS = " Owner@Example.com ,  second@example.com";
+    expect(quotaExemptEmails()).toEqual(["owner@example.com", "second@example.com"]);
+  });
+
+  it("matches case-insensitively and ignores surrounding whitespace on the checked email too", () => {
+    process.env.AI_QUOTA_UNLIMITED_EMAILS = "owner@example.com";
+    expect(isQuotaExemptEmail("OWNER@example.com")).toBe(true);
+    expect(isQuotaExemptEmail(" owner@example.com ")).toBe(true);
+    expect(isQuotaExemptEmail("stranger@example.com")).toBe(false);
+  });
+
+  it("drops empty entries from a trailing comma or blank string", () => {
+    process.env.AI_QUOTA_UNLIMITED_EMAILS = "owner@example.com,,";
+    expect(quotaExemptEmails()).toEqual(["owner@example.com"]);
+    process.env.AI_QUOTA_UNLIMITED_EMAILS = "";
+    expect(quotaExemptEmails()).toEqual([]);
+  });
+});
+
+describe("DEFAULT_REQUESTS_PER_DAY", () => {
+  it("is a sane, non-trivial default (not the previous, too-tight 40)", () => {
+    expect(DEFAULT_REQUESTS_PER_DAY).toBeGreaterThanOrEqual(80);
   });
 });

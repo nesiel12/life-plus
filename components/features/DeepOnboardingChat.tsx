@@ -6,6 +6,7 @@ import { Send, SkipForward } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import type { OnboardingTopic } from "@/lib/onboarding/deepOnboarding";
 import type { Person, PersonalDNA } from "@/types";
+import { AiFetchError, throwAiError } from "@/lib/api/aiClient";
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -89,7 +90,8 @@ export function DeepOnboardingChat({ onUnavailable }: { onUnavailable: () => voi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ history, skippedTopics: skipped }),
       });
-      if (!res.ok) throw new Error("Onboarding request failed");
+      // AiFetchError, not a plain Error — same reasoning as AICompanion.tsx.
+      if (!res.ok) await throwAiError(res, "Onboarding request failed");
       const data: OnboardingMessageResponse = await res.json();
 
       if (data.fallbackToStaticForm) {
@@ -111,7 +113,8 @@ export function DeepOnboardingChat({ onUnavailable }: { onUnavailable: () => voi
     } catch (err) {
       // Was a bare `catch {}` — see AICompanion.tsx's identical fix for why.
       console.error("[DeepOnboardingChat] /api/onboarding/message failed:", err);
-      const nextTurns: ChatTurn[] = [...history, { role: "assistant", content: FRIENDLY_ERROR }];
+      const message = err instanceof AiFetchError ? err.message : FRIENDLY_ERROR;
+      const nextTurns: ChatTurn[] = [...history, { role: "assistant", content: message }];
       setTurns(nextTurns);
       saveTranscript(nextTurns, skipped);
     } finally {

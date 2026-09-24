@@ -8,6 +8,7 @@ import { recordRecommendationOutcomeAction } from "@/app/actions/recommendations
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import type { CommandProposal } from "@/lib/commands/proposal";
 import { isSosMessage } from "@/lib/ai/fabIntents";
+import { AiFetchError, throwAiError } from "@/lib/api/aiClient";
 
 interface CommandTurn {
   id: string;
@@ -78,7 +79,11 @@ export function CommandPanel({ incoming, onConsumed, onSos, onAskInChat }: Comma
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: commandText }),
       });
-      if (!res.ok) throw new Error("Command request failed");
+      // AiFetchError, not a plain Error: lets the catch below show a real
+      // server message (a quota explanation, say) instead of always the
+      // generic FRIENDLY_ERROR — same fix and same reasoning as
+      // components/layout/AICompanion.tsx.
+      if (!res.ok) await throwAiError(res, "Command request failed");
       const data: { reply: string; proposal: CommandProposal | null } = await res.json();
 
       setTurns((prev) => [
@@ -99,10 +104,8 @@ export function CommandPanel({ incoming, onConsumed, onSos, onAskInChat }: Comma
       // discarded with no trace, the one thing that made a silent
       // server-side empty reply indistinguishable from a genuine outage.
       console.error("[CommandPanel] /api/commands/interpret failed:", err);
-      setTurns((prev) => [
-        ...prev,
-        { id: turnId, commandText, reply: FRIENDLY_ERROR, proposal: null, resolved: "accepted", executing: false },
-      ]);
+      const reply = err instanceof AiFetchError ? err.message : FRIENDLY_ERROR;
+      setTurns((prev) => [...prev, { id: turnId, commandText, reply, proposal: null, resolved: "accepted", executing: false }]);
     } finally {
       setSending(false);
     }

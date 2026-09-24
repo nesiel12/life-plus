@@ -38,6 +38,7 @@ const { aiQuotaResponse } = await import("@/lib/api/aiErrorResponse");
 
 const USER = { kind: "user" as const, userId: "11111111-1111-1111-1111-111111111111" };
 const SYSTEM = { kind: "system" as const, job: "daily_insight" };
+const EXEMPT = { kind: "exempt" as const, userId: "22222222-2222-2222-2222-222222222222", email: "owner@example.com" };
 
 const allow = () => consumeAiUnits.mockResolvedValue({ allowed: true, rejectedScope: null, used: null, cap: null });
 const deny = (scope: string) =>
@@ -119,6 +120,19 @@ describe("the system actor", () => {
   it("is not charged even when a user quota would be exhausted", async () => {
     deny("day");
     await expect(generateChatText({ system: "s", prompt: "p", actor: SYSTEM })).resolves.toBe("ok");
+    expect(consumeAiUnits).not.toHaveBeenCalled();
+  });
+});
+
+describe("an exempt actor (AI_QUOTA_UNLIMITED_EMAILS)", () => {
+  it("bypasses the quota entirely, the same as the system actor", async () => {
+    await expect(generateChatText({ system: "s", prompt: "p", actor: EXEMPT })).resolves.toBe("ok");
+    expect(consumeAiUnits).not.toHaveBeenCalled();
+  });
+
+  it("is not charged even when a user quota would be exhausted", async () => {
+    deny("day");
+    await expect(generateChatText({ system: "s", prompt: "p", actor: EXEMPT })).resolves.toBe("ok");
     expect(consumeAiUnits).not.toHaveBeenCalled();
   });
 });
