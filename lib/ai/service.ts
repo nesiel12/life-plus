@@ -2,7 +2,7 @@ import "server-only";
 import { generateText, generateObject, streamObject, streamText, experimental_transcribe as transcribe } from "ai";
 import type { z } from "zod";
 import type { ChatModelCandidate } from "@/lib/ai/provider";
-import { getChatModel, getChatModelChain, getTranscriptionModel } from "@/lib/ai/provider";
+import { getChatModelChain, getTranscriptionModel } from "@/lib/ai/provider";
 import { isRetryableAiError } from "@/lib/ai/retryableError";
 import { bytezGenerateObject, bytezGenerateText } from "@/lib/ai/bytez";
 import {
@@ -165,30 +165,130 @@ async function withModelFallback<T>(
   throw lastError;
 }
 
+/**
+ * A minimal stand-in for StreamTextResult, carrying only what
+ * app/api/chat/route.ts actually calls.
+ */
+export interface ChatStream {
+  toTextStreamResponse(init?: ResponseInit): Response;
+}
+
+/**
+ * Streams the chat persona's reply, failing over to the next model in the
+ * chain — but ONLY before any text has reached the caller.
+ *
+ * Genuinely diagnosed 2026-09-25: streamText's own error handling does not
+ * throw into `for await (const chunk of result.textStream)` — a provider
+ * failure (a 503 "high demand", the single most common failure mode seen
+ * live against this app's Gemini key) makes the stream end with ZERO
+ * chunks and no exception anywhere. Before this fix, that meant
+ * `streamChatReply` "succeeded", returned a 200 with an empty body, the
+ * route's own try/catch never fired (nothing threw), and the client
+ * (components/layout/AICompanion.tsx) read `fullText === ""` and showed
+ * "לא הצלחתי להתחבר כרגע" — the exact fallback UI, but with the real cause
+ * silently discarded instead of logged. The bug was invisible from either
+ * end: not a wrong model or key, an unhandled empty-stream case.
+ *
+ * The fix: `onError` (which the SDK does invoke) is used to actually
+ * capture the failure, and this function reads the FIRST chunk itself
+ * before handing anything back — if that first read comes back empty, the
+ * failure is real and known, so it is safe to retry the next model in
+ * getChatModelChain() (Bytez excluded — no streaming path) instead of
+ * discarding it. Once a first chunk is in hand, the original concern this
+ * function used to cite (replaying or dropping tokens the user already
+ * saw) is real again, so no further fallback happens past that point —
+ * the abortSignal bound plus the client's stall watchdog still own a
+ * genuine mid-stream hang or drop, unchanged.
+ *
+ * If every candidate fails before producing a single chunk, this throws
+ * for real — which is what makes app/api/chat/route.ts's own catch block
+ * actually log the true provider error instead of never seeing one.
+ */
 export async function streamChatReply(params: {
   system: string;
   messages: ChatMessage[];
   actor: AiActor;
-}) {
+}): Promise<ChatStream> {
   await chargeQuota(params.actor, "chat");
 
-  // The abortSignal every other call in this module already had, and this one
-  // was missing. Without it a provider that accepts the connection and then
-  // stalls mid-stream produces a response that never completes and never
-  // errors — which is exactly the "stuck on Life Plus חושב…" symptom, since
-  // the client is sitting in an await that will never resolve.
-  //
-  // Deliberately not routed through withModelFallback: failing over
-  // mid-stream would mean either replaying tokens the user has already seen
-  // or silently discarding them. The bound here plus the client's own stall
-  // watchdog (components/layout/AICompanion.tsx) turn a hang into a clean,
-  // honest error instead.
-  return streamText({
-    model: getChatModel(),
-    system: params.system,
-    messages: params.messages,
-    abortSignal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
-  });
+  const chain = getChatModelChain().filter((c): c is Extract<ChatModelCandidate, { kind: "sdk" }> => c.kind === "sdk");
+  if (chain.length === 0) {
+    throw new Error("[ai] streamChatReply: no configured model supports streaming");
+  }
+
+  let lastError: unknown;
+  for (let i = 0; i < chain.length; i++) {
+    const candidate = chain[i];
+    let capturedError: unknown;
+    const result = streamText({
+      model: candidate.model,
+      system: params.system,
+      messages: params.messages,
+      // The abortSignal every other call in this module already had: without
+      // it a provider that accepts the connection and then stalls mid-stream
+      // produces a response that never completes and never errors — the
+      // "stuck on Life Plus חושב…" symptom, the client sitting in an await
+      // that never resolves.
+      abortSignal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+      onError: ({ error }) => {
+        capturedError = error;
+      },
+    });
+
+    const iterator = result.textStream[Symbol.asyncIterator]();
+    const first = await iterator.next();
+
+    if (first.done) {
+      lastError = capturedError ?? new Error(`[ai] streamChatReply: ${candidate.label} produced no output`);
+      const isLast = i === chain.length - 1;
+      // Same discipline as withModelFallback: a capacity failure (503 "high
+      // demand", the one actually seen live against this app's key) is worth
+      // another model; a correctness failure (a dead key, a 401) will fail
+      // identically everywhere, so stop here instead of multiplying latency.
+      const advance = !isLast && isRetryableAiError(capturedError);
+      console.error(
+        `[ai] streamChatReply: ${candidate.label} produced zero output${advance ? `, falling over to ${chain[i + 1].label}` : ""}:`,
+        capturedError instanceof Error ? capturedError.message : capturedError
+      );
+      if (advance) continue;
+      throw lastError;
+    }
+
+    if (i > 0) {
+      console.warn(`[ai] streamChatReply recovered on fallback model ${candidate.label} (attempt ${i + 1})`);
+    }
+
+    // A real first chunk is in hand: reconstruct a stream that starts with it
+    // and continues from the same iterator, so nothing is replayed or lost.
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(first.value));
+      },
+      async pull(controller) {
+        const next = await iterator.next();
+        if (next.done) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(encoder.encode(next.value));
+      },
+      async cancel() {
+        await iterator.return?.();
+      },
+    });
+
+    return {
+      toTextStreamResponse(init?: ResponseInit): Response {
+        return new Response(readable, {
+          ...init,
+          headers: { "content-type": "text/plain; charset=utf-8", ...(init?.headers ?? {}) },
+        });
+      },
+    };
+  }
+
+  throw lastError;
 }
 
 export async function generateChatText(params: {
