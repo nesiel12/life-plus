@@ -69,6 +69,11 @@ export async function classifyRouterDomain(message: string, actor: AiActor): Pro
       schema: routerIntentSchema,
       system: ROUTER_SYSTEM,
       prompt: buildRouterPrompt(message),
+      // This call runs on every chat turn and already degrades to "general"
+      // on any failure — a same-model retry buys nothing a cross-model one
+      // (generateStructuredData's own withModelFallback) doesn't already
+      // cover, at the cost of real latency. See maxRetries's own doc.
+      maxRetries: 0,
     });
     return result.domain;
   } catch {

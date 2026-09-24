@@ -25,23 +25,54 @@ import { resolveChatProvider, type ChatProvider } from "@/lib/ai/resolveChatProv
 // lib/ai/retryableError.ts for exactly what counts as one).
 const OPENAI_CHAT_MODEL_ID = "gpt-4o-mini";
 // Pinned to a dated model, not a Google-maintained "-latest"/"-lite-latest"
-// alias — reversing the previous approach here, deliberately. Re-verified
-// 2026-09-24 against the freshly-rotated key with direct REST calls
-// (generateContent, not the SDK): "gemini-2.5-flash" and "gemini-2.0-flash"
-// both 404 ("no longer available to new users"); "gemini-flash-latest" AND
-// "gemini-flash-lite-latest" (this constant's previous value) both 503
-// "high demand" on every call, consistently, not a one-off spike — the
-// aliases now resolve to an old, saturated generation. "gemini-3.6-flash"
-// and "gemini-3.5-flash" were the only models in the account's live
-// ListModels response that returned real 200s, repeatedly. If this starts
-// erroring again, don't assume the key — re-run ListModels
+// alias, for the reasons in the 2026-09-24 half of this comment below.
+//
+// 2026-09-25 update — swapped which of the two goes primary, after two
+// further live findings against the same key:
+//
+// 1. "gemini-3.6-flash" (this constant's value until today) carries its own
+//    separate free-tier cap of 20 requests/DAY — confirmed via the live
+//    429 body: `"quotaId": "GenerateRequestsPerDayPerProjectPerModel-
+//    FreeTier", "quotaDimensions": {"model": "gemini-3.6-flash"}, "quota
+//    Value": "20"`. Ordinary chat usage (this session's own diagnostics
+//    included) exhausts that in minutes, at which point every chat message
+//    silently failed — see lib/ai/service.ts's streamChatReply for the
+//    other half of that incident (the SDK not throwing on an exhausted
+//    stream). "gemini-3.5-flash" was NOT exhausted at the same time,
+//    despite equivalent testing load, so its own daily cap is evidently
+//    higher (unconfirmed exact number — Google doesn't expose it until you
+//    hit it).
+// 2. "gemini-3.6-flash" defaults to a "thinking" mode with 20+ seconds to
+//    the FIRST streamed chunk on a trivial prompt — measured live. That is
+//    most of this app's own STREAM_TIMEOUT_MS budget spent before a single
+//    byte reaches the person waiting. "gemini-3.5-flash" answered the same
+//    prompt in ~4s with no special configuration. (streamChatReply also
+//    now explicitly sets thinkingBudget: 0 for whichever of the two ends up
+//    a "thinking" model, cutting "gemini-3.6-flash" alone to ~5-7s — still
+//    behind "gemini-3.5-flash" with no config needed at all.)
+//
+// "gemini-3.5-flash" as primary is the fix for both: faster by default, and
+// not the model this app's own testing has already burned through a tiny
+// daily allowance on. "gemini-3.6-flash" stays configured as the fallback
+// — still a live, real, working model, just not the one to lead with.
+//
+// [2026-09-24] Re-verified against the freshly-rotated key with direct REST
+// calls (generateContent, not the SDK): "gemini-2.5-flash" and "gemini-2.0-
+// flash" both 404 ("no longer available to new users"); "gemini-flash-
+// latest" AND "gemini-flash-lite-latest" both 503 "high demand" on every
+// call, consistently, not a one-off spike — the aliases now resolve to an
+// old, saturated generation. "gemini-3.6-flash" and "gemini-3.5-flash" were
+// the only models in the account's live ListModels response that returned
+// real 200s, repeatedly. If this starts erroring again, don't assume the
+// key — re-run ListModels
 // (https://generativelanguage.googleapis.com/v1beta/models?key=…) and a
 // direct generateContent call against a few candidates before touching
 // anything else; see docs/BACKLOG.md.
-const GEMINI_CHAT_MODEL_ID = "gemini-3.6-flash";
+const GEMINI_CHAT_MODEL_ID = "gemini-3.5-flash";
 // A second, independently-verified-live model — not the same one twice, so
-// a genuine outage of the primary actually has somewhere else to go.
-const GEMINI_FALLBACK_MODEL_ID = "gemini-3.5-flash";
+// a genuine outage (or, as of 2026-09-25, a daily-quota exhaustion) of the
+// primary actually has somewhere else to go.
+const GEMINI_FALLBACK_MODEL_ID = "gemini-3.6-flash";
 const OPENAI_FALLBACK_MODEL_ID = "gpt-4o-mini";
 const TRANSCRIPTION_MODEL_ID = "whisper-1";
 // Second fallback, between Gemini and OpenAI — see lib/ai/bytez.ts for why

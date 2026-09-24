@@ -12,6 +12,12 @@ import { currentUserActor } from "@/lib/ai/actor";
 import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
+// Explicit, not implicit in the platform default: a genuinely slow model
+// call (a busy provider, a "thinking" model) must fail into this route's
+// own honest fallback, not be cut off by an ambient serverless ceiling
+// first. Added 2026-09-25 alongside the same fix on every other AI-backed
+// route.
 
 const RATE_LIMIT = { limit: 10, windowMs: 5 * 60 * 1000 }; // 10 generations / 5 min
 

@@ -108,7 +108,9 @@ export function DeepOnboardingChat({ onUnavailable }: { onUnavailable: () => voi
         clearSavedTranscript();
         await completeOnboarding();
       }
-    } catch {
+    } catch (err) {
+      // Was a bare `catch {}` — see AICompanion.tsx's identical fix for why.
+      console.error("[DeepOnboardingChat] /api/onboarding/message failed:", err);
       const nextTurns: ChatTurn[] = [...history, { role: "assistant", content: FRIENDLY_ERROR }];
       setTurns(nextTurns);
       saveTranscript(nextTurns, skipped);

@@ -92,7 +92,13 @@ export function CommandPanel({ incoming, onConsumed, onSos, onAskInChat }: Comma
           executing: false,
         },
       ]);
-    } catch {
+    } catch (err) {
+      // Was a bare `catch {}` — logged now, same reasoning and same real
+      // 2026-09-25 incident as components/layout/AICompanion.tsx's own fix:
+      // a real failure here (a non-200, a thrown network error) was
+      // discarded with no trace, the one thing that made a silent
+      // server-side empty reply indistinguishable from a genuine outage.
+      console.error("[CommandPanel] /api/commands/interpret failed:", err);
       setTurns((prev) => [
         ...prev,
         { id: turnId, commandText, reply: FRIENDLY_ERROR, proposal: null, resolved: "accepted", executing: false },

@@ -24,7 +24,12 @@ import { geminiTranscribeWindow, type MediaSource, type RawWindowLine } from "@/
 // "high demand" on 2026-09-24 against the freshly-rotated key, while these
 // two returned real 200s. Multimodal (video/audio) generateContent isn't
 // restricted to any particular flash tier, so the same pair covers this too.
-const MEDIA_TRANSCRIPTION_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash"];
+// "gemini-3.5-flash" leads for the same reason it leads the chat chain as
+// of 2026-09-25 (see lib/ai/provider.ts): "gemini-3.6-flash" carries its
+// own separate 20-requests/day free-tier cap, live-confirmed via a real
+// 429 body, and a lesson's transcription runs one window at a time —
+// exactly the repeated-call pattern that cap is smallest for.
+const MEDIA_TRANSCRIPTION_MODELS = ["gemini-3.5-flash", "gemini-3.6-flash"];
 
 // The one shared AI service (Unified AI Provider Layer) — every AI-backed
 // route calls through here instead of importing the `ai` SDK or
@@ -166,6 +171,17 @@ async function withModelFallback<T>(
 }
 
 /**
+ * Whether a chain candidate's label is a Gemini model that both HAS a
+ * thinking mode and can be told to turn it off — i.e. worth passing
+ * thinkingConfig to at all. Labels are `gemini:<model id>` /
+ * `openai:<model id>` / `bytez:<model id>` (lib/ai/provider.ts). A "-lite"
+ * Gemini tier live-confirmed 400s on receiving thinkingConfig in any form.
+ */
+function isThinkingCapableGemini(label: string): boolean {
+  return label.startsWith("gemini:") && !label.includes("lite");
+}
+
+/**
  * A minimal stand-in for StreamTextResult, carrying only what
  * app/api/chat/route.ts actually calls.
  */
@@ -230,6 +246,24 @@ export async function streamChatReply(params: {
       // "stuck on Life Plus חושב…" symptom, the client sitting in an await
       // that never resolves.
       abortSignal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+      // Zero, not the SDK's own default (2): live-diagnosed 2026-09-25, the
+      // SDK's built-in retry re-tries the SAME model with exponential
+      // backoff on exactly the errors this function already has its OWN,
+      // better retry for — a different model, immediately. Left at the
+      // default, a quota-exhausted or overloaded primary burned 20-30s
+      // retrying itself 3 times (matching Google's own suggested 8-15s
+      // backoff) before this function's fallover ever got a turn, which on
+      // a tight STREAM_TIMEOUT_MS budget could exhaust the whole window on
+      // a model this function was about to correctly abandon anyway.
+      maxRetries: 0,
+      // Cuts time-to-first-token for the "thinking" model tier: live-
+      // measured 2026-09-25 against gemini-3.6-flash, default thinking took
+      // 20s+ to produce a first chunk at all; thinkingBudget: 0 brought that
+      // to ~5-7s. NOT harmless on every candidate, live-confirmed the hard
+      // way: a "-lite" Gemini model 400s ("Request contains an invalid
+      // argument") on receiving thinkingConfig at all, so this is gated to
+      // labels that are Gemini and not a lite tier — see isThinkingCapable.
+      ...(isThinkingCapableGemini(candidate.label) ? { providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } } } : {}),
       onError: ({ error }) => {
         capturedError = error;
       },
@@ -307,7 +341,15 @@ export async function generateChatText(params: {
       model: candidate.model,
       system: params.system,
       prompt: params.prompt,
-      maxRetries: 1,
+      // 0, not the previous 1: plain text has no schema to self-correct on
+      // a retry the way generateObject's near-miss retry does (see that
+      // function's own maxRetries comment) — a same-model retry here is
+      // only ever retrying a capacity failure, which withModelFallback
+      // (this function's caller, one line up) already retries against a
+      // DIFFERENT model. Same reasoning, and same live 2026-09-25
+      // incident, as generateStructuredData gaining its own overridable
+      // maxRetries for classifyRouterDomain — see that function's comment.
+      maxRetries: 0,
       abortSignal: AbortSignal.timeout(GENERATION_TIMEOUT_MS),
     });
     return text;
@@ -337,6 +379,20 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
    * callers that pass this run in background jobs, not a user's request.
    */
   timeoutMs?: number;
+  /**
+   * Overrides generateObject's own same-model retry (default 1 — see the
+   * call site's comment for why that default exists: a cheap chance to fix
+   * a near-miss schema before failing over to a whole different model).
+   * Pass 0 for a call where that trade is wrong — cheap, low-stakes
+   * generation where withModelFallback's own cross-model retry is strictly
+   * better than spending a same-model round trip first. classifyRouterDomain
+   * is exactly this: one short enum field, already degrades to "general" on
+   * any failure, and runs on every single chat turn — live-observed
+   * 2026-09-25, its default retry-then-fallover against an exhausted model
+   * was adding several extra seconds to every /api/chat request on top of
+   * the equivalent cost inside streamChatReply itself.
+   */
+  maxRetries?: number;
 }) {
   await chargeQuota(params.actor, params.operation ?? "structured");
   const { images } = params;
@@ -391,8 +447,9 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
       // hitting the deadline. One retry is enough to recover a genuine
       // one-off malformed response; a schema the model consistently can't
       // satisfy should fail fast to the caller's fallback instead of
-      // burning the whole budget rediscovering that.
-      maxRetries: 1,
+      // burning the whole budget rediscovering that. Overridable — see this
+      // function's own maxRetries param doc.
+      maxRetries: params.maxRetries ?? 1,
       abortSignal: AbortSignal.timeout(params.timeoutMs ?? STRUCTURED_TIMEOUT_MS),
     });
     return object;

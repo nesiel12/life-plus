@@ -204,11 +204,27 @@ export function AICompanion() {
         setStreamingReply(fullText);
       }
 
+      if (!fullText) {
+        // The exact 2026-09-25 incident (see lib/ai/service.ts's
+        // streamChatReply): the server can answer 200 with a genuinely
+        // empty body if every model in its own fallback chain fails before
+        // producing output. Fixed server-side, but this is the one place a
+        // recurrence — of this or any new empty-stream cause — would ever
+        // be visible at all, so it's logged rather than silently shown as
+        // the same friendly text a real network failure gets.
+        console.error("[AICompanion] /api/chat returned 200 with an empty body — every model in the server's fallback chain likely failed.");
+      }
       const created = await addChatMessage({ role: "assistant", content: fullText || FRIENDLY_ERROR });
       if (basedOn.length > 0) {
         setBasedOnByMessageId((prev) => ({ ...prev, [created.id]: basedOn }));
       }
-    } catch {
+    } catch (err) {
+      // Was a bare `catch {}` — a real failure (a non-200 the readAiError
+      // branch above already turned into an Error, a network drop, the
+      // fetch throwing on abort) was discarded here with zero trace, the
+      // one thing that made this class of bug invisible from the browser
+      // console too, not just the server's.
+      console.error("[AICompanion] chat request failed:", err);
       await addChatMessage({ role: "assistant", content: FRIENDLY_ERROR });
     } finally {
       // Clearing the timer here matters as much as setting it: a timer left

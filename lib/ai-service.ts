@@ -68,7 +68,14 @@ function buildProviderChain(): Provider[] {
     openAiCompatibleProvider("Groq", process.env.GROQ_API_KEY, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
     // Live-verified 2026-09-24 (see lib/ai/provider.ts): "gemini-2.0-flash"
     // 404s as "no longer available to new users" against a fresh key.
-    geminiProvider(process.env.GEMINI_API_KEY, "gemini-3.6-flash"),
+    // "gemini-3.5-flash", not "gemini-3.6-flash": 2026-09-25, "gemini-3.6-
+    // flash" was confirmed to carry its own separate 20-requests/day
+    // free-tier cap (live 429 body), and this module has no per-model
+    // fallback of its own — a single call here against an exhausted or
+    // slow "thinking" model just fails, so it leads with the one that
+    // live-measured faster and wasn't the one this app's own testing had
+    // already exhausted (see lib/ai/provider.ts for the full comparison).
+    geminiProvider(process.env.GEMINI_API_KEY, "gemini-3.5-flash"),
     openAiCompatibleProvider("GitHub Models", process.env.GITHUB_TOKEN, "https://models.inference.ai.azure.com", "gpt-4o-mini"),
     openAiCompatibleProvider("OpenRouter", process.env.OPENROUTER_API_KEY, "https://openrouter.ai/api/v1", "meta-llama/llama-3.3-70b-instruct:free"),
     openAiCompatibleProvider("Cerebras", process.env.CEREBRAS_API_KEY, "https://api.cerebras.ai/v1", "llama3.1-70b"),

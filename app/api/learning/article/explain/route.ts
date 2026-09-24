@@ -10,6 +10,12 @@ import { currentUserActor } from "@/lib/ai/actor";
 import { ArticleExplainRequestSchema } from "@/lib/validations/learning";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
+// Explicit, not implicit in the platform default: a genuinely slow model
+// call (a busy provider, a "thinking" model) must fail into this route's
+// own honest fallback, not be cut off by an ambient serverless ceiling
+// first. Added 2026-09-25 alongside the same fix on every other AI-backed
+// route.
 
 // A single short prose explanation, not a heavy generation — closer to a
 // chat turn than the extract route's page-fetch-plus-structured-pick, so a

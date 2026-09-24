@@ -127,6 +127,35 @@ describe("streamChatReply: empty-output failover", () => {
     expect(text).toBe("אבג");
   });
 
+  it("disables the SDK's own retry (this function's fallover already covers it) and disables thinking for a non-lite Gemini candidate", async () => {
+    chain = [candidate("gemini:gemini-3.6-flash")];
+    streamTextMock.mockImplementationOnce(succeeding("hi"));
+
+    await streamChatReply({ system: "s", messages: [], actor: SYSTEM_ACTOR });
+
+    const call = streamTextMock.mock.calls[0][0];
+    expect(call.maxRetries).toBe(0);
+    expect(call.providerOptions).toEqual({ google: { thinkingConfig: { thinkingBudget: 0 } } });
+  });
+
+  it("never sends thinkingConfig to a lite Gemini candidate (400s live if it does)", async () => {
+    chain = [candidate("gemini:gemini-flash-lite-latest")];
+    streamTextMock.mockImplementationOnce(succeeding("hi"));
+
+    await streamChatReply({ system: "s", messages: [], actor: SYSTEM_ACTOR });
+
+    expect(streamTextMock.mock.calls[0][0].providerOptions).toBeUndefined();
+  });
+
+  it("never sends thinkingConfig to a non-Gemini candidate", async () => {
+    chain = [candidate("openai:gpt-4o-mini")];
+    streamTextMock.mockImplementationOnce(succeeding("hi"));
+
+    await streamChatReply({ system: "s", messages: [], actor: SYSTEM_ACTOR });
+
+    expect(streamTextMock.mock.calls[0][0].providerOptions).toBeUndefined();
+  });
+
   it("throws when no configured model supports streaming (empty chain)", async () => {
     chain = [];
     await expect(streamChatReply({ system: "s", messages: [], actor: SYSTEM_ACTOR })).rejects.toThrow(
