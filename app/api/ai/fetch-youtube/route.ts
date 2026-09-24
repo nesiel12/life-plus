@@ -10,12 +10,21 @@ import {
 } from "youtube-transcript";
 import { authOptions } from "@/lib/auth";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
+import { youtubeVideoDetails } from "@/lib/torah/sources/youtube";
+import { youtubeVideoId } from "@/lib/learning/youtube";
 
 // Transcript-fetching half of the Torah Space AI Summarizer's YouTube flow:
 // given a video URL, returns its caption text as one plain string. The
 // frontend then feeds that straight into /api/ai/summarize-shiur — this
 // route does no summarization itself, only extraction, same
 // single-responsibility split as extract's PDF/audio branches.
+//
+// Two tiers when there's no caption text: `youtubeVideoDetails` (shared with
+// the Torah source providers) tries the YouTube Data API first — title,
+// channel AND description, when YOUTUBE_API_KEY is configured — and falls
+// back to keyless oEmbed (title/channel only) on its own. Either way the
+// route still answers 200 with whatever metadata it found; only a truly
+// unavailable video is a hard error (see below).
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -56,10 +65,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "יש להזין קישור תקין לסרטון YouTube." }, { status: 400 });
   }
 
-  // Public oEmbed — no API key, no quota. Gives us the title and channel even
-  // when captions are off, which is what the AI's metadata-only fallback
-  // summary is built from.
-  const meta = await fetchOembed(parsed.data.url);
+  // Title/channel/description even when captions are off — the Data API
+  // tier when YOUTUBE_API_KEY is configured (this also carries the
+  // description, which oEmbed never does), falling back to keyless oEmbed on
+  // its own. Either way this is what the AI's metadata-only fallback summary
+  // below is built from.
+  const id = youtubeVideoId(parsed.data.url);
+  const details = id ? await youtubeVideoDetails(id) : null;
+  const meta: OembedMeta | null = details ? { title: details.title, author: details.channelTitle ?? null, description: details.description ?? null } : null;
 
   try {
     const segments = await YoutubeTranscript.fetchTranscript(parsed.data.url);
@@ -96,19 +109,5 @@ export async function POST(request: Request) {
 interface OembedMeta {
   title: string;
   author: string | null;
-}
-
-async function fetchOembed(url: string): Promise<OembedMeta | null> {
-  try {
-    const res = await fetch(
-      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`,
-      { signal: AbortSignal.timeout(6_000) }
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as { title?: string; author_name?: string };
-    if (!data.title) return null;
-    return { title: data.title, author: data.author_name ?? null };
-  } catch {
-    return null;
-  }
+  description: string | null;
 }

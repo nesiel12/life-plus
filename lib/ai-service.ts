@@ -66,7 +66,9 @@ function geminiProvider(apiKey: string | undefined, model: string): Provider | n
 function buildProviderChain(): Provider[] {
   const providers = [
     openAiCompatibleProvider("Groq", process.env.GROQ_API_KEY, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
-    geminiProvider(process.env.GEMINI_API_KEY, "gemini-2.0-flash"),
+    // Live-verified 2026-09-24 (see lib/ai/provider.ts): "gemini-2.0-flash"
+    // 404s as "no longer available to new users" against a fresh key.
+    geminiProvider(process.env.GEMINI_API_KEY, "gemini-3.6-flash"),
     openAiCompatibleProvider("GitHub Models", process.env.GITHUB_TOKEN, "https://models.inference.ai.azure.com", "gpt-4o-mini"),
     openAiCompatibleProvider("OpenRouter", process.env.OPENROUTER_API_KEY, "https://openrouter.ai/api/v1", "meta-llama/llama-3.3-70b-instruct:free"),
     openAiCompatibleProvider("Cerebras", process.env.CEREBRAS_API_KEY, "https://api.cerebras.ai/v1", "llama3.1-70b"),

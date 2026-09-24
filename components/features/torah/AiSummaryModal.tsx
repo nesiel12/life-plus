@@ -187,12 +187,20 @@ export function AiSummaryModal({ open, onClose, onSave }: AiSummaryModalProps) {
       if (typeof transcriptData.text === "string" && transcriptData.text.trim()) {
         textToSummarize = transcriptData.text;
       } else if (transcriptData.meta?.title) {
-        // No captions — summarise from the title/channel, honestly flagged.
-        setWarn("לסרטון אין תמלול. הסיכום יתבסס על כותרת הסרטון והנושא בלבד.");
+        // No captions — summarise from whatever metadata is available,
+        // honestly flagged. The description (Data API only, via
+        // YOUTUBE_API_KEY) is often a written outline for a shiur and is a
+        // materially better basis than the title alone when it's there.
+        setWarn(
+          transcriptData.meta.description
+            ? "לסרטון אין תמלול. הסיכום יתבסס על כותרת הסרטון והתיאור שלו."
+            : "לסרטון אין תמלול. הסיכום יתבסס על כותרת הסרטון והנושא בלבד."
+        );
         textToSummarize = [
           "אין תמלול לסרטון. המידע הזמין:",
           `כותרת: ${transcriptData.meta.title}`,
           transcriptData.meta.author ? `ערוץ: ${transcriptData.meta.author}` : "",
+          transcriptData.meta.description ? `תיאור הסרטון:\n${transcriptData.meta.description}` : "",
         ]
           .filter(Boolean)
           .join("\n");

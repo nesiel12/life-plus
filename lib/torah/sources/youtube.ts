@@ -174,17 +174,28 @@ export interface YoutubeVideoDetails {
   title: string;
   channelTitle?: string;
   durationSeconds: number | null;
+  /**
+   * The uploader's own description, Data-API only (oEmbed doesn't carry it).
+   * A shiur's description is often a written outline — the richest fallback
+   * text available when there is no transcript (see fetch-youtube's route).
+   * Trimmed to a few paragraphs; a video's description can run to thousands
+   * of characters of links and boilerplate that add nothing to a summary.
+   */
+  description?: string;
 }
 
+const MAX_DESCRIPTION_CHARS = 1500;
+
 interface VideosResult {
-  items?: { snippet?: { title?: string; channelTitle?: string }; contentDetails?: { duration?: string } }[];
+  items?: { snippet?: { title?: string; channelTitle?: string; description?: string }; contentDetails?: { duration?: string } }[];
 }
 
 /**
- * Title, channel and duration for one video.
+ * Title, channel, duration and (Data API only) description for one video.
  *
  * The Data API when a key is configured — the only source of the video's
- * DURATION, which the transcription planner needs. Falls back to oEmbed
+ * DURATION and DESCRIPTION, which the transcription planner and the
+ * no-transcript AI summary fallback need respectively. Falls back to oEmbed
  * (title and channel only) without a key.
  */
 export async function youtubeVideoDetails(videoId: string): Promise<YoutubeVideoDetails | null> {
@@ -196,11 +207,13 @@ export async function youtubeVideoDetails(videoId: string): Promise<YoutubeVideo
     );
     const item = result?.items?.[0];
     if (item?.snippet?.title) {
+      const description = item.snippet.description?.trim();
       return {
         videoId,
         title: decodeXml(item.snippet.title),
         channelTitle: item.snippet.channelTitle,
         durationSeconds: parseIsoDuration(item.contentDetails?.duration),
+        description: description ? decodeXml(description).slice(0, MAX_DESCRIPTION_CHARS) : undefined,
       };
     }
     if (result && (result.items ?? []).length === 0) return null;

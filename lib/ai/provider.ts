@@ -24,22 +24,24 @@ import { resolveChatProvider, type ChatProvider } from "@/lib/ai/resolveChatProv
 // reaches OpenAI on a genuine capacity failure (see isRetryableAiError in
 // lib/ai/retryableError.ts for exactly what counts as one).
 const OPENAI_CHAT_MODEL_ID = "gpt-4o-mini";
-// A Google-maintained alias ("whatever flash model is currently
-// recommended"), not a pinned dated model — deliberately, after a pinned
-// "gemini-2.5-flash" broke in production with "no longer available to new
-// users" (a 404, not a deprecation warning). Re-verified 2026-08-31 against a
-// real key: "gemini-2.5-flash" / "gemini-2.0-flash" both 404 ("no longer
-// available"); "gemini-flash-latest" was returning 503 "high demand" on every
-// call; "gemini-flash-lite-latest" returned real Hebrew replies 3/3. Lite is
-// also cheaper/faster and more than enough for Atlas's short-generation
-// workload (insights, goal breakdown, structured extraction). If the AI SDK
-// starts erroring here again, check model availability with a direct REST
-// call before assuming it's the key — see docs/BACKLOG.md.
-const GEMINI_CHAT_MODEL_ID = "gemini-flash-lite-latest";
-// Secondary aliases used only as failover links in the chain below. Both are
-// Google-maintained aliases rather than pinned dated ids, for exactly the
-// reason documented above.
-const GEMINI_FALLBACK_MODEL_ID = "gemini-flash-latest";
+// Pinned to a dated model, not a Google-maintained "-latest"/"-lite-latest"
+// alias — reversing the previous approach here, deliberately. Re-verified
+// 2026-09-24 against the freshly-rotated key with direct REST calls
+// (generateContent, not the SDK): "gemini-2.5-flash" and "gemini-2.0-flash"
+// both 404 ("no longer available to new users"); "gemini-flash-latest" AND
+// "gemini-flash-lite-latest" (this constant's previous value) both 503
+// "high demand" on every call, consistently, not a one-off spike — the
+// aliases now resolve to an old, saturated generation. "gemini-3.6-flash"
+// and "gemini-3.5-flash" were the only models in the account's live
+// ListModels response that returned real 200s, repeatedly. If this starts
+// erroring again, don't assume the key — re-run ListModels
+// (https://generativelanguage.googleapis.com/v1beta/models?key=…) and a
+// direct generateContent call against a few candidates before touching
+// anything else; see docs/BACKLOG.md.
+const GEMINI_CHAT_MODEL_ID = "gemini-3.6-flash";
+// A second, independently-verified-live model — not the same one twice, so
+// a genuine outage of the primary actually has somewhere else to go.
+const GEMINI_FALLBACK_MODEL_ID = "gemini-3.5-flash";
 const OPENAI_FALLBACK_MODEL_ID = "gpt-4o-mini";
 const TRANSCRIPTION_MODEL_ID = "whisper-1";
 // Second fallback, between Gemini and OpenAI — see lib/ai/bytez.ts for why

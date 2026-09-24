@@ -19,9 +19,12 @@ import {
 import { adjustAiUnits, consumeAiUnits } from "@/lib/db/aiUsage";
 import { geminiTranscribeWindow, type MediaSource, type RawWindowLine } from "@/lib/ai/geminiMedia";
 
-// Same aliases and order as the chat chain (lib/ai/provider.ts): lite first,
-// the full flash model only as a capacity fallback.
-const MEDIA_TRANSCRIPTION_MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest"];
+// Same two dated models as the chat chain (lib/ai/provider.ts), and the same
+// reason: the "-latest"/"-lite-latest" aliases were both live-verified 503
+// "high demand" on 2026-09-24 against the freshly-rotated key, while these
+// two returned real 200s. Multimodal (video/audio) generateContent isn't
+// restricted to any particular flash tier, so the same pair covers this too.
+const MEDIA_TRANSCRIPTION_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash"];
 
 // The one shared AI service (Unified AI Provider Layer) — every AI-backed
 // route calls through here instead of importing the `ai` SDK or
