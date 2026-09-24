@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import {
   BookOpen,
@@ -19,24 +20,32 @@ import { useLearningAudio } from "@/hooks/useLearningAudio";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { NumberTicker } from "@/components/magicui/number-ticker";
 import { TopicsMapTab } from "@/components/features/learning/TopicsMapTab";
-import { DiscoveryTab } from "@/components/features/learning/DiscoveryTab";
-import { LibraryTab } from "@/components/features/learning/LibraryTab";
-import { MasteryTab } from "@/components/features/learning/MasteryTab";
-import { FeynmanTab } from "@/components/features/learning/FeynmanTab";
-import { TopicCanvasModal } from "@/components/features/learning/TopicCanvasModal";
 import { fireCelebration } from "@/components/features/learning/lab/fx";
 import { XpPops, type XpPop } from "@/components/features/learning/lab/FloatingXp";
 import { Portal } from "@/components/features/learning/lab/Portal";
 import { LabContext, type LabApi, type Point } from "@/components/features/learning/lab/LabContext";
 import { StreakFlame } from "@/components/features/learning/lab/StreakFlame";
 import { useLabReducedMotion } from "@/components/features/learning/lab/useLabMotion";
-import { LifePlusShopModal } from "@/components/features/learning/shop/LifePlusShopModal";
-import { ParticleTrailCanvas } from "@/components/features/learning/shop/ParticleTrailCanvas";
 import { getShopStateAction } from "@/app/actions/xpShop";
 import { shopItemById } from "@/lib/learning/xpShop";
 import { labStats, type Celebration } from "@/lib/learning/xp";
 import type { LearningInsights } from "@/lib/learning/types";
 import { cn } from "@/lib/utils";
+
+// Code splitting: the hub's first paint needs only the default (map) tab.
+// Everything else — the other tabs, the topic canvas, the shop, the cursor
+// trail — is its own chunk, fetched when first needed. The canvas chunk is
+// also warmed on idle (see below) so the first card click opens it with no
+// perceptible wait for the shared-layout animation.
+const TabLoading = () => <div className="h-64 animate-pulse rounded-3xl bg-fill-subtle/40" aria-hidden />;
+const DiscoveryTab = dynamic(() => import("@/components/features/learning/DiscoveryTab").then((m) => m.DiscoveryTab), { ssr: false, loading: TabLoading });
+const LibraryTab = dynamic(() => import("@/components/features/learning/LibraryTab").then((m) => m.LibraryTab), { ssr: false, loading: TabLoading });
+const MasteryTab = dynamic(() => import("@/components/features/learning/MasteryTab").then((m) => m.MasteryTab), { ssr: false, loading: TabLoading });
+const FeynmanTab = dynamic(() => import("@/components/features/learning/FeynmanTab").then((m) => m.FeynmanTab), { ssr: false, loading: TabLoading });
+const loadTopicCanvas = () => import("@/components/features/learning/TopicCanvasModal").then((m) => m.TopicCanvasModal);
+const TopicCanvasModal = dynamic(loadTopicCanvas, { ssr: false });
+const LifePlusShopModal = dynamic(() => import("@/components/features/learning/shop/LifePlusShopModal").then((m) => m.LifePlusShopModal), { ssr: false });
+const ParticleTrailCanvas = dynamic(() => import("@/components/features/learning/shop/ParticleTrailCanvas").then((m) => m.ParticleTrailCanvas), { ssr: false });
 
 export type LabTab = "map" | "discovery" | "library" | "mastery" | "feynman";
 
@@ -108,6 +117,18 @@ export function LearningHub() {
       setOwnedBadgeNames(state.ownedItemIds.map((id) => shopItemById(id)).filter((item) => item?.category === "badge").map((item) => item!.name));
       setActiveTrail(state.activeParticleTrail);
     });
+  }, []);
+
+  // Warm the topic canvas chunk once the hub is idle, so opening a topic never
+  // waits on the network (see the dynamic imports at the top of the file).
+  useEffect(() => {
+    const warm = () => void loadTopicCanvas().catch(() => undefined);
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(warm, { timeout: 3000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(warm, 1500);
+    return () => clearTimeout(id);
   }, []);
 
   const stats = useMemo(() => labStats(topics, resources), [topics, resources]);
@@ -296,7 +317,7 @@ export function LearningHub() {
 
         <AnimatePresence>{openId && <TopicCanvasModal key={openId} topicId={openId} onClose={closeCanvas} />}</AnimatePresence>
         <XpPops pops={pops} />
-        <ParticleTrailCanvas activeTrailId={activeTrail} />
+        {activeTrail && <ParticleTrailCanvas activeTrailId={activeTrail} />}
         {shopOpen && (
           <LifePlusShopModal
             onClose={() => {

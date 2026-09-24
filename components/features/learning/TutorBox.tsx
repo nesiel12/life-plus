@@ -12,6 +12,21 @@ interface TutorBoxProps {
   topicTitle: string;
   /** Titles of the topic's resources, to ground the question in what is being studied. */
   resourceTitles: readonly string[];
+  /** The step open on the canvas, if any — questions are about it first. */
+  stepTitle?: string;
+  /**
+   * Roleplay: real people tied to the step (the step brief's key figures).
+   * Picking one makes the tutor answer in character — a simulation, and it
+   * says so.
+   */
+  personas?: readonly TutorPersona[];
+  /** Hides the box's own heading when a surrounding drawer already has one. */
+  hideHeading?: boolean;
+}
+
+export interface TutorPersona {
+  name: string;
+  contribution: string;
 }
 
 const PROMPTS = ["הסבר לי את הנושא בקצרה", "תן לי דוגמה", "בחן אותי בשלוש שאלות"];
@@ -19,13 +34,24 @@ const MAX_RESOURCES_IN_PROMPT = 5;
 const PARTICLES = [0, 60, 120, 180, 240, 300];
 
 /** The question, framed so the answer is a tutor's and is about *this* topic. */
-export function buildTutorMessage(topicTitle: string, resourceTitles: readonly string[], question: string): string {
+export function buildTutorMessage(
+  topicTitle: string,
+  resourceTitles: readonly string[],
+  question: string,
+  options: { stepTitle?: string; persona?: TutorPersona } = {}
+): string {
   const sources = resourceTitles.slice(0, MAX_RESOURCES_IN_PROMPT).join("; ");
+  const { stepTitle, persona } = options;
   return [
     `אני לומד את הנושא "${topicTitle}"${sources ? ` (המקורות שלי: ${sources})` : ""}.`,
+    stepTitle ? `כרגע אני בשלב: "${stepTitle}".` : "",
     `השאלה שלי: ${question.trim()}`,
-    "ענה כמורה פרטי — בקצרה, בבהירות ובעברית.",
-  ].join("\n");
+    persona
+      ? `ענה בגוף ראשון בדמותו של ${persona.name} (${persona.contribution}) — סימולציה חינוכית: שמור על עובדות היסטוריות נכונות, אל תמציא ציטוטים, ואם נשאלת על משהו שקרה אחרי תקופתו — אמור זאת בדמות. בקצרה ובעברית.`
+      : "ענה כמורה פרטי — בקצרה, בבהירות ובעברית.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /**
@@ -37,12 +63,14 @@ export function buildTutorMessage(topicTitle: string, resourceTitles: readonly s
  * ring pulses around the box and six sparks orbit it: transforms and opacity
  * only, and still under reduced motion.
  */
-export function TutorBox({ topicTitle, resourceTitles }: TutorBoxProps) {
+export function TutorBox({ topicTitle, resourceTitles, stepTitle, personas = [], hideHeading }: TutorBoxProps) {
   const reduce = useLabReducedMotion();
   const [question, setQuestion] = useState("");
   const [reply, setReply] = useState("");
   const [phase, setPhase] = useState<"idle" | "thinking" | "streaming" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [personaName, setPersonaName] = useState<string | null>(null);
+  const persona = personas.find((p) => p.name === personaName);
   const controllerRef = useRef<AbortController | null>(null);
 
   // Closing the canvas mid-answer must not leave a request running.
@@ -65,7 +93,7 @@ export function TutorBox({ topicTitle, resourceTitles }: TutorBoxProps) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: buildTutorMessage(topicTitle, resourceTitles, q), history: [] }),
+        body: JSON.stringify({ message: buildTutorMessage(topicTitle, resourceTitles, q, { stepTitle, persona }), history: [] }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error((await readAiError(res, "Tutor request failed")).message);
@@ -91,10 +119,40 @@ export function TutorBox({ topicTitle, resourceTitles }: TutorBoxProps) {
 
   return (
     <section aria-label="שאל על הנושא" className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-        <GraduationCap size={17} className="text-accent-learning" aria-hidden />
-        שאל על הנושא
-      </h3>
+      {!hideHeading && (
+        <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
+          <GraduationCap size={17} className="text-accent-learning" aria-hidden />
+          שאל על הנושא
+        </h3>
+      )}
+
+      {personas.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted">מי עונה?</span>
+          <div role="radiogroup" aria-label="מי עונה" className="flex flex-wrap gap-1.5">
+            {[null, ...personas.map((p) => p.name)].map((name) => (
+              <button
+                key={name ?? "tutor"}
+                type="button"
+                role="radio"
+                aria-checked={personaName === name}
+                onClick={() => {
+                  setPersonaName(name);
+                  setReply("");
+                  setError(null);
+                }}
+                className={cn(
+                  "focus-ring min-h-11 rounded-full px-3 text-xs font-medium transition-colors",
+                  personaName === name ? "bg-accent-learning text-background" : "bg-fill-subtle text-foreground hover:bg-accent-learning/15"
+                )}
+              >
+                {name ? `🎭 ${name}` : "המורה"}
+              </button>
+            ))}
+          </div>
+          {persona && <p className="text-[11px] text-muted">סימולציה: הבינה המלאכותית משחקת את {persona.name}. זה לא ציטוט אמיתי.</p>}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-1.5">
         {PROMPTS.map((prompt) => (
@@ -102,7 +160,7 @@ export function TutorBox({ topicTitle, resourceTitles }: TutorBoxProps) {
             key={prompt}
             onClick={() => void ask(prompt)}
             disabled={busy}
-            className="focus-ring rounded-full border border-hairline-card px-3 py-1 text-xs text-muted transition-colors hover:border-transparent hover:bg-fill-subtle hover:text-foreground disabled:opacity-50"
+            className="focus-ring min-h-11 rounded-full border border-hairline-card px-3 py-1 text-xs text-muted transition-colors hover:border-transparent hover:bg-fill-subtle hover:text-foreground disabled:opacity-50"
           >
             {prompt}
           </button>
@@ -146,7 +204,7 @@ export function TutorBox({ topicTitle, resourceTitles }: TutorBoxProps) {
           <input
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="מה לא ברור? שאל כל דבר על הנושא…"
+            placeholder={persona ? `שאל/י את ${persona.name}…` : "מה לא ברור? שאל כל דבר על הנושא…"}
             aria-label="שאלה על הנושא"
             maxLength={1000}
             className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted"
@@ -155,7 +213,7 @@ export function TutorBox({ topicTitle, resourceTitles }: TutorBoxProps) {
             type="submit"
             disabled={!question.trim() || busy}
             aria-label="שלח שאלה"
-            className="grid size-9 place-items-center rounded-xl bg-accent-learning text-background transition-opacity disabled:opacity-40"
+            className="grid size-11 place-items-center rounded-xl bg-accent-learning text-background transition-opacity disabled:opacity-40"
           >
             {busy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <SendHorizontal size={16} className="-scale-x-100" aria-hidden />}
           </MagneticButton>

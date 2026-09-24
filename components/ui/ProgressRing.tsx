@@ -35,8 +35,12 @@ export function ProgressRing({ value, size = 96, stroke = 9, color, over, childr
 
   return (
     <div
-      role="img"
+      role="progressbar"
       aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(clamped * 100)}
+      aria-valuetext={label}
       className={cn("group relative grid shrink-0 place-items-center", className)}
       style={{ width: size, height: size }}
     >

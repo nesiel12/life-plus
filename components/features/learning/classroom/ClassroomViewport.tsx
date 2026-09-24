@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowRight, Settings2 } from "lucide-react";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { LessonViewport } from "@/components/features/learning/LessonViewport";
 import { SyllabusSidebar } from "@/components/features/learning/classroom/SyllabusSidebar";
 import { ClassroomNavBar } from "@/components/features/learning/classroom/ClassroomNavBar";
+import { useFocusTrap } from "@/components/features/learning/lab/useFocusTrap";
 import { getAdjacentStepId } from "@/lib/learning/classroomNav";
 import { topicProgress, topicXp } from "@/lib/learning/xp";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,10 @@ export function ClassroomViewport({ topic, resources, initialStepId, onClose }: 
   const [activeStepId, setActiveStepId] = useState(initialStepId);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Its own modal layer: without this, Tab was pulled back to the topic canvas
+  // hidden underneath (that canvas's trap only knew about its own panel).
+  const rootRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(rootRef, true, onClose);
 
   const activeResource = useMemo(() => resources.find((r) => r.id === activeStepId) ?? resources[0], [resources, activeStepId]);
   const prevStepId = activeResource ? getAdjacentStepId(resources, activeResource.id, "prev") : null;
@@ -47,7 +52,7 @@ export function ClassroomViewport({ topic, resources, initialStepId, onClose }: 
   if (!activeResource) return null;
 
   return createPortal(
-    <div dir="rtl" className={cn("fixed inset-0 flex flex-col bg-background", CLASSROOM_Z_INDEX)}>
+    <div ref={rootRef} role="dialog" aria-modal="true" aria-label={`שיעור אמן: ${topic.title}`} dir="rtl" className={cn("fixed inset-0 flex flex-col bg-background", CLASSROOM_Z_INDEX)}>
       <header className="flex items-center gap-3 border-b border-hairline-card px-4 py-3 sm:px-6">
         <button
           onClick={onClose}

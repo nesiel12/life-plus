@@ -1,5 +1,5 @@
 import "server-only";
-import { generateText, generateObject, streamText, experimental_transcribe as transcribe } from "ai";
+import { generateText, generateObject, streamObject, streamText, experimental_transcribe as transcribe } from "ai";
 import type { z } from "zod";
 import type { ChatModelCandidate } from "@/lib/ai/provider";
 import { getChatModel, getChatModelChain, getTranscriptionModel } from "@/lib/ai/provider";
@@ -296,6 +296,59 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
     },
     images && images.length > 0 ? { filter: (c) => c.kind === "sdk" } : {}
   );
+}
+
+/**
+ * Structured generation that streams: `onPartial` receives ever-more-complete
+ * snapshots of the object while the model is still writing it, and the
+ * promise resolves with the final, schema-validated object.
+ *
+ * Exists for the heavy learning generations (a masterclass block, a step
+ * brief) that used to sit silent for 20-40s behind generateStructuredData —
+ * long enough for the platform or a proxy to cut the request, and long
+ * enough that the person assumed it had hung. Streaming keeps bytes moving
+ * and lets the UI fill in as the content arrives.
+ *
+ * Failover goes through withModelFallback like every other call. Each partial
+ * is a whole snapshot (not a delta), so a model failing mid-stream and the
+ * next one starting over is safe: the next snapshot simply replaces the last.
+ * Bytez has no streaming path; as a fallback tier it answers in one piece.
+ */
+export async function streamStructuredData<T extends z.ZodTypeAny>(params: {
+  schema: T;
+  system: string;
+  prompt: string;
+  actor: AiActor;
+  operation?: AiOperation;
+  onPartial: (partial: unknown) => void;
+  timeoutMs?: number;
+}): Promise<z.infer<T>> {
+  await chargeQuota(params.actor, params.operation ?? "structured");
+  return withModelFallback("streamStructuredData", async (candidate) => {
+    if (candidate.kind === "bytez") {
+      return bytezGenerateObject({ modelId: candidate.modelId, schema: params.schema, system: params.system, prompt: params.prompt });
+    }
+    let streamError: unknown;
+    const result = streamObject({
+      model: candidate.model,
+      schema: params.schema,
+      system: params.system,
+      prompt: params.prompt,
+      maxRetries: 1,
+      abortSignal: AbortSignal.timeout(params.timeoutMs ?? STREAM_TIMEOUT_MS),
+      onError: ({ error }) => {
+        streamError = error;
+      },
+    });
+    for await (const partial of result.partialObjectStream) params.onPartial(partial);
+    try {
+      return (await result.object) as z.infer<T>;
+    } catch (err) {
+      // The stream's own error (a 503, a rate limit) is the meaningful one for
+      // the retry decision; the object promise only says "no object".
+      throw streamError ?? err;
+    }
+  });
 }
 
 /**

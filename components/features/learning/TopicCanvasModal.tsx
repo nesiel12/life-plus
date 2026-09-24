@@ -1,20 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, GraduationCap, Trash2, X } from "lucide-react";
+import { ChevronDown, GraduationCap, MessageCircleQuestion, Sparkles, Timer, Trash2, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { ProgressRing } from "@/components/ui/ProgressRing";
 import { NumberTicker } from "@/components/magicui/number-ticker";
-import { ContinueLearning } from "@/components/features/learning/ContinueLearning";
 import { EmbeddedCinema } from "@/components/features/learning/EmbeddedCinema";
-import { LearningSplitView } from "@/components/features/learning/LearningSplitView";
-import { ClassroomViewport } from "@/components/features/learning/classroom/ClassroomViewport";
-import { StudyModes } from "@/components/features/learning/StudyModes";
 import { SyllabusQuest } from "@/components/features/learning/SyllabusQuest";
-import { TutorBox } from "@/components/features/learning/TutorBox";
+import { TutorDrawer } from "@/components/features/learning/TutorDrawer";
+import { StepPreview } from "@/components/features/learning/step/StepPreview";
+import { peekStepBrief } from "@/components/features/learning/step/useStepBrief";
 import { STATUS_CYCLE, STATUS_LABEL } from "@/components/features/learning/lab/labels";
+import { focusableIn, isOwnLayerEvent } from "@/components/features/learning/lab/useFocusTrap";
 import { useLabReducedMotion } from "@/components/features/learning/lab/useLabMotion";
 import { useResourceCompletion } from "@/components/features/learning/lab/useResourceCompletion";
 import { GoalTaskLink } from "@/components/features/learning/lab/GoalTaskLink";
@@ -23,12 +23,22 @@ import { topicProgress, topicXp } from "@/lib/learning/xp";
 import { cn } from "@/lib/utils";
 import type { LearningResource } from "@/types";
 
+// Code-split: none of these are needed for the canvas's first paint. The
+// classroom and the deep-study stack only mount on an explicit click, and the
+// focus timer only when its popover opens.
+const ClassroomViewport = dynamic(() => import("@/components/features/learning/classroom/ClassroomViewport").then((m) => m.ClassroomViewport), { ssr: false });
+const StudyModes = dynamic(() => import("@/components/features/learning/StudyModes").then((m) => m.StudyModes), { ssr: false });
+const LearningSplitView = dynamic(() => import("@/components/features/learning/LearningSplitView").then((m) => m.LearningSplitView), { ssr: false });
+const ContinueLearning = dynamic(() => import("@/components/features/learning/ContinueLearning").then((m) => m.ContinueLearning), { ssr: false });
+const FocusTimer = dynamic(() => import("@/components/features/learning/FocusTimer"), {
+  ssr: false,
+  loading: () => <div className="h-72 w-80" aria-hidden />,
+});
+
 interface TopicCanvasModalProps {
   topicId: string;
   onClose: () => void;
 }
-
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * The topic, opened.
@@ -37,9 +47,15 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), texta
  * so the card grows into the canvas on a spring instead of a new screen
  * appearing. The content fades in once the frame has arrived.
  *
+ * Layout: the syllabus is a timeline beside a Live Step Content Preview —
+ * selecting a step (click, or the arrow keys) renders that step's brief in the
+ * main canvas, so the canvas is never an empty column. "שאל על הנושא" is a
+ * slide-over drawer, and a Pomodoro focus timer sits in the header.
+ *
  * It is a real dialog: it renders into <body> (see Portal), locks the page
  * behind it, traps Tab, closes on Escape or a click outside, and hands focus back
- * to what opened it.
+ * to what opened it. Layers on top of it (the tutor drawer, the classroom, a
+ * pioneer profile) own their keys — see isOwnLayerEvent.
  */
 export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
   const reduce = useLabReducedMotion();
@@ -53,17 +69,41 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  const firstVideo = useMemo(() => resources.find((r) => r.type === "youtube" && r.url && parseVideoInput(r.url)) ?? null, [resources]);
-  const [playingId, setPlayingId] = useState<string | null>(firstVideo?.id ?? null);
+  const firstOpen = useMemo(() => resources.find((r) => !r.isCompleted) ?? resources[0] ?? null, [resources]);
+  const [selectedId, setSelectedId] = useState<string | null>(firstOpen?.id ?? null);
   const [theater, setTheater] = useState(false);
   const [deepStudy, setDeepStudy] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [classroomStepId, setClassroomStepId] = useState<string | null>(null);
+  const [tutorOpen, setTutorOpen] = useState(false);
+  const [timerOpen, setTimerOpen] = useState(false);
+  const [timerMounted, setTimerMounted] = useState(false);
+  const tutorId = useId();
+  const timerId = useId();
+  const timerRef = useRef<HTMLDivElement>(null);
+  const timerButtonRef = useRef<HTMLButtonElement>(null);
 
-  // If the video that was playing goes away (deleted), fall back to another.
-  const playing: LearningResource | null = resources.find((r) => r.id === playingId && r.url && parseVideoInput(r.url)) ?? firstVideo;
-  const video = playing?.url ? parseVideoInput(playing.url) : null;
+  // A deleted (or not-yet-loaded) selection falls back to the next step to do.
+  const selectedIndex = resources.findIndex((r) => r.id === selectedId);
+  const selected: LearningResource | null = selectedIndex === -1 ? firstOpen : resources[selectedIndex];
+  const selectedPosition = selected ? resources.indexOf(selected) : -1;
+  const video = selected?.type === "youtube" && selected.url ? parseVideoInput(selected.url) : null;
+
+  const mainRef = useRef<HTMLElement>(null);
+  const selectStep = useCallback(
+    (r: LearningResource, via: "pointer" | "keyboard" = "pointer") => {
+      setSelectedId(r.id);
+      // On a phone the timeline sits above the canvas: a tap should bring the
+      // step into view. Arrow-key browsing stays put on the timeline.
+      if (via === "pointer" && window.matchMedia("(max-width: 1023px)").matches) {
+        requestAnimationFrame(() => mainRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
+      }
+    },
+    [reduce]
+  );
+  const openLesson = useCallback((r: LearningResource) => setClassroomStepId(r.id), []);
+  const closeTutor = useCallback(() => setTutorOpen(false), []);
 
   // The topic can disappear from under us (deleted here, or elsewhere).
   useEffect(() => {
@@ -78,13 +118,15 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
     closeRef.current?.focus();
 
     function onKeyDown(e: KeyboardEvent) {
+      // A drawer, the classroom or a profile modal on top handles its own keys.
+      if (!isOwnLayerEvent(panelRef.current, e)) return;
       if (e.key === "Escape") {
         e.stopPropagation();
         onClose();
         return;
       }
       if (e.key !== "Tab") return;
-      const nodes = [...(panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])].filter((n) => n.offsetParent !== null);
+      const nodes = focusableIn(panelRef.current);
       if (nodes.length === 0) return;
       const first = nodes[0];
       const last = nodes[nodes.length - 1];
@@ -106,9 +148,33 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
     };
   }, [onClose]);
 
+  // The focus-timer popover: Escape or a click outside closes it (and only it).
+  useEffect(() => {
+    if (!timerOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape" || !timerRef.current?.contains(e.target as Node)) return;
+      e.stopPropagation();
+      setTimerOpen(false);
+      timerButtonRef.current?.focus();
+    }
+    function onPointer(e: PointerEvent) {
+      const t = e.target as Node;
+      if (!timerRef.current?.contains(t) && !timerButtonRef.current?.contains(t)) setTimerOpen(false);
+    }
+    window.addEventListener("keydown", onKey, true);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [timerOpen]);
+
   const onWatched = useCallback(() => {
-    if (playing && !playing.isCompleted) complete(playing, true).catch(() => setError("לא הצלחנו לסמן את הסרטון כהושלם."));
-  }, [playing, complete]);
+    if (selected && !selected.isCompleted) complete(selected, true).catch(() => setError("לא הצלחנו לסמן את הסרטון כהושלם."));
+  }, [selected, complete]);
+
+  const personas = useMemo(() => (tutorOpen ? (peekStepBrief(selected?.id)?.keyFigures ?? []) : []), [tutorOpen, selected?.id]);
+  const resourceTitles = useMemo(() => resources.map((r) => r.title), [resources]);
 
   if (!topic) return null;
 
@@ -149,7 +215,7 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
             exit={{ opacity: 0, transition: { duration: 0.1 } }}
           >
             <header className="flex items-center gap-4 border-b border-hairline-card px-5 py-4 sm:px-7">
-              <ProgressRing value={progress.fraction} size={56} stroke={5} color="var(--accent-learning)" label={`${progress.done} מתוך ${progress.total} שלבים הושלמו`}>
+              <ProgressRing className="hidden sm:grid" value={progress.fraction} size={56} stroke={5} color="var(--accent-learning)" label={`${progress.done} מתוך ${progress.total} שלבים הושלמו`}>
                 <span className="ltr text-[0.7rem] font-bold tabular-nums text-foreground">
                   <NumberTicker value={Math.round(progress.fraction * 100)} />%
                 </span>
@@ -162,12 +228,60 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
                   <button
                     onClick={() => updateLearningTopic(topic.id, { status: STATUS_CYCLE[topic.status] }).catch(() => undefined)}
                     aria-label={`סטטוס: ${STATUS_LABEL[topic.status]}. לחץ כדי לשנות`}
-                    className="focus-ring rounded-full bg-accent-learning/15 px-2.5 py-0.5 text-[10px] font-medium text-accent-learning transition-opacity hover:opacity-80"
+                    className="focus-ring min-h-7 rounded-full bg-accent-learning/15 px-2.5 py-0.5 text-[11px] font-medium text-accent-learning transition-opacity hover:opacity-80"
                   >
                     {STATUS_LABEL[topic.status]}
                   </button>
                   {xp > 0 && <span className="font-semibold text-gold-ink">{xp} XP</span>}
                 </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setTutorOpen(true)}
+                aria-expanded={tutorOpen}
+                aria-controls={tutorId}
+                className="focus-ring flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-accent-learning/15 px-3.5 text-sm font-medium text-accent-learning transition-opacity hover:opacity-80"
+              >
+                <MessageCircleQuestion size={16} aria-hidden />
+                <span className="hidden sm:inline">שאל על הנושא</span>
+              </button>
+
+              <div className="relative shrink-0">
+                <button
+                  ref={timerButtonRef}
+                  type="button"
+                  onClick={() => {
+                    setTimerMounted(true);
+                    setTimerOpen((v) => !v);
+                  }}
+                  aria-expanded={timerOpen}
+                  aria-controls={timerId}
+                  aria-label="טיימר ריכוז וצלילי רקע"
+                  className={cn(
+                    "focus-ring grid size-11 place-items-center rounded-full transition-colors",
+                    timerOpen ? "bg-accent-learning/15 text-accent-learning" : "bg-fill-subtle text-muted hover:text-foreground"
+                  )}
+                >
+                  <Timer size={17} aria-hidden />
+                </button>
+                {/* Mounted on first open and then only hidden, so a running
+                    session (and its ambient sound) survives closing the popover. */}
+                {timerMounted && (
+                  <div
+                    ref={timerRef}
+                    id={timerId}
+                    role="region"
+                    aria-label="טיימר ריכוז"
+                    hidden={!timerOpen}
+                    className={cn(
+                      "absolute end-0 top-full z-30 mt-2 origin-top-left rounded-2xl border border-hairline-card bg-surface shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)]",
+                      !reduce && "animate-mac-launch"
+                    )}
+                  >
+                    <FocusTimer />
+                  </div>
+                )}
               </div>
 
               {confirmingDelete ? (
@@ -186,7 +300,7 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
                 <button
                   onClick={() => setConfirmingDelete(true)}
                   aria-label="מחק את הנושא"
-                  className="focus-ring hidden rounded-full p-2 text-muted transition-colors hover:text-accent-family sm:block"
+                  className="focus-ring hidden size-11 place-items-center rounded-full text-muted transition-colors hover:text-accent-family sm:grid"
                 >
                   <Trash2 size={16} aria-hidden />
                 </button>
@@ -196,93 +310,110 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
                 ref={closeRef}
                 onClick={onClose}
                 aria-label="סגור"
-                className="focus-ring grid size-9 shrink-0 place-items-center rounded-full bg-fill-subtle text-muted transition-colors hover:text-foreground"
+                className="focus-ring grid size-11 shrink-0 place-items-center rounded-full bg-fill-subtle text-muted transition-colors hover:text-foreground"
               >
                 <X size={18} aria-hidden />
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7">
-              <div className="mb-5">
-                <GoalTaskLink topicTitle={topic.title} nextStepTitle={resources.find((r) => !r.isCompleted)?.title} />
-              </div>
-
-              <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-                {video && playing && (
-                  <motion.div layout={!reduce} transition={{ type: "spring", bounce: 0.1, duration: 0.5 }} className={cn(theater && "lg:col-span-2")}>
-                    <EmbeddedCinema
-                      videoId={video.videoId}
-                      title={playing.title}
-                      startSeconds={video.startSeconds}
-                      alreadyWatched={playing.isCompleted}
-                      onWatched={onWatched}
-                      theater={theater}
-                      onToggleTheater={() => setTheater((v) => !v)}
-                    />
-                  </motion.div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+              {/* The main canvas (right, in RTL): the selected step, live. */}
+              <main ref={mainRef} className="order-2 min-w-0 scroll-mt-2 px-5 py-6 sm:px-8 lg:order-1 lg:overflow-y-auto">
+                {selected ? (
+                  <StepPreview
+                    key={selected.id}
+                    topic={topic}
+                    resource={selected}
+                    index={selectedPosition}
+                    total={resources.length}
+                    onOpenLesson={openLesson}
+                    media={
+                      video ? (
+                        <div className={cn(!theater && "max-w-3xl")}>
+                          <EmbeddedCinema
+                            videoId={video.videoId}
+                            title={selected.title}
+                            startSeconds={video.startSeconds}
+                            alreadyWatched={selected.isCompleted}
+                            onWatched={onWatched}
+                            theater={theater}
+                            onToggleTheater={() => setTheater((v) => !v)}
+                          />
+                        </div>
+                      ) : undefined
+                    }
+                  />
+                ) : (
+                  <EmptyCanvas />
                 )}
 
-                <motion.div layout={!reduce} className={cn("flex flex-col gap-6", !video && "lg:order-2")}>
-                  <SyllabusQuest
-                    topic={topic}
-                    resources={resources}
-                    playingId={playing?.id ?? null}
-                    onPlayVideo={(r) => setPlayingId(r.id)}
-                    onOpenLesson={(r) => setClassroomStepId(r.id)}
-                  />
-                </motion.div>
+                {/* The existing AI study stack — summary, quiz, roadmap — kept whole
+                    and opened on demand (and code-split), so the canvas stays light. */}
+                <div className="mt-10 border-t border-hairline-card pt-5">
+                  <button
+                    onClick={() => setDeepStudy((v) => !v)}
+                    aria-expanded={deepStudy}
+                    aria-controls={`${tutorId}-deep`}
+                    className="focus-ring flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-1 py-1 text-start"
+                  >
+                    <span className="flex items-center gap-2 text-base font-semibold text-foreground">
+                      <GraduationCap size={17} className="text-accent-learning" aria-hidden />
+                      לימוד מעמיק עם AI
+                      <span className="text-xs font-normal text-muted">סיכום, מבחן ומפת דרכים לכל הנושא</span>
+                    </span>
+                    <ChevronDown size={18} className={cn("text-muted transition-transform duration-300", deepStudy && "rotate-180")} aria-hidden />
+                  </button>
+                  <div id={`${tutorId}-deep`} hidden={!deepStudy}>
+                    {deepStudy && (
+                      <motion.div initial={reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
+                        <StudyModes topicId={topic.id} topicTitle={topic.title} videoUrl={firstYoutubeUrl}>
+                          <LearningSplitView
+                            topicTitle={topic.title}
+                            videoUrl={firstYoutubeUrl}
+                            onQuizComplete={() => {
+                              // Finishing the quiz completes the topic's video — with the same celebration a tick gets.
+                              const next = resources.find((r) => r.type === "youtube" && !r.isCompleted);
+                              if (next) complete(next, true).catch(() => undefined);
+                            }}
+                            onClose={() => setDeepStudy(false)}
+                          />
+                          <div className="mt-5">
+                            <ContinueLearning topic={topic} />
+                          </div>
+                        </StudyModes>
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
 
-                <motion.div layout={!reduce} className={cn(!video && "lg:order-1")}>
-                  <TutorBox topicTitle={topic.title} resourceTitles={resources.map((r) => r.title)} />
-                </motion.div>
-              </div>
+                {error && (
+                  <p role="alert" className="mt-4 text-xs text-accent-family">
+                    {error}
+                  </p>
+                )}
+              </main>
 
-              {/* The existing AI study stack — summary, quiz, roadmap — kept whole
-                  and opened on demand, so the canvas stays light. */}
-              <div className="mt-8 border-t border-hairline-card pt-5">
-                <button
-                  onClick={() => setDeepStudy((v) => !v)}
-                  aria-expanded={deepStudy}
-                  className="focus-ring flex w-full items-center justify-between gap-2 rounded-xl px-1 py-1 text-start"
-                >
-                  <span className="flex items-center gap-2 text-base font-semibold text-foreground">
-                    <GraduationCap size={17} className="text-accent-learning" aria-hidden />
-                    לימוד מעמיק עם AI
-                    <span className="text-xs font-normal text-muted">סיכום, מבחן ומפת דרכים</span>
-                  </span>
-                  <motion.span animate={{ rotate: deepStudy ? 180 : 0 }} transition={{ type: "spring", bounce: 0.45, duration: 0.5 }}>
-                    <ChevronDown size={18} className="text-muted" aria-hidden />
-                  </motion.span>
-                </button>
-                <AnimatePresence initial={false}>
-                  {deepStudy && (
-                    <motion.div key="deep" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-4">
-                      <StudyModes topicId={topic.id} topicTitle={topic.title} videoUrl={firstYoutubeUrl}>
-                        <LearningSplitView
-                          topicTitle={topic.title}
-                          videoUrl={firstYoutubeUrl}
-                          onQuizComplete={() => {
-                            // Finishing the quiz completes the topic's video — with the same celebration a tick gets.
-                            const next = resources.find((r) => r.type === "youtube" && !r.isCompleted);
-                            if (next) complete(next, true).catch(() => undefined);
-                          }}
-                          onClose={() => setDeepStudy(false)}
-                        />
-                        <div className="mt-5">
-                          <ContinueLearning topic={topic} />
-                        </div>
-                      </StudyModes>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {error && (
-                <p role="alert" className="mt-4 text-xs text-accent-family">
-                  {error}
-                </p>
-              )}
+              {/* The timeline (left, in RTL). First on a phone, so the path is
+                  what you see before scrolling into the step. */}
+              <aside aria-label="ציר הזמן של הנושא" className="order-1 flex flex-col gap-5 border-b border-hairline-card px-5 py-5 lg:order-2 lg:overflow-y-auto lg:border-b-0 lg:border-s">
+                <SyllabusQuest topic={topic} resources={resources} selectedId={selected?.id ?? null} onSelect={selectStep} onOpenLesson={openLesson} />
+                <GoalTaskLink topicTitle={topic.title} nextStepTitle={resources.find((r) => !r.isCompleted)?.title} />
+              </aside>
             </div>
+
+            <AnimatePresence>
+              {tutorOpen && (
+                <TutorDrawer
+                  key="tutor"
+                  id={tutorId}
+                  topicTitle={topic.title}
+                  resourceTitles={resourceTitles}
+                  stepTitle={selected?.title}
+                  personas={personas}
+                  onClose={closeTutor}
+                />
+              )}
+            </AnimatePresence>
           </motion.div>
         </motion.div>
       </div>
@@ -290,5 +421,15 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
       {classroomStepId && <ClassroomViewport topic={topic} resources={resources} initialStepId={classroomStepId} onClose={onClose} />}
     </>,
     document.body
+  );
+}
+
+function EmptyCanvas() {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-hairline-card px-6 py-14 text-center">
+      <Sparkles size={26} className="text-accent-learning" aria-hidden />
+      <p className="text-base font-semibold text-foreground">עוד אין שלבים בנושא הזה</p>
+      <p className="max-w-sm text-sm text-muted">בנה מסלול בציר הזמן, ובחר שלב כדי לראות כאן את התקציר שלו, מושגי היסוד, תרשים, בדיקות הבנה ומשימה מעשית.</p>
+    </div>
   );
 }

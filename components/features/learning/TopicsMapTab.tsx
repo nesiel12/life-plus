@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, LayoutGrid, List, Network, type LucideIcon } from "lucide-react";
 import { CuriosityRadar } from "@/components/features/learning/CuriosityRadar";
-import { KnowledgeGraph } from "@/components/features/learning/KnowledgeGraph";
 import { TopicGrid, TopicList } from "@/components/features/learning/TopicGrid";
 import { VideoStudyPanel } from "@/components/features/learning/VideoStudyPanel";
 import { useLab } from "@/components/features/learning/lab/LabContext";
@@ -13,6 +13,13 @@ import { buildRoll, pickSurpriseTopic } from "@/lib/learning/surprise";
 import { filterTopics } from "@/lib/learning/topicSearch";
 import { cn } from "@/lib/utils";
 import type { LearningResource, LearningTopic } from "@/types";
+
+// The graph view is optional (the grid is the default) and the heaviest thing
+// on the tab — its own chunk, loaded when the view is switched to it.
+const KnowledgeGraph = dynamic(() => import("@/components/features/learning/KnowledgeGraph").then((m) => m.KnowledgeGraph), {
+  ssr: false,
+  loading: () => <div className="h-[420px] animate-pulse rounded-3xl bg-fill-subtle/40" aria-hidden />,
+});
 
 type View = "grid" | "graph" | "list";
 

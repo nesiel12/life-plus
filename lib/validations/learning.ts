@@ -9,6 +9,12 @@ import type {
   LessonVideoChapter,
   PioneerExternalLink,
   PioneerProfile,
+  StepBriefContent,
+  StepBriefRequest,
+  StepConcept,
+  StepKeyFigure,
+  StepRecallItem,
+  StepVisual,
 } from "@/types/learning";
 
 // Zod schemas for the Masterclass & Gaming OS's generated lesson content.
@@ -125,4 +131,56 @@ export const ArticleKeyParagraphsSchema = z.object({
 export const ArticleExplainRequestSchema = z.object({
   url: z.string().trim().url(),
   paragraph: z.string().trim().min(1).max(4000),
+});
+
+// --- Step brief (types/learning.ts StepBriefContent) ---------------------
+//
+// Constraints are kept loose on purpose (generous maxima, no exact counts):
+// this schema is handed to the model as its streaming output schema, and a
+// brief that comes back with 7 concepts instead of 6 is still a perfectly
+// good brief — failing it would only cost the learner a wait.
+
+export const StepConceptSchema: z.ZodType<StepConcept> = z.object({
+  term: z.string().trim().min(1).max(80),
+  definition: z.string().trim().min(1).max(600),
+  relatedTo: z.array(z.string().trim().min(1)).max(8),
+});
+
+export const StepKeyFigureSchema: z.ZodType<StepKeyFigure> = z.object({
+  name: z.string().trim().min(1).max(120),
+  contribution: z.string().trim().min(1).max(400),
+});
+
+export const StepVisualSchema: z.ZodType<StepVisual> = z.object({
+  kind: z.enum(["process", "comparison", "none"]),
+  title: z.string().trim().max(120),
+  processStages: z.array(z.object({ title: z.string().trim().min(1).max(80), detail: z.string().trim().max(300) })).max(8),
+  comparisonColumns: z.array(z.string().trim().min(1).max(60)).max(4),
+  comparisonRows: z.array(z.object({ label: z.string().trim().min(1).max(80), cells: z.array(z.string().trim().max(200)).max(4) })).max(8),
+});
+
+export const StepRecallItemSchema: z.ZodType<StepRecallItem> = z.object({
+  sentence: z.string().trim().min(1).max(400),
+  answer: z.string().trim().min(1).max(80),
+  acceptableAnswers: z.array(z.string().trim().min(1).max(80)).max(6),
+  hint: z.string().trim().max(200),
+});
+
+export const StepBriefContentSchema: z.ZodType<StepBriefContent> = z.object({
+  summary: z.string().trim().min(1).max(1200),
+  coreConcepts: z.array(StepConceptSchema).min(1).max(8),
+  keyFigures: z.array(StepKeyFigureSchema).max(4),
+  visual: StepVisualSchema,
+  recall: z.array(StepRecallItemSchema).max(4),
+  feynmanConcept: z.string().trim().min(1).max(120),
+  practice: z.object({
+    title: z.string().trim().min(1).max(120),
+    instructions: z.string().trim().min(1).max(800),
+    estimatedMinutes: z.number().int().min(1).max(240),
+  }),
+});
+
+export const StepBriefRequestSchema: z.ZodType<StepBriefRequest> = z.object({
+  topicId: z.string().trim().min(1),
+  stepId: z.string().trim().min(1),
 });

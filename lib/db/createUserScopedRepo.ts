@@ -77,7 +77,9 @@ type UserScopedTableName =
   // primary key is user_id itself, not a generated id, so it doesn't fit
   // this factory's shape (see lib/db/learningActiveCosmetics.ts).
   | "learning_purchases"
-  | "learning_streak_shield_consumptions";
+  | "learning_streak_shield_consumptions"
+  // Live Step Content Preview cache (20260928000000).
+  | "learning_step_content";
 
 export function createUserScopedRepo<T extends UserScopedTableName>(table: T) {
   type Row = Database["public"]["Tables"][T]["Row"];

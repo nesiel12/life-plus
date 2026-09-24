@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { Component, useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { AlertTriangle, Lightbulb, Mic, PlayCircle, RotateCcw, Sparkles, X } from "lucide-react";
 import { LessonViewportSkeleton } from "@/components/features/learning/LessonViewportSkeleton";
 import { LessonContentRenderer } from "@/components/features/learning/LessonContentRenderer";
@@ -13,6 +13,11 @@ import { getCheckpointAnswersAction, submitCheckpointAnswerAction, type Checkpoi
 import { CHECKPOINT_XP, checkpointCelebrationFor } from "@/lib/learning/masterclassXp";
 import { useLab } from "@/components/features/learning/lab/LabContext";
 import type { LessonGenerateResponse } from "@/app/api/learning/lesson/generate/route";
+import { readAiError } from "@/lib/api/aiClient";
+import { readSseStream } from "@/lib/learning/sseClient";
+import { lessonStreamProgress } from "@/lib/learning/lessonStream";
+import { ConfidenceRating } from "@/components/features/learning/step/ConfidenceRating";
+import { CALIBRATION_MESSAGE, calibrationFor, type ConfidenceLevel } from "@/lib/learning/stepBrief";
 import { TEACHING_MODES, USER_AGE_GROUPS, type InlineCheckpoint, type LessonBlockContent, type TeachingMode, type UserAgeGroup } from "@/types/learning";
 import type { LearningResource, LearningTopic } from "@/types";
 import { cn } from "@/lib/utils";
@@ -201,7 +206,7 @@ export interface LessonViewportProps {
   onCloseSettings: () => void;
 }
 
-type LoadState = { kind: "loading" } | { kind: "error"; message: string } | { kind: "ready"; content: LessonBlockContent; cached: boolean };
+type LoadState = { kind: "loading"; partial?: unknown } | { kind: "error"; message: string } | { kind: "ready"; content: LessonBlockContent; cached: boolean };
 
 export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings }: LessonViewportProps) {
   const topicId = topic.id;
@@ -232,27 +237,51 @@ export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings 
 
   const lab = useLab();
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      const res = await fetch("/api/learning/lesson/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topicId, stepId, userAgeGroup: ageGroup, teachingMode, customEmphasis: appliedCustomEmphasis }),
-      });
-      const body = (await res.json().catch(() => null)) as (LessonGenerateResponse & { error?: string }) | null;
-      if (!res.ok || !body || !body.content) {
-        setState({ kind: "error", message: body?.error || GENERIC_ERROR });
-        return;
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      setState({ kind: "loading" });
+      try {
+        const res = await fetch("/api/learning/lesson/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+          body: JSON.stringify({ topicId, stepId, userAgeGroup: ageGroup, teachingMode, customEmphasis: appliedCustomEmphasis }),
+          signal,
+        });
+        if (!res.ok) {
+          const info = await readAiError(res, GENERIC_ERROR);
+          if (!signal.aborted) setState({ kind: "error", message: info.message });
+          return;
+        }
+        // Server-Sent Events: partial snapshots while the lesson is written,
+        // then `done` (or `error`). Streaming is what keeps a slow generation
+        // from timing out; the partials drive the progress list below.
+        let finished = false;
+        await readSseStream(res, (event, data) => {
+          if (signal.aborted) return;
+          if (event === "partial") setState({ kind: "loading", partial: data });
+          else if (event === "done") {
+            const body = data as LessonGenerateResponse;
+            finished = true;
+            setState(body?.content ? { kind: "ready", content: body.content, cached: body.cached } : { kind: "error", message: GENERIC_ERROR });
+          } else if (event === "error") {
+            finished = true;
+            setState({ kind: "error", message: (data as { error?: string })?.error || GENERIC_ERROR });
+          }
+        });
+        if (!finished && !signal.aborted) setState({ kind: "error", message: GENERIC_ERROR });
+      } catch {
+        if (!signal.aborted) setState({ kind: "error", message: GENERIC_ERROR });
       }
-      setState({ kind: "ready", content: body.content, cached: body.cached });
-    } catch {
-      setState({ kind: "error", message: GENERIC_ERROR });
-    }
-  }, [topicId, stepId, ageGroup, teachingMode, appliedCustomEmphasis]);
+    },
+    [topicId, stepId, ageGroup, teachingMode, appliedCustomEmphasis]
+  );
 
   useEffect(() => {
-    void load();
+    // Leaving the step (or changing the picker) stops reading the old stream;
+    // the server still finishes and caches it (lib/api/sse.ts).
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
     // retryToken intentionally re-triggers the same fetch on retry without
     // changing any of the actual request parameters above.
   }, [load, retryToken]);
@@ -325,7 +354,12 @@ export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings 
         />
       )}
 
-      {state.kind === "loading" && <LessonViewportSkeleton />}
+      {state.kind === "loading" && (
+        <>
+          <LessonStreamStatus partial={state.partial} />
+          <LessonViewportSkeleton />
+        </>
+      )}
       {state.kind === "error" && <LessonErrorState onRetry={retry} message={state.message} />}
       {state.kind === "ready" && (
         <LessonErrorBoundary onRetry={retry}>
@@ -599,36 +633,56 @@ function CheckpointCard({
   onAnswered: (checkpoint: InlineCheckpoint, selectedIndex: number, origin: Point | undefined) => void;
 }) {
   const [selected, setSelected] = useState<number | null>(priorAnswer?.selectedIndex ?? null);
+  // Metacognition: an option is first *picked*, then the learner says how
+  // sure they are, and only then is it revealed. A prior answer (from another
+  // session) skips straight to revealed.
+  const [pending, setPending] = useState<number | null>(null);
+  const [confidence, setConfidence] = useState<ConfidenceLevel | null>(null);
+  // "חשוף תשובה" unmounts once pressed; focus moves to the result it revealed.
+  const resultRef = useRef<HTMLDivElement>(null);
+  const revealedHere = useRef(false);
+  useEffect(() => {
+    if (selected !== null && revealedHere.current) {
+      revealedHere.current = false;
+      resultRef.current?.focus();
+    }
+  }, [selected]);
   // A prior answer arriving after first render (the fetch in LessonViewport
   // resolves after content is already on screen) should still pre-fill —
   // but never override a choice the person has made in this session.
   useEffect(() => {
-    if (priorAnswer && selected === null) setSelected(priorAnswer.selectedIndex);
+    if (priorAnswer && selected === null && pending === null) setSelected(priorAnswer.selectedIndex);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [priorAnswer]);
 
   const answered = selected !== null;
   const correct = selected === checkpoint.correctIndex;
 
-  function choose(index: number, e: MouseEvent<HTMLButtonElement>) {
-    setSelected(index);
-    onAnswered(checkpoint, index, originOf(e.currentTarget));
+  function reveal(e: MouseEvent<HTMLButtonElement>) {
+    if (pending === null || confidence === null) return;
+    revealedHere.current = true;
+    setSelected(pending);
+    onAnswered(checkpoint, pending, originOf(e.currentTarget));
   }
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-hairline-card bg-surface p-4">
       <p className="text-sm font-medium text-foreground">{checkpoint.question}</p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div role="radiogroup" aria-label={checkpoint.question} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {checkpoint.options.map((option, i) => {
           const isCorrectOption = i === checkpoint.correctIndex;
+          const isPending = !answered && pending === i;
           return (
             <button
               key={i}
-              onClick={(e) => choose(i, e)}
+              role="radio"
+              aria-checked={answered ? i === selected : isPending}
+              onClick={() => setPending(i)}
               disabled={answered}
               className={cn(
-                "focus-ring rounded-xl border px-3 py-2 text-start text-sm transition-colors disabled:cursor-default",
-                !answered && "border-hairline-card text-foreground hover:bg-fill-subtle",
+                "focus-ring min-h-11 rounded-xl border px-3 py-2 text-start text-sm transition-colors disabled:cursor-default",
+                !answered && !isPending && "border-hairline-card text-foreground hover:bg-fill-subtle",
+                isPending && "border-accent-learning bg-accent-learning/10 text-foreground",
                 answered && isCorrectOption && "border-accent-health bg-accent-health/10 text-accent-health",
                 answered && !isCorrectOption && i === selected && "border-accent-family bg-accent-family/10 text-accent-family",
                 answered && !isCorrectOption && i !== selected && "border-hairline-card text-muted opacity-60"
@@ -639,20 +693,66 @@ function CheckpointCard({
           );
         })}
       </div>
+      {!answered && pending !== null && (
+        <div className="flex flex-wrap items-end gap-3">
+          <ConfidenceRating value={confidence} onChange={setConfidence} />
+          <button
+            onClick={reveal}
+            disabled={confidence === null}
+            className="focus-ring min-h-11 rounded-xl bg-accent-learning px-4 text-sm font-semibold text-background transition-opacity disabled:opacity-40"
+          >
+            חשוף תשובה
+          </button>
+        </div>
+      )}
       {answered && (
-        <>
+        <div ref={resultRef} tabIndex={-1} role="status" className="flex flex-col gap-2 outline-none">
+          {confidence !== null && <p className="text-xs font-medium text-foreground">{CALIBRATION_MESSAGE[calibrationFor(confidence, correct)]}</p>}
           <p className="text-xs leading-relaxed text-foreground/90">
             {!correct && checkpoint.funnyDistractor && <span className="mb-1 block font-medium text-accent-family">{checkpoint.funnyDistractor}</span>}
             {checkpoint.explanation}
           </p>
           {!correct && (
-            <button onClick={() => setSelected(null)} className="focus-ring flex w-fit items-center gap-1.5 text-xs font-medium text-accent-learning hover:opacity-80">
+            <button
+              onClick={() => {
+                setSelected(null);
+                setPending(null);
+                setConfidence(null);
+              }}
+              className="focus-ring flex min-h-11 w-fit items-center gap-1.5 text-xs font-medium text-accent-learning hover:opacity-80"
+            >
               <RotateCcw size={12} aria-hidden />
               נסה שוב
             </button>
           )}
-        </>
+        </div>
       )}
+    </div>
+  );
+}
+
+/** Which parts of the lesson have been written so far — polite, and only changes per section. */
+function LessonStreamStatus({ partial }: { partial: unknown }) {
+  const sections = lessonStreamProgress(partial);
+  const started = sections.some((s) => s.state !== "pending");
+  return (
+    <div aria-live="polite" className="flex flex-wrap items-center gap-2 text-xs text-muted">
+      <span className="font-medium text-foreground">{started ? "השיעור נכתב עכשיו:" : "מתחיל לכתוב את השיעור…"}</span>
+      {started &&
+        sections.map((s) => (
+          <span
+            key={s.label}
+            className={cn(
+              "rounded-full px-2 py-0.5",
+              s.state === "done" && "bg-accent-learning/15 text-accent-learning",
+              s.state === "writing" && "animate-pulse bg-fill-subtle text-foreground",
+              s.state === "pending" && "text-muted/70"
+            )}
+          >
+            {s.state === "done" ? "✓ " : ""}
+            {s.label}
+          </span>
+        ))}
     </div>
   );
 }

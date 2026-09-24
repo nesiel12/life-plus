@@ -1211,6 +1211,19 @@ export interface Database {
         },
         "topic_id" | "step_id" | "user_age_group" | "teaching_mode" | "content"
       >;
+      learning_step_content: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          topic_id: string;
+          step_id: string;
+          // lib/validations/learning.ts's StepBriefContentSchema.
+          content: Json;
+          created_at: string;
+          updated_at: string;
+        },
+        "topic_id" | "step_id" | "content"
+      >;
       learning_checkpoint_answers: GraphTable<
         {
           id: string;

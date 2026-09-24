@@ -2,6 +2,7 @@ export {
   streamChatReply,
   generateChatText,
   generateStructuredData,
+  streamStructuredData,
   transcribeAudio,
   transcribeMediaWindow,
 } from "@/lib/ai/service";

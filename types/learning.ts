@@ -103,3 +103,87 @@ export interface LessonGenerateRequest {
   /** Free text — a specific angle the person wants emphasized ("focus on the math", "keep it short"). */
   customEmphasis?: string;
 }
+
+// --- Step brief (the topic canvas's Live Step Content Preview) -----------
+//
+// A deliberately smaller, faster sibling of LessonBlockContent: what the
+// topic canvas renders the moment a step is selected on its timeline. The
+// masterclass lesson is the deep dive; this is the "what is this step, what
+// do I need to hold in my head, and how do I prove to myself I have it"
+// card — summary, concepts, a diagram, active-recall checks, a Feynman
+// prompt and one real-world exercise. Cached per (topic, step) in
+// learning_step_content; not keyed by age group / teaching mode, because it
+// is a neutral study aid rather than a persona-styled lesson.
+
+export interface StepConcept {
+  /** Hebrew, RTL — a short term (1-4 words). */
+  term: string;
+  /** Hebrew, RTL — one or two sentences. */
+  definition: string;
+  /** Other `term`s from the same brief this one connects to — drawn as edges in the concept graph. */
+  relatedTo: string[];
+}
+
+export interface StepKeyFigure {
+  name: string;
+  /** Hebrew, RTL — what they contributed to this step's subject, one sentence. */
+  contribution: string;
+}
+
+export interface StepProcessStage {
+  title: string;
+  detail: string;
+}
+
+export interface StepComparisonRow {
+  label: string;
+  /** One cell per entry in StepVisual.comparisonColumns, same order. */
+  cells: string[];
+}
+
+/**
+ * Dual coding: the brief's one visual. `kind` picks which of the two shapes
+ * is filled — a flat object rather than a discriminated union because
+ * provider structured-output modes handle unions poorly; the unused
+ * branch's arrays simply stay empty.
+ */
+export interface StepVisual {
+  kind: "process" | "comparison" | "none";
+  title: string;
+  processStages: StepProcessStage[];
+  comparisonColumns: string[];
+  comparisonRows: StepComparisonRow[];
+}
+
+/** An inline fill-in-the-blank: `sentence` contains exactly one "___". */
+export interface StepRecallItem {
+  sentence: string;
+  answer: string;
+  /** Other spellings/synonyms that should also count as correct. */
+  acceptableAnswers: string[];
+  hint: string;
+}
+
+export interface StepPracticeTask {
+  title: string;
+  /** Hebrew, RTL — concrete instructions, doable today. */
+  instructions: string;
+  estimatedMinutes: number;
+}
+
+export interface StepBriefContent {
+  /** Hebrew, RTL — 2-4 sentences. Also what the narration player reads aloud. */
+  summary: string;
+  coreConcepts: StepConcept[];
+  keyFigures: StepKeyFigure[];
+  visual: StepVisual;
+  recall: StepRecallItem[];
+  /** The concept the learner is asked to explain in their own words (Feynman). */
+  feynmanConcept: string;
+  practice: StepPracticeTask;
+}
+
+export interface StepBriefRequest {
+  topicId: string;
+  stepId: string;
+}

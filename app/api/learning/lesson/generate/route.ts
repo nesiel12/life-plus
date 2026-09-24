@@ -6,8 +6,9 @@ import { learningResourcesRepo, learningTopicsRepo } from "@/lib/db/learning";
 import { learningLessonContentsRepo } from "@/lib/db/learningLessonContents";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { rateLimitResponse } from "@/lib/api/rateLimit";
-import { aiQuotaResponse } from "@/lib/api/aiErrorResponse";
-import { generateStructuredData, isProviderConfigured } from "@/lib/ai";
+import { generateStructuredData, isProviderConfigured, streamStructuredData } from "@/lib/ai";
+import { AiQuotaExceededError } from "@/lib/ai/service";
+import { sseResponse } from "@/lib/api/sse";
 import { currentUserActor } from "@/lib/ai/actor";
 import { buildLessonPrompt } from "@/lib/learning/agePromptEngine";
 import { LessonBlockContentSchema, LessonGenerateRequestSchema } from "@/lib/validations/learning";
@@ -20,12 +21,22 @@ export const runtime = "nodejs";
 // quick chat reply or a single quiz — given more room than the platform's
 // default before this route's own honest error kicks in.
 export const maxDuration = 60;
+// Streaming answers the timeouts this route used to hit: bytes flow from the
+// first second (heartbeats, then partial snapshots), so nothing idles out,
+// and the client shows the lesson being written. The generation itself must
+// still fit in maxDuration — the repair retry only runs if enough is left.
+const ROUTE_BUDGET_MS = 55_000;
+const MIN_RETRY_BUDGET_MS = 15_000;
 
 // Lower than a quick-log or chat rate: this is an expensive, cached
 // generation a person triggers by opening a lesson, not something they'd
 // legitimately fire many times a minute.
 const RATE_LIMIT = { limit: 15, windowMs: 5 * 60 * 1000 };
 
+/**
+ * The `done` event's payload (the route answers in Server-Sent Events:
+ * `partial` snapshots while generating, then `done` or `error`).
+ */
 export interface LessonGenerateResponse {
   content: LessonBlockContent;
   /** Whether this came from learning_lesson_contents rather than a fresh model call. */
@@ -67,7 +78,8 @@ export async function POST(request: NextRequest) {
     // with LessonBlockContent's own shape — safe here because the only
     // writer (below) always stores a value that already passed
     // LessonBlockContentSchema before insert.
-    return NextResponse.json({ content: cached.content as unknown as LessonBlockContent, cached: true } satisfies LessonGenerateResponse);
+    const hit = { content: cached.content as unknown as LessonBlockContent, cached: true } satisfies LessonGenerateResponse;
+    return sseResponse(async (send) => send("done", hit), GENERATION_FAILED);
   }
 
   if (!isProviderConfigured()) {
@@ -83,39 +95,54 @@ export async function POST(request: NextRequest) {
     customEmphasis,
   });
 
-  async function generateOnce(system: string) {
-    const object = await generateStructuredData({
-      actor,
-      schema: LessonBlockContentSchema,
-      system,
-      prompt: prompt.user,
-      operation: "course_module",
-    });
-    return LessonBlockContentSchema.safeParse(object);
-  }
+  const startedAt = Date.now();
 
-  try {
-    let result = await generateOnce(prompt.system);
-
-    // One automatic retry, folding the actual validation errors into the
-    // prompt so the model can see exactly what it got wrong — a plain
-    // re-ask tends to reproduce the same mistake. This is a second,
-    // explicit layer on top of generateStructuredData's own internal
-    // schema-guided generation/repair (lib/ai/service.ts) — cheap insurance
-    // for a generation expensive and rich enough that failing outright
-    // over one near-miss field would be a poor trade.
-    if (!result.success) {
-      const issues = result.error.issues.map((issue) => `- ${issue.path.join(".") || "(root)"}: ${issue.message}`).join("\n");
-      const repairSystem = `${prompt.system}\n\nניסיון קודם החזיר JSON שלא עבר ולידציה. תקן את השגיאות הבאות והחזר JSON תקין לחלוטין התואם את הסכימה בדיוק, בלי טקסט נוסף מסביב:\n${issues}`;
-      result = await generateOnce(repairSystem);
+  return sseResponse(async (send, sendPartial) => {
+    let content: LessonBlockContent;
+    try {
+      content = await streamStructuredData({
+        actor,
+        schema: LessonBlockContentSchema,
+        system: prompt.system,
+        prompt: prompt.user,
+        operation: "course_module",
+        onPartial: sendPartial,
+      });
+    } catch (err) {
+      if (err instanceof AiQuotaExceededError) {
+        send("error", { error: err.message, code: "quota_exceeded", resetAt: err.resetAt.toISOString() });
+        return;
+      }
+      // One repair attempt, if the budget allows: a streamed object that
+      // missed the schema on one field is usually fixed by a second, plain
+      // structured call told exactly that — the same one retry (and the same
+      // second quota charge) this route has always made.
+      const remaining = ROUTE_BUDGET_MS - (Date.now() - startedAt);
+      if (remaining < MIN_RETRY_BUDGET_MS) {
+        console.error("[learning/lesson/generate] stream failed, no budget to retry:", err);
+        send("error", { error: GENERATION_FAILED });
+        return;
+      }
+      console.warn("[learning/lesson/generate] stream failed, retrying once:", err instanceof Error ? err.message : err);
+      const repairSystem = `${prompt.system}\n\nניסיון קודם החזיר JSON שלא עבר ולידציה. החזר JSON תקין לחלוטין התואם את הסכימה בדיוק, בלי טקסט נוסף מסביב.`;
+      const retried = LessonBlockContentSchema.safeParse(
+        await generateStructuredData({
+          actor,
+          schema: LessonBlockContentSchema,
+          system: repairSystem,
+          prompt: prompt.user,
+          operation: "course_module",
+          timeoutMs: remaining - 5_000,
+        })
+      );
+      if (!retried.success) {
+        console.error("[learning/lesson/generate] validation failed after retry:", retried.error.issues);
+        send("error", { error: GENERATION_FAILED });
+        return;
+      }
+      content = retried.data;
     }
 
-    if (!result.success) {
-      console.error("[learning/lesson/generate] validation failed after retry:", result.error.issues);
-      return NextResponse.json({ error: GENERATION_FAILED }, { status: 502 });
-    }
-
-    const content = result.data;
     try {
       await learningLessonContentsRepo.insert({
         user_id: user.id,
@@ -123,31 +150,20 @@ export async function POST(request: NextRequest) {
         step_id: stepId,
         user_age_group: userAgeGroup,
         teaching_mode: teachingMode,
-        // Already validated by LessonBlockContentSchema.safeParse above —
-        // see the read side's matching comment for why the cast is safe.
+        // Validated against LessonBlockContentSchema by the generation above.
         content: content as unknown as Json,
       });
     } catch (insertErr) {
-      // 23505 = unique_violation on the cache key. The findCached() check
-      // above and this insert aren't atomic, so two requests for the same
-      // never-before-generated (topic, step, age group, teaching mode) —
-      // a double-click, or the mic/tap racing itself — can both miss the
-      // cache and both reach here; only one insert wins. Rather than fail
-      // the loser outright (it did real, valid generation work, just lost a
-      // race to write it down), fall back to the row the winner just wrote
-      // — the two are for the identical key, so either is a correct answer
-      // to return.
+      // 23505 = unique_violation on the cache key: two requests for the same
+      // never-before-generated combination both missed the cache (a
+      // double-click, say). Return the winner's row — same key, equally valid.
       if ((insertErr as { code?: string }).code !== "23505") throw insertErr;
       const winner = await learningLessonContentsRepo.findCached(user.id, topicId, stepId, userAgeGroup, teachingMode);
       if (!winner) throw insertErr;
-      return NextResponse.json({ content: winner.content as unknown as LessonBlockContent, cached: true } satisfies LessonGenerateResponse);
+      send("done", { content: winner.content as unknown as LessonBlockContent, cached: true } satisfies LessonGenerateResponse);
+      return;
     }
 
-    return NextResponse.json({ content, cached: false } satisfies LessonGenerateResponse);
-  } catch (err) {
-    const quota = aiQuotaResponse(err);
-    if (quota) return quota;
-    console.error("[learning/lesson/generate] generation failed:", err);
-    return NextResponse.json({ error: GENERATION_FAILED }, { status: 502 });
-  }
+    send("done", { content, cached: false } satisfies LessonGenerateResponse);
+  }, GENERATION_FAILED);
 }

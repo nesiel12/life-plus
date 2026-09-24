@@ -1285,3 +1285,20 @@ body::before {
     animation: none;
   }
 }
+
+/* Step preview narration waveform (components/features/learning/step/
+   NarrationPlayer.tsx): transform-only, each bar's peak set by --amp. */
+@keyframes narration-wave {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(var(--amp, 1));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-[narration-wave"] {
+    animation: none !important;
+  }
+}
