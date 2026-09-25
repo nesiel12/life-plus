@@ -121,6 +121,53 @@ const STRUCTURED_TIMEOUT_MS = 45_000; // generateObject re-prompts on schema mis
 // photographed timetable takes materially longer than a text prompt.
 const VISION_TIMEOUT_MS = 90_000;
 
+// These four are now each candidate's own CAP, not automatically the total
+// time a call can take — see TOTAL_*_BUDGET_MS below for why that stopped
+// being safe on 2026-09-25, when the chain grew from 2-4 candidates
+// (Gemini, maybe Bytez, maybe OpenAI) to as many as six (Groq, Cerebras,
+// SambaNova, two Gemini models, OpenRouter). Giving every one of those its
+// own FULL per-call timeout, uncapped, meant a broad outage could take
+// 6 × 50s = five minutes before this module finally gave up — well past
+// every AI route's own maxDuration (most are 45-60s) and the client's own
+// STREAM_STALL_MS watchdog, turning "the fallback chain is working exactly
+// as designed" into the exact hang-then-crash symptom the chain exists to
+// prevent. withModelFallback and streamChatReply now track a shared
+// deadline across the WHOLE loop and hand each candidate whichever is
+// smaller: its own cap above, or what's actually left of the total budget.
+//
+// Budgets are picked comfortably under the smallest maxDuration any real
+// caller of that operation has (see each route's own maxDuration) — chat
+// (streamChatReply/generateChatText, used by /api/chat's maxDuration=60),
+// structured (most AI routes' maxDuration=45-60), vision (the image-
+// reading routes' maxDuration=90-120).
+const TOTAL_CHAT_BUDGET_MS = 40_000;
+const TOTAL_STRUCTURED_BUDGET_MS = 40_000;
+const TOTAL_VISION_BUDGET_MS = 80_000;
+// Below this much time left, a new attempt isn't worth starting — a fresh
+// connection alone can take longer, and the result is just another timeout
+// that spent the last bit of runway on nothing.
+const MIN_ATTEMPT_BUDGET_MS = 3_000;
+
+/**
+ * A deadline shared across every candidate in one fallover loop.
+ *
+ * `capMs` is that operation's own existing per-call timeout (unchanged —
+ * still what a single candidate gets when there's plenty of budget left).
+ * `remaining()` returns null once there isn't enough time left for another
+ * attempt to be worth making at all (see MIN_ATTEMPT_BUDGET_MS), which is
+ * the loop's signal to stop trying further candidates and throw the last
+ * real error instead of a timeout on a call that never really got a chance.
+ */
+function budgetDeadline(totalMs: number, capMs: number) {
+  const deadline = Date.now() + totalMs;
+  return {
+    remaining(): number | null {
+      const left = deadline - Date.now();
+      return left < MIN_ATTEMPT_BUDGET_MS ? null : Math.min(left, capMs);
+    },
+  };
+}
+
 // Returns the SDK's own stream result as-is (callers use its
 // toTextStreamResponse method directly, exactly as before) — this service
 // hides *which model*, not how the caller consumes a streamed reply.
@@ -142,7 +189,9 @@ const VISION_TIMEOUT_MS = 90_000;
  */
 async function withModelFallback<T>(
   operation: string,
-  attempt: (candidate: ChatModelCandidate) => Promise<T>,
+  totalBudgetMs: number,
+  capMs: number,
+  attempt: (candidate: ChatModelCandidate, timeoutMs: number) => Promise<T>,
   options: { filter?: (candidate: ChatModelCandidate) => boolean } = {}
 ): Promise<T> {
   const full = getChatModelChain();
@@ -151,11 +200,21 @@ async function withModelFallback<T>(
     throw new Error(`[ai] ${operation}: no configured model supports this request`);
   }
   let lastError: unknown;
+  const budget = budgetDeadline(totalBudgetMs, capMs);
 
   for (let i = 0; i < chain.length; i++) {
+    const timeoutMs = budget.remaining();
+    if (timeoutMs === null) {
+      // Out of shared budget — every remaining candidate would be attempted
+      // with too little time to be worth it. Stop here (see
+      // MIN_ATTEMPT_BUDGET_MS) rather than let the platform's own
+      // maxDuration kill the request mid-attempt with no honest fallback.
+      console.warn(`[ai] ${operation}: out of time budget with ${chain.length - i} candidate(s) left untried`);
+      break;
+    }
     const candidate = chain[i];
     try {
-      const result = await attempt(candidate);
+      const result = await attempt(candidate, timeoutMs);
       if (i > 0) {
         console.warn(`[ai] ${operation} recovered on fallback model ${candidate.label} (attempt ${i + 1})`);
       }
@@ -171,7 +230,7 @@ async function withModelFallback<T>(
     }
   }
 
-  throw lastError;
+  throw lastError ?? new Error(`[ai] ${operation}: out of time budget before any candidate could be tried`);
 }
 
 /**
@@ -237,7 +296,16 @@ export async function streamChatReply(params: {
   }
 
   let lastError: unknown;
+  const budget = budgetDeadline(TOTAL_CHAT_BUDGET_MS, STREAM_TIMEOUT_MS);
   for (let i = 0; i < chain.length; i++) {
+    const timeoutMs = budget.remaining();
+    if (timeoutMs === null) {
+      // Out of shared budget — see withModelFallback's identical guard and
+      // this module's own TOTAL_*_BUDGET_MS comment for why a six-candidate
+      // chain can no longer let every candidate have its own full timeout.
+      console.error(`[ai] streamChatReply: out of time budget with ${chain.length - i} candidate(s) left untried`);
+      throw lastError ?? new Error("[ai] streamChatReply: out of time budget before any candidate could produce output");
+    }
     const candidate = chain[i];
     let capturedError: unknown;
     const result = streamText({
@@ -248,8 +316,9 @@ export async function streamChatReply(params: {
       // it a provider that accepts the connection and then stalls mid-stream
       // produces a response that never completes and never errors — the
       // "stuck on Life Plus חושב…" symptom, the client sitting in an await
-      // that never resolves.
-      abortSignal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+      // that never resolves. Bounded by the shared deadline above, not a
+      // fixed per-candidate constant — see TOTAL_CHAT_BUDGET_MS's comment.
+      abortSignal: AbortSignal.timeout(timeoutMs),
       // Zero, not the SDK's own default (2): live-diagnosed 2026-09-25, the
       // SDK's built-in retry re-tries the SAME model with exponential
       // backoff on exactly the errors this function already has its OWN,
@@ -337,7 +406,7 @@ export async function generateChatText(params: {
   operation?: AiOperation;
 }): Promise<string> {
   await chargeQuota(params.actor, params.operation ?? "chat");
-  return withModelFallback("generateChatText", async (candidate) => {
+  return withModelFallback("generateChatText", TOTAL_CHAT_BUDGET_MS, GENERATION_TIMEOUT_MS, async (candidate, timeoutMs) => {
     if (candidate.kind === "bytez") {
       return bytezGenerateText({ modelId: candidate.modelId, system: params.system, prompt: params.prompt });
     }
@@ -354,7 +423,7 @@ export async function generateChatText(params: {
       // incident, as generateStructuredData gaining its own overridable
       // maxRetries for classifyRouterDomain — see that function's comment.
       maxRetries: 0,
-      abortSignal: AbortSignal.timeout(GENERATION_TIMEOUT_MS),
+      abortSignal: AbortSignal.timeout(timeoutMs),
     });
     return text;
   });
@@ -400,10 +469,19 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
 }) {
   await chargeQuota(params.actor, params.operation ?? "structured");
   const { images } = params;
+  const isVision = Boolean(images && images.length > 0);
+  const cap = isVision ? VISION_TIMEOUT_MS : (params.timeoutMs ?? STRUCTURED_TIMEOUT_MS);
+  // params.timeoutMs is for background jobs reading long input (see its own
+  // doc comment) — those don't share an interactive route's maxDuration
+  // pressure the same way, so their total budget scales with the override
+  // instead of the standard interactive one.
+  const totalBudget = isVision ? TOTAL_VISION_BUDGET_MS : params.timeoutMs ? params.timeoutMs * 3 : TOTAL_STRUCTURED_BUDGET_MS;
   return withModelFallback(
     "generateStructuredData",
-    async (candidate) => {
-    if (images && images.length > 0) {
+    totalBudget,
+    cap,
+    async (candidate, timeoutMs) => {
+    if (isVision && images) {
       if (candidate.kind === "bytez") throw new Error("bytez cannot read images");
       const { object } = await generateObject({
         model: candidate.model,
@@ -419,9 +497,7 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
           },
         ],
         maxRetries: 1,
-        // Vision calls carry far more input than a text prompt, so they get
-        // the longer of the two budgets rather than the standard one.
-        abortSignal: AbortSignal.timeout(VISION_TIMEOUT_MS),
+        abortSignal: AbortSignal.timeout(timeoutMs),
       });
       return object;
     }
@@ -454,11 +530,11 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
       // burning the whole budget rediscovering that. Overridable — see this
       // function's own maxRetries param doc.
       maxRetries: params.maxRetries ?? 1,
-      abortSignal: AbortSignal.timeout(params.timeoutMs ?? STRUCTURED_TIMEOUT_MS),
+      abortSignal: AbortSignal.timeout(timeoutMs),
     });
     return object;
     },
-    images && images.length > 0 ? { filter: (c) => c.kind === "sdk" } : {}
+    isVision ? { filter: (c) => c.kind === "sdk" } : {}
   );
 }
 
@@ -488,7 +564,9 @@ export async function streamStructuredData<T extends z.ZodTypeAny>(params: {
   timeoutMs?: number;
 }): Promise<z.infer<T>> {
   await chargeQuota(params.actor, params.operation ?? "structured");
-  return withModelFallback("streamStructuredData", async (candidate) => {
+  const cap = params.timeoutMs ?? STREAM_TIMEOUT_MS;
+  const totalBudget = params.timeoutMs ? params.timeoutMs * 3 : TOTAL_STRUCTURED_BUDGET_MS;
+  return withModelFallback("streamStructuredData", totalBudget, cap, async (candidate, timeoutMs) => {
     if (candidate.kind === "bytez") {
       return bytezGenerateObject({ modelId: candidate.modelId, schema: params.schema, system: params.system, prompt: params.prompt });
     }
@@ -499,7 +577,7 @@ export async function streamStructuredData<T extends z.ZodTypeAny>(params: {
       system: params.system,
       prompt: params.prompt,
       maxRetries: 1,
-      abortSignal: AbortSignal.timeout(params.timeoutMs ?? STREAM_TIMEOUT_MS),
+      abortSignal: AbortSignal.timeout(timeoutMs),
       onError: ({ error }) => {
         streamError = error;
       },

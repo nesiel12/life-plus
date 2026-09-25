@@ -1,29 +1,42 @@
 import "server-only";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI, openai } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { LanguageModel } from "ai";
-import { resolveChatProvider, type ChatProvider } from "@/lib/ai/resolveChatProvider";
 
-// The one place that knows which AI provider Atlas actually uses (Unified
+// The one place that knows which AI providers Atlas actually uses (Unified
 // AI Provider Layer). Every model selection in lib/ai/service.ts comes from
 // here — swapping/adding providers means changing this file (and, only if
 // the new SDK's call shape genuinely differs, service.ts), never any of
 // the AI-backed routes.
 //
-// Two chat providers are supported — Google Gemini and OpenAI — selected by
-// which API key is actually configured, resolved once here rather than
-// duplicated per route. This explicitly overrides this file's own earlier
-// "OpenAI only" note: that was correct when there was exactly one working
-// provider to validate a plugin contract against; there are two now, chosen
-// deliberately, not speculative.
+// Rebuilt 2026-09-25 around a fixed, explicit tier order rather than
+// "whichever of two keys is set wins": Groq → Cerebras → SambaNova →
+// Gemini → OpenRouter (a free model only — see its own section below),
+// each an independent, skip-if-unconfigured link. No Anthropic/Claude
+// integration exists anywhere in this file, by design — Groq, Cerebras,
+// SambaNova and OpenRouter are all "OpenAI-compatible" REST APIs (same
+// request/response shape as OpenAI's own, different host), which is what
+// makes a genuinely fast, free tier of providers usable through the one
+// @ai-sdk/openai integration this file already depended on, via
+// createOpenAI({ apiKey, baseURL }).chat(modelId) — .chat(), not the
+// factory's default call, because @ai-sdk/openai defaults to OpenAI's own
+// Responses API, which none of these four third-party hosts implement
+// (live-confirmed 2026-09-25: both Cerebras and SambaNova specifically
+// 400/404 with "Unsupported model ... on Response API" until forced onto
+// the legacy Chat Completions endpoint via .chat()).
 //
-// Gemini wins when both keys are present. It is the cheaper, faster choice
-// for this app's workload (short generations — insights, goal breakdowns,
-// structured extraction), and OpenAI stays configured specifically to be
-// the fallback: getChatModelChain() below tries Gemini first and only
-// reaches OpenAI on a genuine capacity failure (see isRetryableAiError in
-// lib/ai/retryableError.ts for exactly what counts as one).
-const OPENAI_CHAT_MODEL_ID = "gpt-4o-mini";
+// Every model id below was chosen by querying each provider's own live
+// /v1/models endpoint on 2026-09-25 and test-streaming the result — not
+// carried over from memory or an earlier session. The previous Groq/
+// Cerebras/SambaNova ids this app briefly used (llama-3.3-70b-versatile /
+// llama3.1-70b / Meta-Llama-3.1-70B-Instruct) all 404 today; if this chain
+// starts erroring again, re-run that same check
+// (GET <baseURL>/models with the relevant key) before assuming the key or
+// the code — see docs/BACKLOG.md.
+const GROQ_CHAT_MODEL_ID = "openai/gpt-oss-20b";
+const CEREBRAS_CHAT_MODEL_ID = "gpt-oss-120b";
+const SAMBANOVA_CHAT_MODEL_ID = "Meta-Llama-3.3-70B-Instruct";
+
 // Pinned to a dated model, not a Google-maintained "-latest"/"-lite-latest"
 // alias, for the reasons in the 2026-09-24 half of this comment below.
 //
@@ -51,11 +64,6 @@ const OPENAI_CHAT_MODEL_ID = "gpt-4o-mini";
 //    a "thinking" model, cutting "gemini-3.6-flash" alone to ~5-7s — still
 //    behind "gemini-3.5-flash" with no config needed at all.)
 //
-// "gemini-3.5-flash" as primary is the fix for both: faster by default, and
-// not the model this app's own testing has already burned through a tiny
-// daily allowance on. "gemini-3.6-flash" stays configured as the fallback
-// — still a live, real, working model, just not the one to lead with.
-//
 // [2026-09-24] Re-verified against the freshly-rotated key with direct REST
 // calls (generateContent, not the SDK): "gemini-2.5-flash" and "gemini-2.0-
 // flash" both 404 ("no longer available to new users"); "gemini-flash-
@@ -63,122 +71,116 @@ const OPENAI_CHAT_MODEL_ID = "gpt-4o-mini";
 // call, consistently, not a one-off spike — the aliases now resolve to an
 // old, saturated generation. "gemini-3.6-flash" and "gemini-3.5-flash" were
 // the only models in the account's live ListModels response that returned
-// real 200s, repeatedly. If this starts erroring again, don't assume the
-// key — re-run ListModels
-// (https://generativelanguage.googleapis.com/v1beta/models?key=…) and a
-// direct generateContent call against a few candidates before touching
-// anything else; see docs/BACKLOG.md.
+// real 200s, repeatedly.
 const GEMINI_CHAT_MODEL_ID = "gemini-3.5-flash";
 // A second, independently-verified-live model — not the same one twice, so
-// a genuine outage (or, as of 2026-09-25, a daily-quota exhaustion) of the
-// primary actually has somewhere else to go.
+// a genuine outage (or a daily-quota exhaustion) of the primary actually
+// has somewhere else to go, still within the Gemini tier.
 const GEMINI_FALLBACK_MODEL_ID = "gemini-3.6-flash";
-const OPENAI_FALLBACK_MODEL_ID = "gpt-4o-mini";
-const TRANSCRIPTION_MODEL_ID = "whisper-1";
-// Second fallback, between Gemini and OpenAI — see lib/ai/bytez.ts for why
-// this is a direct REST call rather than an SDK-native model.
-//
-// Bytez has no distinct "free models" tier: it bills all open-model
-// inference by the second (docs.bytez.com/model-api/docs/billing), with a
-// small rolling credit allowance ($1 / 4 weeks on the free plan) that any
-// model draws down, scaled by parameter count — a 7B-class model runs
-// roughly $0.26/hour, a 120B one roughly five times that. Gemma 3 4B is
-// below even the 7B tier, is genuinely capable as an assistant model for
-// its size, and is confirmed as an actual, currently-integrated Bytez
-// model (docs.litellm.ai/docs/providers/bytez uses this exact id as their
-// own worked example) — cheap enough that this fallback tier does not
-// meaningfully eat into a free-tier account's rolling allowance.
-const BYTEZ_CHAT_MODEL_ID = "google/gemma-3-4b-it";
 
-function currentChatProvider(): ChatProvider {
-  return resolveChatProvider({
-    openaiKey: process.env.OPENAI_API_KEY,
-    geminiKey: process.env.GEMINI_API_KEY,
-  });
+// OpenRouter is STRICTLY the last-resort backup, per explicit instruction —
+// and, per that same instruction, only ever a free model: paid usage here
+// would defeat the entire point of an app built around five separately-
+// free provider tiers. isOpenRouterFreeModelId is a real, enforced guard
+// (see getChatModelChain below), not just a naming convention — a model id
+// that doesn't end in ":free" is refused rather than silently billed.
+// google/gemma-4-31b-it:free is one of 20 free models OpenRouter's own
+// live /v1/models listing carried on 2026-09-25 (the user's own suggested
+// "meta-llama/llama-3-8b-instruct:free" no longer exists on that list —
+// that family of ids has aged out) and, live-tested, answered fluently in
+// Hebrew.
+const OPENROUTER_FREE_CHAT_MODEL_ID = "google/gemma-4-31b-it:free";
+export function isOpenRouterFreeModelId(modelId: string): boolean {
+  return modelId.endsWith(":free");
 }
 
-// Explicit apiKey wiring (not the SDK's own default GOOGLE_GENERATIVE_AI_API_KEY
-// env var name) so the project's actual env var, GEMINI_API_KEY, is the one
-// real source of truth — one name, documented once, in .env.example.
+const OPENAI_CHAT_MODEL_ID = "gpt-4o-mini";
+const TRANSCRIPTION_MODEL_ID = "whisper-1";
+// Bytez: see lib/ai/bytez.ts for why this is a direct REST call rather than
+// an SDK-native model. Not part of the five tiers above (the user didn't
+// configure it — BYTEZ_API_KEY is absent — and didn't ask for it), kept
+// only as an opt-in tail candidate for if it's ever added: harmless when
+// unset, since every candidate below is gated on its own key existing.
+const BYTEZ_CHAT_MODEL_ID = "google/gemma-3-4b-it";
+
+// Explicit apiKey wiring (not each SDK's own default env var name) so the
+// project's actual env var names are the one real source of truth for each
+// — one name per provider, documented once, in .env.example.
 function getGoogleProvider() {
   return createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
 }
-
-export function getChatModel(): LanguageModel {
-  // currentChatProvider() being null here means a caller invoked this
-  // without first checking isProviderConfigured() — falling back to OpenAI
-  // (which will itself fail loudly on a missing key) is more honest than
-  // silently picking a provider nothing asked for.
-  //
-  // Bytez deliberately never appears here. This is the single-model picker
-  // streamChatReply uses (see its own comment for why streaming has no
-  // mid-request failover), and Bytez is meant strictly as a fallback tier
-  // inside getChatModelChain() below, never a top-level primary choice.
-  return currentChatProvider() === "gemini" ? getGoogleProvider()(GEMINI_CHAT_MODEL_ID) : openai(OPENAI_CHAT_MODEL_ID);
+function getGroqProvider() {
+  return createOpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" });
+}
+function getCerebrasProvider() {
+  return createOpenAI({ apiKey: process.env.CEREBRAS_API_KEY, baseURL: "https://api.cerebras.ai/v1" });
+}
+function getSambaNovaProvider() {
+  return createOpenAI({ apiKey: process.env.SAMBANOVA_API_KEY, baseURL: "https://api.sambanova.ai/v1" });
+}
+function getOpenRouterProvider() {
+  return createOpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: "https://openrouter.ai/api/v1" });
 }
 
-// A "sdk" candidate is called through generateText/generateObject exactly
-// as before; a "bytez" candidate has no LanguageModel to hand those
+// A "sdk" candidate is called through generateText/generateObject/streamText
+// exactly as before; a "bytez" candidate has no LanguageModel to hand those
 // functions, so it carries only the model id and is called through
-// lib/ai/bytez.ts instead — see the branch in each of
-// lib/ai/service.ts's withModelFallback call sites.
+// lib/ai/bytez.ts instead — see the branch in each of lib/ai/service.ts's
+// call sites.
 export type ChatModelCandidate =
   | { kind: "sdk"; label: string; model: LanguageModel }
   | { kind: "bytez"; label: string; modelId: string };
 
 /**
- * The ordered failover chain (system-wide AI resiliency).
+ * The ordered failover chain (system-wide AI resiliency) — five
+ * independent, free-to-use tiers in the exact order requested: Groq →
+ * Cerebras → SambaNova → Gemini (two models deep) → OpenRouter (a free
+ * model, strictly last resort). Each tier is included only when its own
+ * env var is actually set — an unconfigured provider is skipped, not a
+ * failure. OpenAI and Bytez, if ever configured, are appended after all
+ * five as extra tail candidates rather than removed from the app's
+ * capabilities entirely.
  *
- * A provider returning 503 "high demand" is a capacity problem, and the one
- * reliable cure is a different model — ideally on a different provider,
- * since an overloaded provider tends to be overloaded across its whole
- * fleet. So the chain crosses providers first when both keys exist, then
- * falls back to the same provider's alternate alias.
- *
- * Ordering keeps the current primary first, so nothing about the normal,
- * healthy path changes — this only ever engages after a real failure.
+ * A capacity failure (503, 429, and — live-confirmed 2026-09-25 — 402
+ * "payment required" on a provider account with no billing configured) on
+ * one tier moves to the next; see lib/ai/retryableError.ts for exactly
+ * what counts as one. This function itself does no retrying — it just
+ * builds the ordered list; lib/ai/service.ts's withModelFallback and
+ * streamChatReply are what actually walk it.
  */
 export function getChatModelChain(): ChatModelCandidate[] {
-  const provider = currentChatProvider();
-  const hasOpenAi = Boolean(process.env.OPENAI_API_KEY);
-  const hasGemini = Boolean(process.env.GEMINI_API_KEY);
-  const hasBytez = Boolean(process.env.BYTEZ_API_KEY);
+  const chain: ChatModelCandidate[] = [];
 
-  const openaiPrimary: ChatModelCandidate[] = hasOpenAi
-    ? [{ kind: "sdk", label: `openai:${OPENAI_CHAT_MODEL_ID}`, model: openai(OPENAI_CHAT_MODEL_ID) }]
-    : [];
-  const geminiPrimary: ChatModelCandidate[] = hasGemini
-    ? [{ kind: "sdk", label: `gemini:${GEMINI_CHAT_MODEL_ID}`, model: getGoogleProvider()(GEMINI_CHAT_MODEL_ID) }]
-    : [];
-  const geminiAlternate: ChatModelCandidate[] = hasGemini
-    ? [{ kind: "sdk", label: `gemini:${GEMINI_FALLBACK_MODEL_ID}`, model: getGoogleProvider()(GEMINI_FALLBACK_MODEL_ID) }]
-    : [];
-  const openaiAlternate: ChatModelCandidate[] =
-    hasOpenAi && OPENAI_FALLBACK_MODEL_ID !== OPENAI_CHAT_MODEL_ID
-      ? [{ kind: "sdk", label: `openai:${OPENAI_FALLBACK_MODEL_ID}`, model: openai(OPENAI_FALLBACK_MODEL_ID) }]
-      : [];
-  // The middle tier: "Gemini primary, Bytez second, OpenAI final" per the
-  // requested ordering. Included in the openai-primary branch too (only
-  // reached when Gemini's own key is absent) so a Gemini outage does not
-  // also remove Atlas's only other cross-provider fallback — it slots in
-  // right after whichever provider is actually primary, before that
-  // branch's within-provider alternates, matching the existing "cross
-  // providers before falling back within one" ordering below.
-  const bytez: ChatModelCandidate[] = hasBytez
-    ? [{ kind: "bytez", label: `bytez:${BYTEZ_CHAT_MODEL_ID}`, modelId: BYTEZ_CHAT_MODEL_ID }]
-    : [];
+  if (process.env.GROQ_API_KEY) {
+    chain.push({ kind: "sdk", label: `groq:${GROQ_CHAT_MODEL_ID}`, model: getGroqProvider().chat(GROQ_CHAT_MODEL_ID) });
+  }
+  if (process.env.CEREBRAS_API_KEY) {
+    chain.push({ kind: "sdk", label: `cerebras:${CEREBRAS_CHAT_MODEL_ID}`, model: getCerebrasProvider().chat(CEREBRAS_CHAT_MODEL_ID) });
+  }
+  if (process.env.SAMBANOVA_API_KEY) {
+    chain.push({ kind: "sdk", label: `sambanova:${SAMBANOVA_CHAT_MODEL_ID}`, model: getSambaNovaProvider().chat(SAMBANOVA_CHAT_MODEL_ID) });
+  }
+  if (process.env.GEMINI_API_KEY) {
+    chain.push({ kind: "sdk", label: `gemini:${GEMINI_CHAT_MODEL_ID}`, model: getGoogleProvider()(GEMINI_CHAT_MODEL_ID) });
+    chain.push({ kind: "sdk", label: `gemini:${GEMINI_FALLBACK_MODEL_ID}`, model: getGoogleProvider()(GEMINI_FALLBACK_MODEL_ID) });
+  }
+  if (process.env.BYTEZ_API_KEY) {
+    chain.push({ kind: "bytez", label: `bytez:${BYTEZ_CHAT_MODEL_ID}`, modelId: BYTEZ_CHAT_MODEL_ID });
+  }
+  if (process.env.OPENAI_API_KEY) {
+    chain.push({ kind: "sdk", label: `openai:${OPENAI_CHAT_MODEL_ID}`, model: openai(OPENAI_CHAT_MODEL_ID) });
+  }
+  if (process.env.OPENROUTER_API_KEY) {
+    // The enforced guard named in this constant's own comment: refuses to
+    // wire in an OpenRouter model that isn't free, rather than silently
+    // billing the account the instant someone changes this one constant.
+    if (!isOpenRouterFreeModelId(OPENROUTER_FREE_CHAT_MODEL_ID)) {
+      throw new Error(`[ai] OPENROUTER_FREE_CHAT_MODEL_ID ("${OPENROUTER_FREE_CHAT_MODEL_ID}") is not a free model id (must end in ":free")`);
+    }
+    chain.push({ kind: "sdk", label: `openrouter:${OPENROUTER_FREE_CHAT_MODEL_ID}`, model: getOpenRouterProvider().chat(OPENROUTER_FREE_CHAT_MODEL_ID) });
+  }
 
-  const chain =
-    provider === "gemini"
-      ? [...geminiPrimary, ...bytez, ...openaiPrimary, ...geminiAlternate]
-      : [...openaiPrimary, ...bytez, ...geminiPrimary, ...openaiAlternate, ...geminiAlternate];
-
-  // Never hand back an empty chain: callers gate on isProviderConfigured(),
-  // and an empty array would look like "succeeded with no result" rather
-  // than failing loudly on a missing key.
-  return chain.length > 0
-    ? chain
-    : [{ kind: "sdk", label: `openai:${OPENAI_CHAT_MODEL_ID}`, model: openai(OPENAI_CHAT_MODEL_ID) }];
+  return chain;
 }
 
 export function getTranscriptionModel() {
@@ -188,18 +190,20 @@ export function getTranscriptionModel() {
 // Every AI-backed route previously checked process.env.OPENAI_API_KEY
 // directly before deciding whether to call a real model or fall back to an
 // honest mock/template — real, working provider-coupling in a codebase
-// otherwise disciplined about not leaking it. Routes ask this instead; it
-// now reflects "is any chat-capable provider configured," OpenAI or Gemini.
+// otherwise disciplined about not leaking it. Routes ask this instead.
+// Single source of truth with getChatModelChain() itself (not a separate
+// "which keys count" list that could drift from it): any provider that
+// chain would actually try counts as configured.
 export function isProviderConfigured(): boolean {
-  return currentChatProvider() !== null;
+  return getChatModelChain().length > 0;
 }
 
 // Audio transcription (Torah Space uploads) is OpenAI/Whisper-specific —
 // @ai-sdk/google has no transcription model in this version, only
-// text-to-speech (the opposite direction). Kept distinct from
-// isProviderConfigured() so app/api/torah/extract's audio path gates on the
-// capability it actually needs: a Gemini-only setup enables chat/text
-// generation everywhere, but not audio transcription.
+// text-to-speech (the opposite direction), and none of Groq/Cerebras/
+// SambaNova/OpenRouter's chat-completions-shaped integration above expose
+// one either. Kept distinct from isProviderConfigured() so app/api/torah/
+// extract's audio path gates on the capability it actually needs.
 export function isTranscriptionConfigured(): boolean {
   return Boolean(process.env.OPENAI_API_KEY);
 }

@@ -22,6 +22,13 @@ describe("isRetryableAiError", () => {
       }
     });
 
+    // Live-confirmed 2026-09-25 against real Cerebras/SambaNova accounts:
+    // "Payment Required" is account-specific, not a sign every model in the
+    // chain will fail the same way — a different provider is worth trying.
+    it("retries 402 (a provider account with no billing configured)", () => {
+      expect(isRetryableAiError({ statusCode: 402, message: "Payment Required" })).toBe(true);
+    });
+
     it("reads a status nested on a response object", () => {
       expect(isRetryableAiError({ response: { status: 503 }, message: "" })).toBe(true);
     });

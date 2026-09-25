@@ -33,6 +33,11 @@ interface Briefing {
 const STREAM_STALL_MS = 55_000;
 
 const FRIENDLY_ERROR = "לא הצלחתי להתחבר כרגע. נסה שוב עוד רגע.";
+// Distinct from FRIENDLY_ERROR: a stall is diagnosable (the stall watchdog
+// below fired, meaning the server accepted the connection and then went
+// quiet) — "עמוס כרגע" is honest in a way "לא הצלחתי להתחבר" is not, since
+// the connection itself succeeded.
+const STALL_ERROR = "השרת עמוס כרגע ולא הגיב בזמן. נסה שוב עוד רגע.";
 
 // AI Companion Experience v2 (docs/ATLAS_ARCHITECTURE_VISION.md §10): the
 // primary intelligence surface, not a generic chat box. Two concrete
@@ -171,7 +176,13 @@ export function AICompanion() {
     let stallTimer: ReturnType<typeof setTimeout> | undefined;
     const armStallTimer = () => {
       if (stallTimer) clearTimeout(stallTimer);
-      stallTimer = setTimeout(() => controller.abort(), STREAM_STALL_MS);
+      // A reason, not a bare abort(): without one, the rejection this
+      // produces is a generic "signal is aborted without reason" — the
+      // exact message reported live 2026-09-25, which said nothing about
+      // *why*. A named reason is what lets the catch below tell "the
+      // stream genuinely stalled" apart from every other kind of failure
+      // and show something more specific than the generic fallback.
+      stallTimer = setTimeout(() => controller.abort(new DOMException("Stalled — no response chunk within the timeout", "TimeoutError")), STREAM_STALL_MS);
     };
 
     try {
@@ -227,7 +238,12 @@ export function AICompanion() {
       // real reset time, e.g.) — anything else (a network drop, an abort)
       // falls back to the generic friendly text, same as before.
       console.error("[AICompanion] chat request failed:", err);
-      const message = err instanceof AiFetchError ? err.message : FRIENDLY_ERROR;
+      // signal.reason, not the caught error object itself — fetch's own
+      // AbortError name is inconsistent about carrying the real reason
+      // through, but the reason set on the signal by armStallTimer above is
+      // always there to check directly.
+      const stalled = controller.signal.aborted && controller.signal.reason instanceof DOMException && controller.signal.reason.name === "TimeoutError";
+      const message = stalled ? STALL_ERROR : err instanceof AiFetchError ? err.message : FRIENDLY_ERROR;
       await addChatMessage({ role: "assistant", content: message });
     } finally {
       // Clearing the timer here matters as much as setting it: a timer left

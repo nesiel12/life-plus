@@ -99,18 +99,24 @@ export async function POST(request: NextRequest) {
   const limited = rateLimitResponse(`chat:${token.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
-  // Resolved from the session, never from the request body.
-  const actor = await currentUserActor();
-
   const parsed = await parseJsonBody(request, chatRequestSchema);
   if (parsed.error) return parsed.error;
   const { message, history = [] } = parsed.data;
 
-  if (!isProviderConfigured()) {
-    return textResponse(mockReply(message), []);
-  }
-
   try {
+    // Resolved from the session, never from the request body. Moved inside
+    // this try 2026-09-25: it does a real Supabase lookup (getCurrentUser,
+    // by session email), and sitting outside the try meant a genuine DB
+    // hiccup here — not hypothetical; this is the "generic Next.js Runtime
+    // Error {message, details, hint, code}" reported live, exactly the
+    // shape a raw PostgrestError prints as — crashed the whole route with
+    // no fallback at all, unlike every other failure in this handler.
+    const actor = await currentUserActor();
+
+    if (!isProviderConfigured()) {
+      return textResponse(mockReply(message), []);
+    }
+
     // The Section AI Router (Sprint 6): classified in parallel with the user
     // lookup below since it only needs the message text, not the DB — this
     // never adds sequential latency to the common case, and a classification

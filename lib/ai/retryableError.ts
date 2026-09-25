@@ -1,7 +1,8 @@
 // Deciding whether an AI call failure is worth retrying on a different model.
 //
-// Pure and separately testable, following the same "pure module the
-// server-only file imports from" split resolveChatProvider.ts already uses.
+// Pure and separately testable, the same "pure module the server-only file
+// imports from" split this codebase uses elsewhere (e.g.
+// lib/goals/deriveGoalStage.ts).
 //
 // The distinction that matters: a *capacity* failure (the provider is busy,
 // rate-limited, or the model is momentarily overloaded) will very likely
@@ -11,8 +12,17 @@
 // just multiplies the latency before the user sees the same error. Retrying
 // everything is how a 3-second failure becomes a 90-second one.
 
-/** HTTP statuses that mean "try again, possibly elsewhere". */
-const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
+/**
+ * HTTP statuses that mean "try again, possibly elsewhere".
+ *
+ * 402 added 2026-09-25, live-confirmed against real Cerebras/SambaNova
+ * accounts: "Payment Required" means THAT provider's account has no billing
+ * configured — a fact specific to that one account, unlike a 400/401 (a
+ * malformed request or bad key, which fails identically everywhere). A
+ * different provider in the chain knows nothing about this account's
+ * billing status and is very much worth trying.
+ */
+const RETRYABLE_STATUS = new Set([402, 408, 409, 425, 429, 500, 502, 503, 504]);
 
 /** Statuses that will fail the same way on every model — never retry. */
 const FATAL_STATUS = new Set([400, 401, 403, 404, 422]);

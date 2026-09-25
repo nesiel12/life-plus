@@ -5,11 +5,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // exactly as a real request would with whatever keys are actually
 // configured — the same pattern lib/sessionCookie.test.ts uses.
 
-async function chainWith(env: { openai?: string; gemini?: string; bytez?: string }) {
+interface Env {
+  groq?: string;
+  cerebras?: string;
+  sambanova?: string;
+  gemini?: string;
+  bytez?: string;
+  openai?: string;
+  openrouter?: string;
+}
+
+const ENV_VAR: Record<keyof Env, string> = {
+  groq: "GROQ_API_KEY",
+  cerebras: "CEREBRAS_API_KEY",
+  sambanova: "SAMBANOVA_API_KEY",
+  gemini: "GEMINI_API_KEY",
+  bytez: "BYTEZ_API_KEY",
+  openai: "OPENAI_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+};
+
+async function chainWith(env: Env) {
   vi.resetModules();
-  if (env.openai) vi.stubEnv("OPENAI_API_KEY", env.openai);
-  if (env.gemini) vi.stubEnv("GEMINI_API_KEY", env.gemini);
-  if (env.bytez) vi.stubEnv("BYTEZ_API_KEY", env.bytez);
+  for (const [key, value] of Object.entries(env)) {
+    if (value) vi.stubEnv(ENV_VAR[key as keyof Env], value);
+  }
   const { getChatModelChain } = await import("@/lib/ai/provider");
   return getChatModelChain();
 }
@@ -24,57 +44,85 @@ beforeEach(() => {
 });
 
 describe("getChatModelChain", () => {
-  it("orders Gemini, then Bytez, then OpenAI when all three keys are set", async () => {
-    const chain = await chainWith({ openai: "sk-x", gemini: "g-x", bytez: "b-x" });
-    expect(chain.map((c) => c.kind)).toEqual(["sdk", "bytez", "sdk", "sdk"]);
-    expect(chain[0].label).toMatch(/^gemini:/);
-    expect(chain[1].label).toMatch(/^bytez:/);
-    expect(chain[2].label).toMatch(/^openai:/);
+  it("orders Groq, Cerebras, SambaNova, then Gemini (two models deep) when all are configured", async () => {
+    const chain = await chainWith({ groq: "g", cerebras: "c", sambanova: "s", gemini: "gem" });
+    expect(chain.map((c) => c.label.split(":")[0])).toEqual(["groq", "cerebras", "sambanova", "gemini", "gemini"]);
+    expect(chain.every((c) => c.kind === "sdk")).toBe(true);
   });
 
-  it("omits Bytez entirely when BYTEZ_API_KEY is unset", async () => {
-    const chain = await chainWith({ openai: "sk-x", gemini: "g-x" });
-    expect(chain.some((c) => c.kind === "bytez")).toBe(false);
-    expect(chain[0].label).toMatch(/^gemini:/);
-    expect(chain[1].label).toMatch(/^openai:/);
+  it("skips any tier whose own key is unset, keeping the rest in order", async () => {
+    const chain = await chainWith({ groq: "g", gemini: "gem" });
+    expect(chain.map((c) => c.label.split(":")[0])).toEqual(["groq", "gemini", "gemini"]);
   });
 
-  it("places Bytez right after Gemini even when OpenAI is entirely absent", async () => {
-    const chain = await chainWith({ gemini: "g-x", bytez: "b-x" });
-    expect(chain.map((c) => c.kind)).toEqual(["sdk", "bytez", "sdk"]);
-    expect(chain[0].label).toMatch(/^gemini:/);
-    expect(chain[1].label).toMatch(/^bytez:/);
+  it("places OpenRouter strictly last, after every other configured tier", async () => {
+    const chain = await chainWith({ groq: "g", gemini: "gem", openrouter: "or" });
+    expect(chain[chain.length - 1].label.split(":")[0]).toBe("openrouter");
   });
 
-  // Gemini's key missing is the one case where OpenAI becomes primary —
-  // Bytez still has to appear, or a Gemini outage would also remove
-  // Atlas's only other cross-provider fallback.
-  it("still includes Bytez when only OpenAI and Bytez are configured", async () => {
-    const chain = await chainWith({ openai: "sk-x", bytez: "b-x" });
-    expect(chain[0].label).toMatch(/^openai:/);
-    expect(chain[1].label).toMatch(/^bytez:/);
-    expect(chain.some((c) => c.kind === "bytez")).toBe(true);
+  it("OpenRouter's wired model id is always a free model", async () => {
+    const chain = await chainWith({ openrouter: "or" });
+    const openrouter = chain.find((c) => c.label.startsWith("openrouter:"));
+    expect(openrouter).toBeDefined();
+    expect(openrouter!.label.endsWith(":free")).toBe(true);
   });
 
-  it("never puts Bytez first — Gemini leads whenever it is configured", async () => {
-    const chain = await chainWith({ gemini: "g-x", bytez: "b-x", openai: "sk-x" });
-    expect(chain[0].kind).toBe("sdk");
-    expect(chain[0].label).toMatch(/^gemini:/);
-  });
-
-  it("falls back to a single OpenAI candidate when nothing is configured", async () => {
-    const chain = await chainWith({});
-    expect(chain).toHaveLength(1);
-    expect(chain[0].label).toMatch(/^openai:/);
+  it("includes Bytez, and only Bytez, as a bytez-kind candidate when configured", async () => {
+    const chain = await chainWith({ gemini: "gem", bytez: "b" });
+    const bytez = chain.filter((c) => c.kind === "bytez");
+    expect(bytez).toHaveLength(1);
+    expect(bytez[0].label).toMatch(/^bytez:/);
   });
 
   it("a bytez candidate carries a modelId, never a LanguageModel", async () => {
-    const chain = await chainWith({ gemini: "g-x", bytez: "b-x" });
+    const chain = await chainWith({ bytez: "b" });
     const bytez = chain.find((c) => c.kind === "bytez");
     expect(bytez).toBeDefined();
     if (bytez?.kind === "bytez") {
       expect(typeof bytez.modelId).toBe("string");
       expect(bytez.modelId.length).toBeGreaterThan(0);
     }
+  });
+
+  it("includes OpenAI, when configured, only as a tail candidate after the five named tiers", async () => {
+    const chain = await chainWith({ groq: "g", openai: "o", openrouter: "or" });
+    const kinds = chain.map((c) => c.label.split(":")[0]);
+    expect(kinds.indexOf("openai")).toBeGreaterThan(kinds.indexOf("groq"));
+    expect(kinds.indexOf("openrouter")).toBeGreaterThan(kinds.indexOf("openai"));
+  });
+
+  it("is empty when nothing is configured — never a phantom fallback candidate", async () => {
+    const chain = await chainWith({});
+    expect(chain).toEqual([]);
+  });
+
+  it("is stable and repeatable for the exact env this app actually ships with", async () => {
+    // Mirrors .env.local as of 2026-09-25: everything except OPENAI_API_KEY
+    // and BYTEZ_API_KEY.
+    const chain = await chainWith({ groq: "g", cerebras: "c", sambanova: "s", gemini: "gem", openrouter: "or" });
+    expect(chain.map((c) => c.label.split(":")[0])).toEqual(["groq", "cerebras", "sambanova", "gemini", "gemini", "openrouter"]);
+  });
+});
+
+describe("isOpenRouterFreeModelId", () => {
+  it("accepts a :free-suffixed id and rejects anything else", async () => {
+    const { isOpenRouterFreeModelId } = await import("@/lib/ai/provider");
+    expect(isOpenRouterFreeModelId("google/gemma-4-31b-it:free")).toBe(true);
+    expect(isOpenRouterFreeModelId("google/gemma-4-31b-it")).toBe(false);
+    expect(isOpenRouterFreeModelId("openai/gpt-4o")).toBe(false);
+  });
+});
+
+describe("isProviderConfigured", () => {
+  it("is true whenever the chain is non-empty, false otherwise — the same source of truth, not a separate list", async () => {
+    vi.resetModules();
+    vi.stubEnv("GROQ_API_KEY", "g");
+    let mod = await import("@/lib/ai/provider");
+    expect(mod.isProviderConfigured()).toBe(true);
+
+    vi.resetModules();
+    vi.unstubAllEnvs();
+    mod = await import("@/lib/ai/provider");
+    expect(mod.isProviderConfigured()).toBe(false);
   });
 });
