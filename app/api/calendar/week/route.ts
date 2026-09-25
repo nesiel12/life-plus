@@ -45,6 +45,10 @@ async function fetchWeekEvents(
     start_time: event.start,
     end_time: event.end,
     is_all_day: event.isAllDay,
+    // Carried through, not dropped: fetchAllCalendarsWindow can legitimately
+    // return the same event id twice (once per calendar it's genuinely on)
+    // — see WeekCalendarEvent's own comment for why this field exists.
+    calendar_id: event.calendarId,
   }));
 }
 

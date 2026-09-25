@@ -9,6 +9,18 @@ export interface WeekCalendarEvent {
   start_time: string;
   end_time: string;
   is_all_day: boolean;
+  /**
+   * Which Google calendar this event came from. The SAME event id can
+   * legitimately appear on two calendars the user has access to (an invite
+   * they also own, or a shared calendar) — lib/googleCalendar/fetchWindow.ts's
+   * fetchAllCalendarsWindow deliberately keeps both as distinct rows (its
+   * own comment: "two distinct events that happen to share an id" are not a
+   * duplicate). Carried through here, and folded into each row's id below,
+   * so that stays true all the way to the rendered list — without it, two
+   * genuinely different calendar entries collapsed onto the same React key
+   * (the 2026-09-25 "duplicate key" incident).
+   */
+  calendar_id: string;
 }
 
 export type TimelineRowData =
@@ -73,7 +85,7 @@ export function buildDailyTimelineRows(
 ): TimelineRowData[] {
   const anytimeEvents: TimelineRowData[] = events
     .filter((e) => e.is_all_day && dateKey(e.start_time) === selectedDate)
-    .map((e) => ({ kind: "event", id: `event-${e.id}`, time: null, event: e }));
+    .map((e) => ({ kind: "event", id: `event-${e.calendar_id}-${e.id}`, time: null, event: e }));
 
   const anytimeTasks: TimelineRowData[] = (isToday ? tasks.filter((t) => !t.dueDate && t.status !== "done") : []).map(
     (t) => ({ kind: "task", id: `task-${t.id}`, time: null, task: t })
@@ -84,7 +96,7 @@ export function buildDailyTimelineRows(
       .filter((e) => !e.is_all_day && dateKey(e.start_time) === selectedDate)
       .map((e) => ({
         sortMinutes: minutesSinceMidnight(e.start_time),
-        row: { kind: "event", id: `event-${e.id}`, time: formatTime(e.start_time), event: e } as TimelineRowData,
+        row: { kind: "event", id: `event-${e.calendar_id}-${e.id}`, time: formatTime(e.start_time), event: e } as TimelineRowData,
       })),
     ...tasks
       .filter((t): t is Task & { dueDate: string } => Boolean(t.dueDate) && dateKey(t.dueDate as string) === selectedDate)
@@ -125,7 +137,25 @@ export function buildDailyTimelineRows(
     .sort((a, b) => a.sortMinutes - b.sortMinutes)
     .map((entry) => entry.row);
 
-  return [...anytimeEvents, ...anytimeTasks, ...timed];
+  // A final by-id dedupe: belt-and-suspenders against any React "duplicate
+  // key" crash regardless of source, not just the calendar_id case above —
+  // this is the one function every consumer's list key is built from, so
+  // it's the one place worth guaranteeing uniqueness rather than trusting
+  // every future caller to notice. First occurrence wins; a real duplicate
+  // this ever catches is itself worth knowing about, not just silently
+  // dropped.
+  const rows = [...anytimeEvents, ...anytimeTasks, ...timed];
+  const seen = new Set<string>();
+  const deduped: TimelineRowData[] = [];
+  for (const row of rows) {
+    if (seen.has(row.id)) {
+      console.warn(`[buildDailyTimelineRows] dropped a row with a duplicate id: ${row.id}`);
+      continue;
+    }
+    seen.add(row.id);
+    deduped.push(row);
+  }
+  return deduped;
 }
 
 // Work shifts for a single date — fed into the Daily AI Recommendations

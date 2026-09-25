@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useId, useState, type MouseEvent, type ReactNode } from "react";
 import dynamic from "next/dynamic";
+import { retryImport } from "@/lib/dynamicImport";
 import { motion } from "framer-motion";
 import { AlertTriangle, BookOpenCheck, Brain, Check, ChevronDown, GraduationCap, Layers, Loader2, Network, RotateCcw, Users } from "lucide-react";
 import { ResourceLauncher } from "@/components/features/learning/ResourceLauncher";
@@ -24,8 +25,13 @@ import type { LearningResource, LearningTopic } from "@/types";
 import { cn } from "@/lib/utils";
 
 // The mind map is the heaviest, least-needed-first part of the canvas: split
-// out so the step's text paints without waiting for it.
-const ConceptGraph = dynamic(() => import("@/components/features/learning/step/ConceptGraph"), {
+// out so the step's text paints without waiting for it. retryImport: a
+// transient chunk-load failure (a real, live "Failed to load chunk" report
+// 2026-09-25) resolves on its own instead of falling all the way to
+// app/error.tsx's boundary — see that file's own comment for the other half
+// (a genuinely STALE chunk after a new deploy, which no retry can fix and
+// needs a reload instead).
+const ConceptGraph = dynamic(() => retryImport(() => import("@/components/features/learning/step/ConceptGraph")), {
   ssr: false,
   loading: () => <div className="aspect-[7/4] w-full rounded-2xl bg-fill-subtle/40" aria-hidden />,
 });

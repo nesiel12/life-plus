@@ -127,6 +127,7 @@ describe("tomorrowOutlook", () => {
     start_time: start,
     end_time: start,
     is_all_day: allDay,
+    calendar_id: "primary",
   });
   const task = (id: string, dueDate?: string, status: Task["status"] = "todo"): Task => ({
     id,
