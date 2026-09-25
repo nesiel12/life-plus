@@ -61,7 +61,17 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-describe("the real six-tier chain (Groq → Cerebras → SambaNova → Gemini ×2 → OpenRouter) — mirrors .env.local exactly", () => {
+describe("the real six-tier chain (Groq → Gemini ×2 → Cerebras → SambaNova → OpenRouter) — mirrors .env.local exactly", () => {
+  // Order updated 2026-09-25: Gemini moved up to directly after Groq, ahead
+  // of Cerebras/SambaNova specifically because those two were live-
+  // confirmed 402 "Payment Required" (no billing on file at either
+  // provider account) — no point paying two guaranteed-to-fail network
+  // hops before reaching a tier that actually works. See
+  // provider.test.ts's own ordering test for the chain-shape assertion;
+  // this file only checks call counts and final results, position-
+  // agnostic, so the reorder needed no structural change here — only the
+  // mock failure labels below, kept honest with what's actually being
+  // simulated at each position.
   beforeEach(() => {
     vi.stubEnv("GROQ_API_KEY", "groq-test-key");
     vi.stubEnv("CEREBRAS_API_KEY", "cerebras-test-key");
@@ -86,38 +96,37 @@ describe("the real six-tier chain (Groq → Cerebras → SambaNova → Gemini ×
 
     vi.mocked(generateText)
       .mockRejectedValueOnce(retryableFailure("groq")) // 1
-      .mockRejectedValueOnce(retryableFailure("cerebras")) // 2
-      .mockResolvedValueOnce({ text: "תשובה מ-SambaNova" } as never); // 3
+      .mockRejectedValueOnce(retryableFailure("gemini-primary")) // 2
+      .mockResolvedValueOnce({ text: "תשובה מ-Gemini השני" } as never); // 3
 
-    await expect(generateChatText({ system: "s", prompt: "p", actor: SYSTEM_ACTOR })).resolves.toBe("תשובה מ-SambaNova");
+    await expect(generateChatText({ system: "s", prompt: "p", actor: SYSTEM_ACTOR })).resolves.toBe("תשובה מ-Gemini השני");
     expect(generateText).toHaveBeenCalledTimes(3);
   });
 
-  it("does not stop after Gemini's own first model — its second model is a real, distinct fourth attempt", async () => {
+  it("reaches Cerebras only once both Groq and both Gemini models have failed", async () => {
     const { generateText } = await import("ai");
     const { generateChatText } = await import("@/lib/ai/service");
 
     vi.mocked(generateText)
       .mockRejectedValueOnce(retryableFailure("groq"))
-      .mockRejectedValueOnce(retryableFailure("cerebras"))
-      .mockRejectedValueOnce(retryableFailure("sambanova"))
-      .mockRejectedValueOnce(retryableFailure("gemini-primary"))
-      .mockResolvedValueOnce({ text: "תשובה מ-Gemini השני" } as never);
-
-    await expect(generateChatText({ system: "s", prompt: "p", actor: SYSTEM_ACTOR })).resolves.toBe("תשובה מ-Gemini השני");
-    expect(generateText).toHaveBeenCalledTimes(5);
-  });
-
-  it("reaches OpenRouter — strictly last — only once every other tier has failed", async () => {
-    const { generateText } = await import("ai");
-    const { generateChatText } = await import("@/lib/ai/service");
-
-    vi.mocked(generateText)
-      .mockRejectedValueOnce(retryableFailure("groq"))
-      .mockRejectedValueOnce(retryableFailure("cerebras"))
-      .mockRejectedValueOnce(retryableFailure("sambanova"))
       .mockRejectedValueOnce(retryableFailure("gemini-primary"))
       .mockRejectedValueOnce(retryableFailure("gemini-fallback"))
+      .mockResolvedValueOnce({ text: "תשובה מ-Cerebras" } as never);
+
+    await expect(generateChatText({ system: "s", prompt: "p", actor: SYSTEM_ACTOR })).resolves.toBe("תשובה מ-Cerebras");
+    expect(generateText).toHaveBeenCalledTimes(4);
+  });
+
+  it("reaches OpenRouter — strictly last — only once every other tier has failed, Cerebras and SambaNova included", async () => {
+    const { generateText } = await import("ai");
+    const { generateChatText } = await import("@/lib/ai/service");
+
+    vi.mocked(generateText)
+      .mockRejectedValueOnce(retryableFailure("groq"))
+      .mockRejectedValueOnce(retryableFailure("gemini-primary"))
+      .mockRejectedValueOnce(retryableFailure("gemini-fallback"))
+      .mockRejectedValueOnce(retryableFailure("cerebras")) // live reality 2026-09-25: 402, no billing
+      .mockRejectedValueOnce(retryableFailure("sambanova")) // same
       .mockResolvedValueOnce({ text: "תשובה מ-OpenRouter" } as never);
 
     await expect(generateChatText({ system: "s", prompt: "p", actor: SYSTEM_ACTOR })).resolves.toBe("תשובה מ-OpenRouter");
@@ -138,10 +147,10 @@ describe("the real six-tier chain (Groq → Cerebras → SambaNova → Gemini ×
     const { generateText } = await import("ai");
     const { generateChatText } = await import("@/lib/ai/service");
 
-    for (const label of ["groq", "cerebras", "sambanova", "gemini-primary"]) {
+    for (const label of ["groq", "gemini-primary", "gemini-fallback", "cerebras"]) {
       vi.mocked(generateText).mockRejectedValueOnce(retryableFailure(label));
     }
-    vi.mocked(generateText).mockRejectedValueOnce(retryableFailure("gemini-fallback"));
+    vi.mocked(generateText).mockRejectedValueOnce(retryableFailure("sambanova"));
     vi.mocked(generateText).mockRejectedValueOnce(retryableFailure("openrouter-final"));
 
     await expect(generateChatText({ system: "s", prompt: "p", actor: SYSTEM_ACTOR })).rejects.toThrow("openrouter-final");

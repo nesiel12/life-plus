@@ -44,9 +44,9 @@ beforeEach(() => {
 });
 
 describe("getChatModelChain", () => {
-  it("orders Groq, Cerebras, SambaNova, then Gemini (two models deep) when all are configured", async () => {
+  it("orders Groq, then Gemini (two models deep), then Cerebras, then SambaNova, when all are configured", async () => {
     const chain = await chainWith({ groq: "g", cerebras: "c", sambanova: "s", gemini: "gem" });
-    expect(chain.map((c) => c.label.split(":")[0])).toEqual(["groq", "cerebras", "sambanova", "gemini", "gemini"]);
+    expect(chain.map((c) => c.label.split(":")[0])).toEqual(["groq", "gemini", "gemini", "cerebras", "sambanova"]);
     expect(chain.every((c) => c.kind === "sdk")).toBe(true);
   });
 
@@ -84,10 +84,10 @@ describe("getChatModelChain", () => {
     }
   });
 
-  it("includes OpenAI, when configured, only as a tail candidate after the five named tiers", async () => {
-    const chain = await chainWith({ groq: "g", openai: "o", openrouter: "or" });
+  it("includes OpenAI, when configured, only as a tail candidate before OpenRouter", async () => {
+    const chain = await chainWith({ groq: "g", sambanova: "s", openai: "o", openrouter: "or" });
     const kinds = chain.map((c) => c.label.split(":")[0]);
-    expect(kinds.indexOf("openai")).toBeGreaterThan(kinds.indexOf("groq"));
+    expect(kinds.indexOf("openai")).toBeGreaterThan(kinds.indexOf("sambanova"));
     expect(kinds.indexOf("openrouter")).toBeGreaterThan(kinds.indexOf("openai"));
   });
 
@@ -98,9 +98,11 @@ describe("getChatModelChain", () => {
 
   it("is stable and repeatable for the exact env this app actually ships with", async () => {
     // Mirrors .env.local as of 2026-09-25: everything except OPENAI_API_KEY
-    // and BYTEZ_API_KEY.
+    // and BYTEZ_API_KEY. Order updated same day, once Cerebras/SambaNova's
+    // account-level 402s were confirmed live: Gemini moved up to directly
+    // after Groq, ahead of the two known-broken (no billing) tiers.
     const chain = await chainWith({ groq: "g", cerebras: "c", sambanova: "s", gemini: "gem", openrouter: "or" });
-    expect(chain.map((c) => c.label.split(":")[0])).toEqual(["groq", "cerebras", "sambanova", "gemini", "gemini", "openrouter"]);
+    expect(chain.map((c) => c.label.split(":")[0])).toEqual(["groq", "gemini", "gemini", "cerebras", "sambanova", "openrouter"]);
   });
 });
 

@@ -10,9 +10,16 @@ import type { LanguageModel } from "ai";
 // the AI-backed routes.
 //
 // Rebuilt 2026-09-25 around a fixed, explicit tier order rather than
-// "whichever of two keys is set wins": Groq → Cerebras → SambaNova →
-// Gemini → OpenRouter (a free model only — see its own section below),
-// each an independent, skip-if-unconfigured link. No Anthropic/Claude
+// "whichever of two keys is set wins": Groq → Gemini (two models deep) →
+// Cerebras → SambaNova → OpenRouter (a free model only — see its own
+// section below), each an independent, skip-if-unconfigured link. Gemini
+// sits second, immediately after Groq, rather than after Cerebras/
+// SambaNova specifically because those two were live-confirmed 402
+// "Payment Required" (no billing on file at either provider account) —
+// no sense paying two guaranteed-to-fail network hops before reaching a
+// tier that actually works; they stay wired in, lower priority, so they
+// activate automatically the moment billing is added, no code change
+// needed then. No Anthropic/Claude
 // integration exists anywhere in this file, by design — Groq, Cerebras,
 // SambaNova and OpenRouter are all "OpenAI-compatible" REST APIs (same
 // request/response shape as OpenAI's own, different host), which is what
@@ -133,13 +140,15 @@ export type ChatModelCandidate =
 
 /**
  * The ordered failover chain (system-wide AI resiliency) — five
- * independent, free-to-use tiers in the exact order requested: Groq →
- * Cerebras → SambaNova → Gemini (two models deep) → OpenRouter (a free
- * model, strictly last resort). Each tier is included only when its own
- * env var is actually set — an unconfigured provider is skipped, not a
- * failure. OpenAI and Bytez, if ever configured, are appended after all
- * five as extra tail candidates rather than removed from the app's
- * capabilities entirely.
+ * independent, free-to-use tiers in the exact order requested (updated
+ * 2026-09-25 once Cerebras/SambaNova's account-level 402s were confirmed
+ * live): Groq → Gemini (two models deep) → Cerebras → SambaNova →
+ * OpenRouter (a free model, strictly last resort). Each tier is included
+ * only when its own env var is actually set — an unconfigured provider is
+ * skipped, not a failure. OpenAI and Bytez, if ever configured, are
+ * appended between SambaNova and OpenRouter as extra tail candidates
+ * rather than removed from the app's capabilities entirely — OpenRouter
+ * stays last regardless, per its own "strictly last resort" requirement.
  *
  * A capacity failure (503, 429, and — live-confirmed 2026-09-25 — 402
  * "payment required" on a provider account with no billing configured) on
@@ -154,15 +163,15 @@ export function getChatModelChain(): ChatModelCandidate[] {
   if (process.env.GROQ_API_KEY) {
     chain.push({ kind: "sdk", label: `groq:${GROQ_CHAT_MODEL_ID}`, model: getGroqProvider().chat(GROQ_CHAT_MODEL_ID) });
   }
+  if (process.env.GEMINI_API_KEY) {
+    chain.push({ kind: "sdk", label: `gemini:${GEMINI_CHAT_MODEL_ID}`, model: getGoogleProvider()(GEMINI_CHAT_MODEL_ID) });
+    chain.push({ kind: "sdk", label: `gemini:${GEMINI_FALLBACK_MODEL_ID}`, model: getGoogleProvider()(GEMINI_FALLBACK_MODEL_ID) });
+  }
   if (process.env.CEREBRAS_API_KEY) {
     chain.push({ kind: "sdk", label: `cerebras:${CEREBRAS_CHAT_MODEL_ID}`, model: getCerebrasProvider().chat(CEREBRAS_CHAT_MODEL_ID) });
   }
   if (process.env.SAMBANOVA_API_KEY) {
     chain.push({ kind: "sdk", label: `sambanova:${SAMBANOVA_CHAT_MODEL_ID}`, model: getSambaNovaProvider().chat(SAMBANOVA_CHAT_MODEL_ID) });
-  }
-  if (process.env.GEMINI_API_KEY) {
-    chain.push({ kind: "sdk", label: `gemini:${GEMINI_CHAT_MODEL_ID}`, model: getGoogleProvider()(GEMINI_CHAT_MODEL_ID) });
-    chain.push({ kind: "sdk", label: `gemini:${GEMINI_FALLBACK_MODEL_ID}`, model: getGoogleProvider()(GEMINI_FALLBACK_MODEL_ID) });
   }
   if (process.env.BYTEZ_API_KEY) {
     chain.push({ kind: "bytez", label: `bytez:${BYTEZ_CHAT_MODEL_ID}`, modelId: BYTEZ_CHAT_MODEL_ID });
