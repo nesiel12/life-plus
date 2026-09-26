@@ -105,8 +105,8 @@ function validPayload(): LessonBlockContent {
     coreContent: "הסבר מעמיק על עקרון אי-הוודאות.",
     blooperOrDisaster: "טעות מפורסמת שקרתה בדרך.",
     mindBlowingTrivia: ["עובדה מפתיעה ראשונה", "עובדה מפתיעה שנייה"],
-    memeData: { jokeText: "בדיחה על אי-ודאות." },
-    inAppMedia: {},
+    memeData: { jokeText: "בדיחה על אי-ודאות.", imageUrl: null, funnyQuizAnswers: null },
+    inAppMedia: { youtubeVideoId: null, videoChapters: null, audioSnippets: null },
     inlineCheckpoints: [
       {
         id: "c1",
@@ -114,6 +114,7 @@ function validPayload(): LessonBlockContent {
         options: ["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correctIndex: 1,
         explanation: "ההסבר לתשובה הנכונה.",
+        funnyDistractor: null,
       },
     ],
   };
@@ -163,9 +164,16 @@ describe("LessonBlockContentSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects a non-URL externalLink.url", () => {
+  // 2026-09-25: externalLink.url is deliberately no longer z.string().url()
+  // — that compiles to a JSON-schema "format": "uri" annotation some
+  // providers' structured-output modes reject outright (live-confirmed
+  // against Groq: the whole generation request failed before a single
+  // token was produced). See lib/validations/learning.test.ts for the
+  // dedicated coverage of that relaxation; this file's own concern is
+  // still real — an EMPTY url is rejected — just no longer strict syntax.
+  it("still rejects an empty externalLink.url", () => {
     const payload = validPayload();
-    payload.pioneers[0].externalLinks[0].url = "not-a-url";
+    payload.pioneers[0].externalLinks[0].url = "";
     const result = LessonBlockContentSchema.safeParse(payload);
     expect(result.success).toBe(false);
   });

@@ -2,6 +2,54 @@ import { describe, expect, it } from "vitest";
 import { isRetryableAiError } from "@/lib/ai/retryableError";
 
 describe("isRetryableAiError", () => {
+  describe("provider-specific structured-output schema incompatibility — worth another model even at 400", () => {
+    // Live-confirmed 2026-09-25 against Groq, twice, in the exact same
+    // masterclass-lesson schema: an unsupported JSON-schema "format"
+    // keyword, and separately an .optional() field Groq's strict mode
+    // insists must still be listed in `required`. Both are 400s that
+    // would otherwise be fatal — the whole point of this classification.
+    it("retries Groq's unsupported-format rejection despite the 400", () => {
+      const err = Object.assign(
+        new Error("invalid JSON schema for response_format: /properties/imageUrl/format: unknown or unsupported string format 'uri'"),
+        { statusCode: 400 }
+      );
+      expect(isRetryableAiError(err)).toBe(true);
+    });
+
+    it("retries Groq's missing-optional-in-required rejection despite the 400", () => {
+      const err = Object.assign(
+        new Error(
+          "invalid JSON schema for response_format: /properties/inlineCheckpoints/items/required: `required` is required to be supplied and to be an array including every key in properties. The following properties must be listed in `required`: funnyDistractor"
+        ),
+        { statusCode: 400 }
+      );
+      expect(isRetryableAiError(err)).toBe(true);
+    });
+
+    it("a 400 with no schema-incompatibility wording is still fatal, unchanged", () => {
+      expect(isRetryableAiError(Object.assign(new Error("Invalid request: message is required"), { statusCode: 400 }))).toBe(false);
+    });
+  });
+
+  describe("generated content violating its own schema's constraints — also worth another model", () => {
+    // Live-caught 2026-09-25 auditing lib/ai/agents/taskAgent.ts: Groq
+    // accepted the schema fine, but the model's own reply overshot
+    // considerations' max(6) with 11 entries, and Groq 400s that server-side
+    // rather than just returning the (invalid) JSON. One model's sampling
+    // overshooting a constraint says nothing about the next model in the
+    // chain, so this is worth a fallover exactly like a real schema
+    // incompatibility, not a fatal stop.
+    it("retries Groq's maxItems content-validation rejection despite the 400", () => {
+      const err = Object.assign(
+        new Error(
+          "Generated JSON does not match the expected schema. Please adjust your prompt. See 'failed_generation' for more details. Error: jsonschema: '/considerations' does not validate with /properties/considerations/anyOf/0/maxItems: maxItems: got 11, want 6"
+        ),
+        { statusCode: 400 }
+      );
+      expect(isRetryableAiError(err)).toBe(true);
+    });
+  });
+
   describe("capacity failures — worth another model", () => {
     it("retries the exact error the app is failing with in production", () => {
       // AI_APICallError: This model is currently experiencing high demand

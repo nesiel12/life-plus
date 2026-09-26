@@ -22,12 +22,14 @@ const questionKindSchema = z.enum(["mcq", "short"]);
 export const quizQuestionSchema = z.object({
   prompt: z.string().min(1).describe("שאלה אחת, בעברית"),
   kind: questionKindSchema,
+  // .nullable(), not .optional(): Groq's strict structured-output mode
+  // requires every property listed — see lib/validations/learning.ts.
   options: z
     .array(z.string())
     .min(3)
     .max(5)
-    .optional()
-    .describe("רק עבור mcq — כולל את התשובה הנכונה, בלי לסמן אותה"),
+    .nullable()
+    .describe("רק עבור mcq — כולל את התשובה הנכונה, בלי לסמן אותה. null עבור short"),
   correctAnswer: z.string().min(1).describe("הטקסט המדויק של האפשרות הנכונה (mcq), או תשובת מודל קצרה (short)"),
 });
 

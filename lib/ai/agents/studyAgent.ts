@@ -19,7 +19,9 @@ export const studySummarySchema = z.object({
 
 export const studyQuizSchema = z.object({
   question: z.string().describe("שאלה פתוחה אחת בעברית שבודקת הבנה, לא שינון"),
-  hint: z.string().optional().describe("רמז קצר, רק אם השאלה קשה"),
+  // .nullable(), not .optional(): Groq's strict structured-output mode
+  // requires every property listed — see lib/validations/learning.ts.
+  hint: z.string().nullable().describe("רמז קצר אם השאלה קשה, אחרת null"),
 });
 
 export const studyGradeSchema = z.object({

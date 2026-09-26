@@ -21,46 +21,50 @@ export const calendarIntentSchema = z.object({
   intent: z
     .enum(["create", "unclear"])
     .describe("create when a concrete event is being requested; unclear when the message is ambiguous or not about scheduling"),
+  // .nullable(), not .optional(), throughout this schema: Groq's strict
+  // structured-output mode requires every property to be listed, expressing
+  // "doesn't apply" as null rather than an omittable key (live-confirmed
+  // fix, 2026-09-25 — see lib/validations/learning.ts for the original).
   title: z
     .string()
     .trim()
     .max(200)
-    .optional()
-    .describe("Short Hebrew event title, no date or time inside it"),
+    .nullable()
+    .describe("Short Hebrew event title, no date or time inside it, otherwise null"),
   start: z
     .string()
-    .optional()
-    .describe("Local start as YYYY-MM-DDTHH:MM, resolved against the supplied current time. Omit when intent is unclear."),
+    .nullable()
+    .describe("Local start as YYYY-MM-DDTHH:MM, resolved against the supplied current time. null when intent is unclear."),
   durationMinutes: z
     .number()
     .int()
     .min(5)
     .max(24 * 60)
-    .optional()
-    .describe("Duration in minutes. Default to 60 when the user did not say."),
+    .nullable()
+    .describe("Duration in minutes, or null to default to 60."),
   clarification: z
     .string()
-    .optional()
-    .describe("When intent is unclear, one short Hebrew question asking for exactly what is missing"),
+    .nullable()
+    .describe("When intent is unclear, one short Hebrew question asking for exactly what is missing; null otherwise"),
   recurrence: z
     .object({
       freq: z.enum(["daily", "weekly"]).describe("daily = every day; weekly = specific weekdays"),
       byWeekday: z
         .array(z.number().int().min(0).max(6))
-        .optional()
+        .nullable()
         .describe(
           "For weekly: the weekdays it lands on, Sunday=0 … Saturday=6. " +
-            "'כל ערב חוץ משישי שבת' => [0,1,2,3,4]. 'כל יום שני' => [1]."
+            "'כל ערב חוץ משישי שבת' => [0,1,2,3,4]. 'כל יום שני' => [1]. null if not weekly."
         ),
-      count: z.number().int().min(1).max(365).optional().describe("Stop after N occurrences, if the user said so"),
+      count: z.number().int().min(1).max(365).nullable().describe("Stop after N occurrences, if the user said so, otherwise null"),
       until: z
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}$/)
-        .optional()
-        .describe("Stop on this date (YYYY-MM-DD), if the user gave an end date"),
+        .nullable()
+        .describe("Stop on this date (YYYY-MM-DD), if the user gave an end date, otherwise null"),
     })
-    .optional()
-    .describe("Present ONLY when the user asked for something repeating ('כל יום', 'כל שני ורביעי', 'כל ערב'). Omit for a one-off event."),
+    .nullable()
+    .describe("Present ONLY when the user asked for something repeating ('כל יום', 'כל שני ורביעי', 'כל ערב'). null for a one-off event."),
 });
 
 export type CalendarIntent = z.infer<typeof calendarIntentSchema>;

@@ -117,6 +117,17 @@ const GENERATION_TIMEOUT_MS = 40_000;
 // and the client aborts sooner on a *stall* anyway.
 const STREAM_TIMEOUT_MS = 50_000;
 const STRUCTURED_TIMEOUT_MS = 45_000; // generateObject re-prompts on schema mismatch — give it more room
+// Live-diagnosed 2026-09-25: a course_module generation (a masterclass
+// lesson — origin story, several pioneer profiles, deep core content, a
+// blooper, trivia, a meme, checkpoints, all in one JSON object) is large
+// enough that a provider's own DEFAULT completion-token ceiling truncated
+// it mid-object — Groq's own error named this outright: "max completion
+// tokens reached before generating a valid document... Increase
+// max_completion_tokens." Generous on purpose (Groq's actual ceiling for
+// the configured model is 65,536 — this is nowhere near it) rather than
+// tuned tight, since a max is a ceiling, not a cost — providers don't
+// charge for tokens never generated.
+const COURSE_MODULE_MAX_OUTPUT_TOKENS = 8000;
 // Vision requests carry an image, not a sentence: uploading and reading a
 // photographed timetable takes materially longer than a text prompt.
 const VISION_TIMEOUT_MS = 90_000;
@@ -531,6 +542,9 @@ export async function generateStructuredData<T extends z.ZodTypeAny>(params: {
       // function's own maxRetries param doc.
       maxRetries: params.maxRetries ?? 1,
       abortSignal: AbortSignal.timeout(timeoutMs),
+      // See COURSE_MODULE_MAX_OUTPUT_TOKENS's own comment — a provider's
+      // default ceiling truncated a rich lesson mid-object, live.
+      ...(params.operation === "course_module" ? { maxOutputTokens: COURSE_MODULE_MAX_OUTPUT_TOKENS } : {}),
     });
     return object;
     },
@@ -578,11 +592,26 @@ export async function streamStructuredData<T extends z.ZodTypeAny>(params: {
       prompt: params.prompt,
       maxRetries: 1,
       abortSignal: AbortSignal.timeout(timeoutMs),
+      // See COURSE_MODULE_MAX_OUTPUT_TOKENS's own comment — a provider's
+      // default ceiling truncated a rich lesson mid-object, live.
+      ...(params.operation === "course_module" ? { maxOutputTokens: COURSE_MODULE_MAX_OUTPUT_TOKENS } : {}),
       onError: ({ error }) => {
         streamError = error;
       },
     });
     for await (const partial of result.partialObjectStream) params.onPartial(partial);
+    // Live-diagnosed 2026-09-25, and the actual cause of that day's
+    // "משהו השתבש ביצירת השיעור" masterclass-lesson hang: onError fires
+    // correctly on a request-level failure (a provider rejecting the JSON
+    // schema itself, in the incident's case — see lib/validations/
+    // learning.ts's fix for the specific field), but the loop above then
+    // ends with zero chunks and no exception, and `result.object` — the
+    // very next line — never resolves OR rejects, not even once the
+    // abortSignal's own timeout passes. Checking streamError FIRST, before
+    // ever touching that promise, is what makes this fail in milliseconds
+    // instead of hanging until Vercel's own platform ceiling kills the
+    // function with no honest error reaching anyone.
+    if (streamError) throw streamError;
     try {
       return (await result.object) as z.infer<T>;
     } catch (err) {

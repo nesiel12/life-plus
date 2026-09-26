@@ -1,7 +1,7 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getUserByEmail } from "@/lib/db/users";
+import { getCurrentUser } from "@/lib/currentUser";
 import { learningResourcesRepo, learningTopicsRepo } from "@/lib/db/learning";
 import { learningLessonContentsRepo } from "@/lib/db/learningLessonContents";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
@@ -58,10 +58,12 @@ export async function POST(request: NextRequest) {
   const limited = rateLimitResponse(`learning-lesson-generate:${token.email}`, RATE_LIMIT.limit, RATE_LIMIT.windowMs);
   if (limited) return limited;
 
-  const user = await getUserByEmail(token.email);
-  if (!user) {
-    return NextResponse.json({ error: "User record not found for authenticated session" }, { status: 500 });
-  }
+  // getCurrentUser(), not getUserByEmail + a manual 500: the former now
+  // self-heals a missing row (lib/currentUser.ts, 2026-09-25) instead of
+  // this route having its own, narrower "fail with an honest error" copy
+  // of what used to be the same failure everywhere. One resolution path,
+  // used consistently by every AI route.
+  const user = await getCurrentUser();
 
   // Ownership check before touching the cache or spending a model call —
   // never generate or cache content keyed to a topic/step this user doesn't

@@ -50,15 +50,22 @@ export interface InlineCheckpoint {
   correctIndex: number;
   /** Hebrew, RTL — shown after answering, right or wrong. */
   explanation: string;
-  /** Hebrew, RTL — an optional witty line for a wrong answer, softening the miss. */
-  funnyDistractor?: string;
+  /**
+   * Hebrew, RTL — an optional witty line for a wrong answer, softening the
+   * miss. `null`, not an absent property: some providers' structured-output
+   * validators (Groq, live-confirmed 2026-09-25) require every property to
+   * be present, expressing "optional" as nullable rather than omittable —
+   * see lib/validations/learning.ts's matching schema for the full story.
+   */
+  funnyDistractor: string | null;
 }
 
 export interface LessonMemeData {
-  imageUrl?: string;
+  /** `null`, not absent — see InlineCheckpoint.funnyDistractor's own comment for why. */
+  imageUrl: string | null;
   /** Hebrew, RTL. */
   jokeText: string;
-  funnyQuizAnswers?: string[];
+  funnyQuizAnswers: string[] | null;
 }
 
 export interface LessonVideoChapter {
@@ -69,9 +76,10 @@ export interface LessonVideoChapter {
 }
 
 export interface LessonInAppMedia {
-  youtubeVideoId?: string;
-  videoChapters?: LessonVideoChapter[];
-  audioSnippets?: string[];
+  /** `null`, not absent — see InlineCheckpoint.funnyDistractor's own comment for why. */
+  youtubeVideoId: string | null;
+  videoChapters: LessonVideoChapter[] | null;
+  audioSnippets: string[] | null;
 }
 
 /**

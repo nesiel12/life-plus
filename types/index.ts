@@ -410,7 +410,7 @@ export interface LearningQuote {
 export interface QuizQuestionRecord {
   prompt: string;
   kind: "mcq" | "short";
-  options?: string[];
+  options?: string[] | null;
   correctAnswer: string;
   userAnswer: string;
   correct: boolean;

@@ -9,11 +9,11 @@ import type { ChronotypeSettings, Task } from "@/types";
 
 interface TaskAssist {
   kind: "research" | "draft" | "unclear";
-  overview?: string;
-  considerations?: string[];
-  draftSubject?: string;
-  draftBody?: string;
-  unclearReason?: string;
+  overview?: string | null;
+  considerations?: string[] | null;
+  draftSubject?: string | null;
+  draftBody?: string | null;
+  unclearReason?: string | null;
 }
 
 export interface TaskScheduleContext {

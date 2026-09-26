@@ -58,6 +58,34 @@ const RETRYABLE_TEXT = [
   "try again",
 ];
 
+// A provider's OWN structured-output validator rejecting the JSON schema
+// shape — an unsupported "format" keyword, an .optional() field it insists
+// must still be listed in `required` — is a PROVIDER-SPECIFIC
+// incompatibility, not a statement about the request being genuinely
+// malformed. A different provider's structured-output validator can, and
+// in practice does, accept the identical schema; the AI SDK's own zod→
+// JSON-schema conversion is one shared shape handed to every provider, and
+// each provider's own "strict mode" rules vary. Live-confirmed 2026-09-25
+// against Groq, twice, for two different schema quirks in the exact same
+// masterclass-lesson schema (see lib/validations/learning.ts's fix for the
+// first). Always a 400 — see isRetryableAiError for why that status is
+// checked here, ahead of the blanket "400 is fatal" rule below, instead of
+// through the plain RETRYABLE_TEXT list.
+const SCHEMA_INCOMPATIBILITY_TEXT = ["invalid json schema", "response_format", "unsupported string format", "unsupported_format"];
+
+// A distinct failure mode from the above: the schema itself was accepted,
+// but the model's own generated CONTENT violated one of its constraints
+// (maxItems, maxLength, an enum value it invented) — Groq validates this
+// server-side and 400s instead of just returning the bad JSON. Live-caught
+// 2026-09-25 auditing the task/calendar/learning-lab agents: a "research"
+// TaskAssist reply produced 11 considerations against a max(6), and — before
+// this fix — that alone killed the whole fallover chain with a fatal 400
+// instead of ever reaching Gemini. Same reasoning as SCHEMA_INCOMPATIBILITY_
+// TEXT applies: one model's sampling overshooting a constraint says nothing
+// about whether the next model in the chain will too, so it is worth
+// advancing rather than surfacing to the user immediately.
+const SCHEMA_VALIDATION_CONTENT_TEXT = ["does not match the expected schema", "json_validate_failed", "does not validate"];
+
 function statusOf(error: unknown): number | null {
   if (typeof error !== "object" || error === null) return null;
   const e = error as Record<string, unknown>;
@@ -92,12 +120,20 @@ function textOf(error: unknown): string {
  * chain would turn one fast, clear auth error into a slow, confusing one.
  */
 export function isRetryableAiError(error: unknown): boolean {
+  const text = textOf(error);
+
+  // Checked first, ahead of the blanket "400 is fatal" rule right below —
+  // see SCHEMA_INCOMPATIBILITY_TEXT's own comment for why this specific
+  // class of 400 is the one exception to "a 400 fails the same way on
+  // every model".
+  if (SCHEMA_INCOMPATIBILITY_TEXT.some((needle) => text.includes(needle))) return true;
+  if (SCHEMA_VALIDATION_CONTENT_TEXT.some((needle) => text.includes(needle))) return true;
+
   const status = statusOf(error);
   if (status !== null) {
     if (FATAL_STATUS.has(status)) return false;
     if (RETRYABLE_STATUS.has(status)) return true;
   }
 
-  const text = textOf(error);
   return RETRYABLE_TEXT.some((needle) => text.includes(needle));
 }

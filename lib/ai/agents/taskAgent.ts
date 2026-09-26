@@ -29,27 +29,32 @@ export const taskAssistSchema = z.object({
         "draft: the task is best helped by a ready-to-edit piece of writing (email, message, short doc). " +
         "unclear: the task is a physical/logistical action (e.g. laundry, a doctor's visit) that neither mode meaningfully helps with."
     ),
+  // .nullable(), not .optional(), on every field below: some providers'
+  // structured-output validators (Groq, live-confirmed 2026-09-25 against
+  // the masterclass lesson schema — see lib/validations/learning.ts)
+  // require every property to be present, expressing "doesn't apply to
+  // this kind" as null rather than an omittable key.
   overview: z
     .string()
-    .optional()
-    .describe("research only: 1-2 sentences in Hebrew framing what's actually being decided"),
+    .nullable()
+    .describe("research only, otherwise null: 1-2 sentences in Hebrew framing what's actually being decided"),
   considerations: z
     .array(z.string())
     .max(6)
-    .optional()
-    .describe("research only: 2-6 short Hebrew bullets, the real factors to weigh — not a purchase recommendation"),
+    .nullable()
+    .describe("research only, otherwise null: 2-6 short Hebrew bullets, the real factors to weigh — not a purchase recommendation"),
   draftSubject: z
     .string()
-    .optional()
-    .describe("draft only: a short Hebrew subject line, when the draft is an email — omit otherwise"),
+    .nullable()
+    .describe("draft only, otherwise null: a short Hebrew subject line, when the draft is an email — null otherwise"),
   draftBody: z
     .string()
-    .optional()
-    .describe("draft only: the full Hebrew draft text, ready to edit and send"),
+    .nullable()
+    .describe("draft only, otherwise null: the full Hebrew draft text, ready to edit and send"),
   unclearReason: z
     .string()
-    .optional()
-    .describe("unclear only: one short, respectful Hebrew sentence explaining why this task doesn't fit either mode"),
+    .nullable()
+    .describe("unclear only, otherwise null: one short, respectful Hebrew sentence explaining why this task doesn't fit either mode"),
 });
 
 export type TaskAssist = z.infer<typeof taskAssistSchema>;

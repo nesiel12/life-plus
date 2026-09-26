@@ -37,7 +37,14 @@ export const TeachingModeSchema = z.enum(TEACHING_MODES);
 
 export const PioneerExternalLinkSchema: z.ZodType<PioneerExternalLink> = z.object({
   title: z.string().trim().min(1),
-  url: z.string().trim().url(),
+  // Not .url(): that compiles to a JSON-schema "format": "uri" annotation,
+  // which some providers' native structured-output validators reject
+  // outright as an unsupported format (live-confirmed 2026-09-25 against
+  // Groq: "unknown or unsupported string format 'uri'") — the whole
+  // generation call fails before it can even start, for every field this
+  // constraint touches. The model was never truly enforcing URL syntax
+  // itself either way; min(1) is what actually matters here.
+  url: z.string().trim().min(1),
   type: z.enum(["article", "video", "audio"]),
 });
 
@@ -60,13 +67,15 @@ export const InlineCheckpointSchema: z.ZodType<InlineCheckpoint> = z.object({
   options: z.array(z.string().trim().min(1)).length(4),
   correctIndex: z.number().int().min(0).max(3),
   explanation: z.string().trim().min(1),
-  funnyDistractor: z.string().trim().min(1).optional(),
+  // .nullable(), not .optional() — see types/learning.ts's InlineCheckpoint.funnyDistractor for why.
+  funnyDistractor: z.string().trim().min(1).nullable(),
 });
 
+// See PioneerExternalLinkSchema's own comment for why this is not .url().
 export const LessonMemeDataSchema: z.ZodType<LessonMemeData> = z.object({
-  imageUrl: z.string().trim().url().optional(),
+  imageUrl: z.string().trim().min(1).nullable(),
   jokeText: z.string().trim().min(1),
-  funnyQuizAnswers: z.array(z.string().trim().min(1)).optional(),
+  funnyQuizAnswers: z.array(z.string().trim().min(1)).nullable(),
 });
 
 export const LessonVideoChapterSchema: z.ZodType<LessonVideoChapter> = z.object({
@@ -78,13 +87,15 @@ export const LessonInAppMediaSchema: z.ZodType<LessonInAppMedia> = z.object({
   // A bare 11-char YouTube id, not a full URL — what the video embed
   // component actually needs, and it rules out someone pasting a full
   // watch?v=... link into the field by mistake.
+  // .nullable(), not .optional() — see types/learning.ts's LessonInAppMedia for why.
   youtubeVideoId: z
     .string()
     .trim()
     .regex(/^[A-Za-z0-9_-]{11}$/)
-    .optional(),
-  videoChapters: z.array(LessonVideoChapterSchema).optional(),
-  audioSnippets: z.array(z.string().trim().url()).optional(),
+    .nullable(),
+  videoChapters: z.array(LessonVideoChapterSchema).nullable(),
+  // See PioneerExternalLinkSchema's own comment for why this is not .url().
+  audioSnippets: z.array(z.string().trim().min(1)).nullable(),
 });
 
 export const LessonBlockContentSchema: z.ZodType<LessonBlockContent> = z.object({

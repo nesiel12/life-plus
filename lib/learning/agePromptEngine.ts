@@ -57,7 +57,7 @@ const JSON_SCHEMA_REMINDER = `החזר אך ורק JSON תקין התואם במ
   "inlineCheckpoints": [{ "id", "question", "options": [4 מחרוזות בדיוק], "correctIndex": 0-3, "explanation", "funnyDistractor"? }]
 }
 כל שדה טקסט הוא עברית טבעית ותקנית, כתובה כמחרוזת JSON רגילה — לעולם אל תשתיל בתוך מחרוזת JSON תג \`\`\` או markdown code fence; אם אתה כותב קוד בתוך coreContent, סמן אותו בתחביר Markdown רגיל (משתמע מתוך המחרוזת), לא בתגי code fence שעלולים לשבור את ה-JSON עצמו.
-שדות של קישורים חיצוניים או מדיה (youtubeVideoId, imageUrl, audioSnippets, externalLinks) הם כולם אופציונליים — אל תמציא מזהה סרטון יוטיוב, קישור או תמונה רק כדי למלא את השדה. כלול אותם רק אם אתה בטוח לחלוטין שהם אמיתיים וידועים; אחרת פשוט השמט את השדה. קישור שבור גרוע יותר מחוסר קישור.`;
+שדות של קישורים חיצוניים או מדיה (youtubeVideoId, imageUrl, audioSnippets, videoChapters, funnyQuizAnswers, funnyDistractor) הם שדות שיכולים להיות null — אל תמציא מזהה סרטון יוטיוב, קישור או תמונה רק כדי למלא את השדה. כלול אותם רק אם אתה בטוח לחלוטין שהם אמיתיים וידועים; אחרת החזר null בשדה (לא להשמיט אותו — הסכימה דורשת שהשדה יופיע, פשוט עם הערך null). קישור שבור גרוע יותר מחוסר קישור.`;
 
 /** Builds the system/user prompt pair for one masterclass lesson block — the request generateStructuredData sends to the model. */
 export function buildLessonPrompt(params: BuildLessonPromptParams): LessonPrompt {

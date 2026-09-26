@@ -1,7 +1,7 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getUserByEmail } from "@/lib/db/users";
+import { getCurrentUser } from "@/lib/currentUser";
 import { learningResourcesRepo, learningTopicsRepo } from "@/lib/db/learning";
 import { learningStepContentRepo } from "@/lib/db/learningStepContent";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -41,8 +41,9 @@ export async function GET(request: NextRequest) {
   if (!token?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const topicId = request.nextUrl.searchParams.get("topicId");
   if (!topicId) return NextResponse.json({ error: "topicId is required" }, { status: 400 });
-  const user = await getUserByEmail(token.email);
-  if (!user) return NextResponse.json({ error: "User record not found for authenticated session" }, { status: 500 });
+  // getCurrentUser(), not getUserByEmail + a manual 500 — see the POST
+  // handler's own comment below for why.
+  const user = await getCurrentUser();
 
   const { data, error } = await getSupabaseClient()
     .from("learning_step_content")
@@ -80,8 +81,11 @@ export async function POST(request: NextRequest) {
   if (parsed.error) return parsed.error;
   const { topicId, stepId } = parsed.data;
 
-  const user = await getUserByEmail(token.email);
-  if (!user) return NextResponse.json({ error: "User record not found for authenticated session" }, { status: 500 });
+  // getCurrentUser(), not getUserByEmail + a manual 500: the former now
+  // self-heals a missing row (lib/currentUser.ts, 2026-09-25) instead of
+  // this route keeping its own, narrower copy of what used to be the same
+  // failure everywhere.
+  const user = await getCurrentUser();
 
   // Ownership of both, and that the step belongs to that topic, before the
   // cache or a model call — same rule as the masterclass route.

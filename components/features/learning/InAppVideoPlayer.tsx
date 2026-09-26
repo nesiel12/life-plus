@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 interface InAppVideoPlayerProps {
   videoId: string;
   title: string;
-  chapters?: LessonVideoChapter[];
+  chapters?: LessonVideoChapter[] | null;
 }
 
 function formatChapterTime(seconds: number): string {

@@ -17,8 +17,8 @@ export type QuizQuestionKind = "mcq" | "short";
 export interface GeneratedQuestion {
   prompt: string;
   kind: QuizQuestionKind;
-  /** Present for "mcq" only, in display order. */
-  options?: string[];
+  /** Present for "mcq" only, in display order; null/absent for "short". */
+  options?: string[] | null;
   /** The option's text (for mcq) or the model answer (for short). */
   correctAnswer: string;
 }

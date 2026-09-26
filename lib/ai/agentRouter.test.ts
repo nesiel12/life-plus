@@ -168,7 +168,14 @@ describe("groundStudy", () => {
 
 describe("formatTaskAssistGrounding", () => {
   it("names the real matched task, not a generic reference", () => {
-    const assist: TaskAssist = { kind: "unclear", unclearReason: "זו פעולה פיזית." };
+    const assist: TaskAssist = {
+      kind: "unclear",
+      overview: null,
+      considerations: null,
+      draftSubject: null,
+      draftBody: null,
+      unclearReason: "זו פעולה פיזית.",
+    };
     const grounding = formatTaskAssistGrounding("לקפל כביסה", assist);
     expect(grounding.lines[0]).toContain("לקפל כביסה");
     expect(grounding.basedOn).toEqual(["עוזר הביצוע — לקפל כביסה"]);
@@ -179,6 +186,9 @@ describe("formatTaskAssistGrounding", () => {
       kind: "research",
       overview: "בחירת מחשב נייד תלויה בשימוש המיועד.",
       considerations: ["ביצועים מול ניידות", "תקציב"],
+      draftSubject: null,
+      draftBody: null,
+      unclearReason: null,
     };
     const grounding = formatTaskAssistGrounding("לתחקר מחשב נייד", assist);
     expect(grounding.lines).toContain("בחירת מחשב נייד תלויה בשימוש המיועד.");
@@ -189,8 +199,11 @@ describe("formatTaskAssistGrounding", () => {
   it("includes the real draft subject and body", () => {
     const assist: TaskAssist = {
       kind: "draft",
+      overview: null,
+      considerations: null,
       draftSubject: "בקשה לתור",
       draftBody: "שלום, אשמח לתאם תור בהקדם.",
+      unclearReason: null,
     };
     const grounding = formatTaskAssistGrounding("לכתוב מייל לרופא", assist);
     expect(grounding.lines).toContain("נושא: בקשה לתור");
@@ -198,13 +211,27 @@ describe("formatTaskAssistGrounding", () => {
   });
 
   it("includes the honest unclear reason without inventing help", () => {
-    const assist: TaskAssist = { kind: "unclear", unclearReason: "זו פעולה פיזית שלא ניתן לעזור בה מרחוק." };
+    const assist: TaskAssist = {
+      kind: "unclear",
+      overview: null,
+      considerations: null,
+      draftSubject: null,
+      draftBody: null,
+      unclearReason: "זו פעולה פיזית שלא ניתן לעזור בה מרחוק.",
+    };
     const grounding = formatTaskAssistGrounding("לקפל כביסה", assist);
     expect(grounding.lines).toContain("זו פעולה פיזית שלא ניתן לעזור בה מרחוק.");
   });
 
   it("degrades gracefully when a mode's own fields are missing", () => {
-    const grounding = formatTaskAssistGrounding("X", { kind: "research" });
+    const grounding = formatTaskAssistGrounding("X", {
+      kind: "research",
+      overview: null,
+      considerations: null,
+      draftSubject: null,
+      draftBody: null,
+      unclearReason: null,
+    });
     expect(grounding.lines).toEqual(['המשתמש ביקש עזרה עם המשימה הפתוחה שלו "X".']);
   });
 });
