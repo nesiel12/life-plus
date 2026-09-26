@@ -14,6 +14,7 @@ import { useResourceCompletion } from "@/components/features/learning/lab/useRes
 import { youtubeSearchUrl } from "@/lib/learning/youtube";
 import { topicProgress, topicXp, xpForResource } from "@/lib/learning/xp";
 import { cn } from "@/lib/utils";
+import { useLessonPrefetchHandlers } from "@/lib/learning/lessonPrefetch";
 import type { LearningResource, LearningTopic } from "@/types";
 
 interface SyllabusQuestProps {
@@ -203,6 +204,7 @@ interface QuestStepProps {
 const QuestStep = memo(function QuestStep({ resource, index, isLast, current, selected, reduce, onToggle, onSelect, onOpenLesson, onRemove }: QuestStepProps) {
   const done = resource.isCompleted;
   const Icon = RESOURCE_ICON[resource.type];
+  const lessonPrefetch = useLessonPrefetchHandlers(resource);
 
   return (
     <motion.li
@@ -313,6 +315,7 @@ const QuestStep = memo(function QuestStep({ resource, index, isLast, current, se
           <button
             type="button"
             onClick={() => onOpenLesson(resource)}
+            {...lessonPrefetch}
             className="focus-ring flex min-h-11 items-center gap-1 rounded-lg px-2 text-xs font-medium text-accent-learning transition-colors hover:bg-accent-learning/10"
           >
             <GraduationCap size={11} aria-hidden />

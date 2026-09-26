@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
   CalendarClock,
@@ -30,6 +31,7 @@ import { APP_NAME } from "@/lib/constants";
 import { useT, type TranslationKey } from "@/lib/i18n/useT";
 import { requestVoiceAssistant } from "@/lib/voice/voiceAssistantEvent";
 import { cn } from "@/lib/utils";
+import { clearOfflineData } from "@/lib/query/offlineStore";
 
 // The עוזר קולי's global trigger (components/features/voice/
 // VoiceAssistantModal.tsx, mounted once in AppShell.tsx): a plain button
@@ -156,6 +158,7 @@ export function Sidebar() {
   const t = useT();
   const pathname = usePathname();
   const { data: session } = useSession();
+  const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
 
   return (
@@ -219,7 +222,7 @@ export function Sidebar() {
               <span className="hidden truncate text-xs text-muted lg:inline">{session.user.name}</span>
             </div>
             <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={() => void clearOfflineData(queryClient).finally(() => signOut({ callbackUrl: "/login" }))}
               className="focus-ring nav-liquid-item glass-control-hover rounded-full p-2 text-muted transition-colors hover:text-foreground"
               onPointerMove={trackLiquidPointer}
               aria-label={t("nav.signOut")}

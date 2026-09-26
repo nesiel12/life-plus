@@ -1,5 +1,6 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import type { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/currentUser";
 import { learningResourcesRepo, learningTopicsRepo } from "@/lib/db/learning";
@@ -11,7 +12,7 @@ import { AiQuotaExceededError } from "@/lib/ai/service";
 import { sseResponse } from "@/lib/api/sse";
 import { currentUserActor } from "@/lib/ai/actor";
 import { buildLessonPrompt } from "@/lib/learning/agePromptEngine";
-import { LessonBlockContentSchema, LessonGenerateRequestSchema } from "@/lib/validations/learning";
+import { LessonBlockContentSchema, LessonGenerateRequestSchema, TeachingModeSchema, UserAgeGroupSchema } from "@/lib/validations/learning";
 import type { LessonBlockContent } from "@/types/learning";
 import type { Json } from "@/types/database";
 
@@ -44,6 +45,37 @@ export interface LessonGenerateResponse {
 }
 
 const GENERATION_FAILED = "לא הצלחנו ליצור שיעור כרגע. נסה שוב עוד רגע.";
+
+const CachedLessonQuerySchema = z.object({
+  // uuid, not just non-empty: both columns are uuid, and a malformed id would
+  // otherwise surface as a Postgres cast error (a 500) instead of a 400.
+  topicId: z.string().uuid(),
+  stepId: z.string().uuid(),
+  userAgeGroup: UserAgeGroupSchema,
+  teachingMode: TeachingModeSchema,
+});
+
+/**
+ * Cache-only read of one lesson variant — never generates, never charges
+ * quota. This is what the classroom's hover/focus prefetch calls: a hover is
+ * not a request to spend a model call, so a miss is just a 404.
+ */
+export async function GET(request: NextRequest) {
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  if (!token?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const parsed = CachedLessonQuerySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+  const { topicId, stepId, userAgeGroup, teachingMode } = parsed.data;
+
+  const user = await getCurrentUser();
+  const cached = await learningLessonContentsRepo.findCached(user.id, topicId, stepId, userAgeGroup, teachingMode);
+  if (!cached) return NextResponse.json({ error: "Not cached" }, { status: 404 });
+
+  return NextResponse.json({ content: cached.content as unknown as LessonBlockContent, cached: true } satisfies LessonGenerateResponse);
+}
 
 export async function POST(request: NextRequest) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });

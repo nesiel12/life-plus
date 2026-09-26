@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, GraduationCap, MessageCircleQuestion, Sparkles, Timer, Trash2, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
@@ -76,6 +77,7 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [classroomStepId, setClassroomStepId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [tutorOpen, setTutorOpen] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
   const [timerMounted, setTimerMounted] = useState(false);
@@ -173,7 +175,7 @@ export function TopicCanvasModal({ topicId, onClose }: TopicCanvasModalProps) {
     if (selected && !selected.isCompleted) complete(selected, true).catch(() => setError("לא הצלחנו לסמן את הסרטון כהושלם."));
   }, [selected, complete]);
 
-  const personas = useMemo(() => (tutorOpen ? (peekStepBrief(selected?.id)?.keyFigures ?? []) : []), [tutorOpen, selected?.id]);
+  const personas = useMemo(() => (tutorOpen ? (peekStepBrief(queryClient, selected?.id)?.keyFigures ?? []) : []), [queryClient, tutorOpen, selected?.id]);
   const resourceTitles = useMemo(() => resources.map((r) => r.title), [resources]);
 
   if (!topic) return null;

@@ -16,6 +16,9 @@ import type { LessonGenerateResponse } from "@/app/api/learning/lesson/generate/
 import { readAiError } from "@/lib/api/aiClient";
 import { readSseStream } from "@/lib/learning/sseClient";
 import { lessonStreamProgress } from "@/lib/learning/lessonStream";
+import { readStoredAgeGroup, readStoredTeachingMode, storeAgeGroup, storeTeachingMode } from "@/lib/learning/masterclassPrefs";
+import { lessonQueryKey } from "@/lib/query/aiContentKeys";
+import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { ConfidenceRating } from "@/components/features/learning/step/ConfidenceRating";
 import { CALIBRATION_MESSAGE, calibrationFor, type ConfidenceLevel } from "@/lib/learning/stepBrief";
 import { TEACHING_MODES, USER_AGE_GROUPS, type InlineCheckpoint, type LessonBlockContent, type TeachingMode, type UserAgeGroup } from "@/types/learning";
@@ -35,25 +38,6 @@ const TEACHING_MODE_LABEL: Record<TeachingMode, string> = {
   ANALOGIES: "אנלוגיות",
   SOCRATIC: "סוקרטי",
 };
-
-const AGE_GROUP_KEY = "lifeplus.masterclass.ageGroup";
-const TEACHING_MODE_KEY = "lifeplus.masterclass.teachingMode";
-
-function readStored<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return (allowed as readonly string[]).includes(raw ?? "") ? (raw as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function writeStored(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // ignore — the picker still works for this session, just not remembered
-  }
-}
 
 // --- Error boundary ----------------------------------------------------
 //
@@ -221,17 +205,25 @@ export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings 
   // calls per open, each independently charging AI quota and racing on the
   // cache insert (the unique-violation fallback added earlier papered over
   // the race's failure mode without addressing why two requests fired at
-  // all). readStored's own try/catch already makes it safe to call during
+  // all). masterclassPrefs' own try/catch already makes it safe to call during
   // SSR, where localStorage doesn't exist.
-  const [ageGroup, setAgeGroup] = useState<UserAgeGroup>(() => readStored(AGE_GROUP_KEY, USER_AGE_GROUPS, "ADULTS_19_PLUS"));
-  const [teachingMode, setTeachingMode] = useState<TeachingMode>(() => readStored(TEACHING_MODE_KEY, TEACHING_MODES, "STORYTELLING"));
+  const [ageGroup, setAgeGroup] = useState<UserAgeGroup>(() => readStoredAgeGroup());
+  const [teachingMode, setTeachingMode] = useState<TeachingMode>(() => readStoredTeachingMode());
   // Not persisted, unlike the two above: a custom focus prompt is specific
   // to the lesson it was written for, not a general standing preference to
   // remember app-wide.
   const [customEmphasisInput, setCustomEmphasisInput] = useState("");
   const [appliedCustomEmphasis, setAppliedCustomEmphasis] = useState<string | undefined>(undefined);
 
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const queryClient = useQueryClient();
+  const isRestoring = useIsRestoring();
+  // A lesson already in the query cache (this session, a hover prefetch, or
+  // restored from IndexedDB) renders on the first frame — no skeleton, no
+  // request, and it works offline.
+  const [state, setState] = useState<LoadState>(() => {
+    const known = queryClient.getQueryData<LessonBlockContent>(lessonQueryKey(topicId, stepId, ageGroup, teachingMode));
+    return known ? { kind: "ready", content: known, cached: true } : { kind: "loading" };
+  });
   const [retryToken, setRetryToken] = useState(0);
   const [answers, setAnswers] = useState<Record<string, CheckpointAnswerState>>({});
 
@@ -239,6 +231,12 @@ export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings 
 
   const load = useCallback(
     async (signal: AbortSignal) => {
+      const key = lessonQueryKey(topicId, stepId, ageGroup, teachingMode);
+      const known = queryClient.getQueryData<LessonBlockContent>(key);
+      if (known) {
+        setState({ kind: "ready", content: known, cached: true });
+        return;
+      }
       setState({ kind: "loading" });
       try {
         const res = await fetch("/api/learning/lesson/generate", {
@@ -262,6 +260,7 @@ export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings 
           else if (event === "done") {
             const body = data as LessonGenerateResponse;
             finished = true;
+            if (body?.content) queryClient.setQueryData(key, body.content);
             setState(body?.content ? { kind: "ready", content: body.content, cached: body.cached } : { kind: "error", message: GENERIC_ERROR });
           } else if (event === "error") {
             finished = true;
@@ -273,18 +272,21 @@ export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings 
         if (!signal.aborted) setState({ kind: "error", message: GENERIC_ERROR });
       }
     },
-    [topicId, stepId, ageGroup, teachingMode, appliedCustomEmphasis]
+    [queryClient, topicId, stepId, ageGroup, teachingMode, appliedCustomEmphasis]
   );
 
   useEffect(() => {
     // Leaving the step (or changing the picker) stops reading the old stream;
     // the server still finishes and caches it (lib/api/sse.ts).
+    // Wait for the IndexedDB restore: starting before it lands would ask the
+    // server for a lesson this device already holds (and fail offline).
+    if (isRestoring) return;
     const controller = new AbortController();
     void load(controller.signal);
     return () => controller.abort();
     // retryToken intentionally re-triggers the same fetch on retry without
     // changing any of the actual request parameters above.
-  }, [load, retryToken]);
+  }, [load, retryToken, isRestoring]);
 
   // Prior checkpoint answers for this exact generated variant, fetched once
   // the content itself has loaded — pre-fills each CheckpointCard so
@@ -305,11 +307,11 @@ export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings 
 
   const changeAgeGroup = useCallback((v: UserAgeGroup) => {
     setAgeGroup(v);
-    writeStored(AGE_GROUP_KEY, v);
+    storeAgeGroup(v);
   }, []);
   const changeTeachingMode = useCallback((v: TeachingMode) => {
     setTeachingMode(v);
-    writeStored(TEACHING_MODE_KEY, v);
+    storeTeachingMode(v);
   }, []);
   const applyCustomEmphasis = useCallback(() => {
     setAppliedCustomEmphasis(customEmphasisInput.trim() || undefined);

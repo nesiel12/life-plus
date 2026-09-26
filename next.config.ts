@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { NextConfig } from "next";
+import { withSerwist } from "@serwist/turbopack";
 
 // Which brand-mark file actually exists in public/, resolved once at build
 // time so the client never requests a missing file and flashes a broken-image
@@ -54,4 +55,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

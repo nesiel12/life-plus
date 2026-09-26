@@ -16,6 +16,7 @@ import { Logo } from "@/components/ui/Logo";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { getInitialState } from "@/app/actions/bootstrap";
 import { setTimezoneAction } from "@/app/actions/timezone";
+import { isConfirmedSignedOut } from "@/lib/query/offlineStore";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -48,6 +49,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [isAuthPage, hydrated, status, hydrate, retryToken]);
 
   const retry = useCallback(() => setRetryToken((t) => t + 1), []);
+
+  // With the service worker, a cold start with no connection now renders this
+  // shell from cache — and next-auth, unable to reach the server, reports
+  // "unauthenticated". Rendering the page un-hydrated would claim the
+  // person's data is empty ("המעבדה ריקה"), so tell a failed session check
+  // apart from a real signed-out answer and say "no connection" instead.
+  const [serverUnreachable, setServerUnreachable] = useState(false);
+  useEffect(() => {
+    if (isAuthPage || status !== "unauthenticated") {
+      setServerUnreachable(false);
+      return;
+    }
+    let cancelled = false;
+    void isConfirmedSignedOut().then((signedOut) => {
+      if (!cancelled) setServerUnreachable(!signedOut);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthPage, status]);
 
   // Keep the stored timezone in step with the device.
   //
@@ -87,6 +108,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     // those pages hung on the hydration spinner forever, since hydration only
     // ever runs for an authenticated session.
     if (status === "unauthenticated") {
+      if (serverUnreachable) {
+        return (
+          <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+            <Logo size={32} />
+            <p className="text-lg font-medium text-foreground">אין חיבור לאינטרנט.</p>
+            <p className="max-w-sm text-sm text-muted">הנתונים שלך לא נמחקו — הם פשוט לא נטענו. נסה שוב כשהחיבור יחזור.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 rounded-lg bg-accent-faith/20 px-4 py-2 text-sm text-accent-faith transition-opacity hover:opacity-80"
+            >
+              נסה שוב
+            </button>
+          </div>
+        );
+      }
       return <>{children}</>;
     }
 

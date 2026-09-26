@@ -23,6 +23,7 @@ import { xpForResource } from "@/lib/learning/xp";
 import type { StepBriefContent, StepConcept } from "@/types/learning";
 import type { LearningResource, LearningTopic } from "@/types";
 import { cn } from "@/lib/utils";
+import { useLessonPrefetchHandlers } from "@/lib/learning/lessonPrefetch";
 
 // The mind map is the heaviest, least-needed-first part of the canvas: split
 // out so the step's text paints without waiting for it. retryImport: a
@@ -54,6 +55,7 @@ interface StepPreviewProps {
 export const StepPreview = memo(function StepPreview({ topic, resource, index, total, media, onOpenLesson }: StepPreviewProps) {
   const complete = useResourceCompletion();
   const { state, retry } = useStepBrief(topic.id, resource.id);
+  const lessonPrefetch = useLessonPrefetchHandlers(resource);
   const [error, setError] = useState<string | null>(null);
   const Icon = RESOURCE_ICON[resource.type];
   const done = resource.isCompleted;
@@ -99,6 +101,7 @@ export const StepPreview = memo(function StepPreview({ topic, resource, index, t
           <button
             type="button"
             onClick={() => onOpenLesson(resource)}
+            {...lessonPrefetch}
             className="focus-ring flex min-h-11 items-center gap-1.5 rounded-xl border border-accent-learning/30 px-4 text-sm font-medium text-accent-learning transition-colors hover:bg-accent-learning/10"
           >
             <GraduationCap size={15} aria-hidden />

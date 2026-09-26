@@ -12,6 +12,20 @@
       "autoPort": false
     },
     {
+      "name": "life-plus-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "start",
+        "--",
+        "--port",
+        "3000"
+      ],
+      "port": 3000,
+      "autoPort": false,
+      "url": "http://127.0.0.1:3000"
+    },
+    {
       "name": "life-plus-dev-alt",
       "runtimeExecutable": "env",
       "runtimeArgs": [

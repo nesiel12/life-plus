@@ -4,9 +4,14 @@ import { MotionConfig } from "framer-motion";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/components/providers/AuthProvider";
-import { ThemeProvider, themeInitScript } from "@/components/providers/ThemeProvider";
+import {
+  ThemeProvider,
+  themeInitScript,
+} from "@/components/providers/ThemeProvider";
 import { ActiveSkinProvider } from "@/components/providers/ActiveSkinProvider";
 import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
+import { QueryProvider } from "@/components/providers/QueryProvider";
+import { SerwistProvider } from "@serwist/turbopack/react";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -39,22 +44,34 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className={`${heebo.variable} antialiased`}>
-        {/* Respects the OS-level "reduce motion" setting for every
-            framer-motion animation in the app with one change, instead of
-            each component re-implementing its own check (design/motion/a11y
-            audit). "user" means it only ever reduces motion when the person
-            has actually asked for that — never forced. */}
-        <MotionConfig reducedMotion="user">
-          <ThemeProvider>
-            <PreferencesProvider>
-              <AuthProvider>
-                <ActiveSkinProvider>
-                  <AppShell>{children}</AppShell>
-                </ActiveSkinProvider>
-              </AuthProvider>
-            </PreferencesProvider>
-          </ThemeProvider>
-        </MotionConfig>
+        {/* Offline shell: registers /serwist/sw.js (production only — a dev
+            service worker would serve stale Turbopack chunks). reloadOnOnline
+            is off so regaining signal never throws away a lesson mid-read. */}
+        <SerwistProvider
+          swUrl="/serwist/sw.js"
+          disable={process.env.NODE_ENV === "development"}
+          register
+          reloadOnOnline={false}
+        >
+          {/* Respects the OS-level "reduce motion" setting for every
+              framer-motion animation in the app with one change, instead of
+              each component re-implementing its own check (design/motion/a11y
+              audit). "user" means it only ever reduces motion when the person
+              has actually asked for that — never forced. */}
+          <MotionConfig reducedMotion="user">
+            <ThemeProvider>
+              <PreferencesProvider>
+                <AuthProvider>
+                  <QueryProvider>
+                    <ActiveSkinProvider>
+                      <AppShell>{children}</AppShell>
+                    </ActiveSkinProvider>
+                  </QueryProvider>
+                </AuthProvider>
+              </PreferencesProvider>
+            </ThemeProvider>
+          </MotionConfig>
+        </SerwistProvider>
       </body>
     </html>
   );
