@@ -17,7 +17,8 @@ import { readAiError } from "@/lib/api/aiClient";
 import { readSseStream } from "@/lib/learning/sseClient";
 import { lessonStreamProgress } from "@/lib/learning/lessonStream";
 import { readStoredAgeGroup, readStoredTeachingMode, storeAgeGroup, storeTeachingMode } from "@/lib/learning/masterclassPrefs";
-import { lessonQueryKey } from "@/lib/query/aiContentKeys";
+import { lessonQueryKey } from "@/lib/query/offlineKeys";
+import { isNetworkFailure } from "@/lib/query/offlineStore";
 import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { ConfidenceRating } from "@/components/features/learning/step/ConfidenceRating";
 import { CALIBRATION_MESSAGE, calibrationFor, type ConfidenceLevel } from "@/lib/learning/stepBrief";
@@ -26,6 +27,7 @@ import type { LearningResource, LearningTopic } from "@/types";
 import { cn } from "@/lib/utils";
 
 const GENERIC_ERROR = "משהו השתבש ביצירת השיעור — נסה שוב";
+const OFFLINE_ERROR = "אין חיבור — השיעור הזה עוד לא נשמר במכשיר. הוא ייווצר כשהחיבור יחזור.";
 
 const AGE_GROUP_LABEL: Record<UserAgeGroup, string> = {
   KIDS_8_12: "ילדים (8-12)",
@@ -268,8 +270,8 @@ export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings 
           }
         });
         if (!finished && !signal.aborted) setState({ kind: "error", message: GENERIC_ERROR });
-      } catch {
-        if (!signal.aborted) setState({ kind: "error", message: GENERIC_ERROR });
+      } catch (err) {
+        if (!signal.aborted) setState({ kind: "error", message: isNetworkFailure(err) ? OFFLINE_ERROR : GENERIC_ERROR });
       }
     },
     [queryClient, topicId, stepId, ageGroup, teachingMode, appliedCustomEmphasis]
@@ -297,6 +299,8 @@ export function LessonViewport({ topic, resource, settingsOpen, onCloseSettings 
     void getCheckpointAnswersAction(topicId, stepId, ageGroup, teachingMode).then((rows) => {
       if (cancelled) return;
       setAnswers(Object.fromEntries(rows.map((row) => [row.checkpointId, row])));
+    }).catch(() => {
+      // offline or failed — the lesson still works, just without prior answers pre-filled
     });
     return () => {
       cancelled = true;

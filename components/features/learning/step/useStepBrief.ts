@@ -5,7 +5,8 @@ import { useIsRestoring, useQueryClient, type QueryClient } from "@tanstack/reac
 import { readAiError } from "@/lib/api/aiClient";
 import { readSseStream } from "@/lib/learning/sseClient";
 import type { StepContentCacheResponse, StepContentDoneEvent } from "@/app/api/learning/step-content/route";
-import { stepBriefQueryKey } from "@/lib/query/aiContentKeys";
+import { stepBriefQueryKey } from "@/lib/query/offlineKeys";
+import { isNetworkFailure } from "@/lib/query/offlineStore";
 import type { StepBriefContent } from "@/types/learning";
 
 export type StepBriefState =
@@ -16,6 +17,7 @@ export type StepBriefState =
   | { kind: "error"; message: string };
 
 const GENERIC_ERROR = "לא הצלחנו להכין את תקציר השלב. נסה שוב.";
+const OFFLINE_ERROR = "אין חיבור — התקציר הזה עוד לא נשמר במכשיר. הוא ייווצר כשהחיבור יחזור.";
 // Browsing the timeline with the arrow keys passes through steps on the way
 // to the one the person wants; only a selection that settles starts a
 // generation (a cached step still shows instantly — see below).
@@ -115,8 +117,8 @@ export function useStepBrief(topicId: string, stepId: string | null): { state: S
           }
         });
         if (!finished && !controller.signal.aborted) setState({ kind: "error", message: GENERIC_ERROR });
-      } catch {
-        if (!controller.signal.aborted) setState({ kind: "error", message: GENERIC_ERROR });
+      } catch (err) {
+        if (!controller.signal.aborted) setState({ kind: "error", message: isNetworkFailure(err) ? OFFLINE_ERROR : GENERIC_ERROR });
       }
     };
 

@@ -3,7 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 
 vi.mock("@/components/features/learning/classroom/ClassroomViewport", () => ({}));
 const { prefetchLesson } = await import("./lessonPrefetch");
-const { lessonQueryKey } = await import("@/lib/query/aiContentKeys");
+const { lessonQueryKey } = await import("@/lib/query/offlineKeys");
 
 describe("prefetchLesson", () => {
   afterEach(() => vi.unstubAllGlobals());

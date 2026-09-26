@@ -14,8 +14,8 @@ describe("makeQueryClient", () => {
   it("keeps an unobserved AI result in memory so it can be persisted", async () => {
     vi.useFakeTimers();
     const client = makeQueryClient();
-    client.setQueryData(["ai-content", "lesson", "t", "s", "ADULTS_19_PLUS", "STORYTELLING"], { originStory: "o" });
+    client.setQueryData(["offline", "lesson", "t", "s", "ADULTS_19_PLUS", "STORYTELLING"], { originStory: "o" });
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(client.getQueryData(["ai-content", "lesson", "t", "s", "ADULTS_19_PLUS", "STORYTELLING"])).toEqual({ originStory: "o" });
+    expect(client.getQueryData(["offline", "lesson", "t", "s", "ADULTS_19_PLUS", "STORYTELLING"])).toEqual({ originStory: "o" });
   });
 });

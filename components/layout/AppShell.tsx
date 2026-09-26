@@ -17,6 +17,11 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { getInitialState } from "@/app/actions/bootstrap";
 import { setTimezoneAction } from "@/app/actions/timezone";
 import { isConfirmedSignedOut } from "@/lib/query/offlineStore";
+import { learningIndexQueryKey, type LearningIndexSnapshot } from "@/lib/query/offlineKeys";
+import { LearningIndexPersister, OfflineContent } from "@/components/layout/OfflineShell";
+import { hydrateFromLearningSnapshot } from "@/lib/learning/offlineSnapshot";
+import { InstallPwaBanner } from "@/components/ui/InstallPwaButton";
+import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -30,14 +35,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   // knowing to hard-refresh. Now it's a real, retryable error state.
   const [loadError, setLoadError] = useState(false);
   const [retryToken, setRetryToken] = useState(0);
+  // True while the store holds only the device's learning snapshot (an
+  // offline cold start), not a real bootstrap. Everything else in the store
+  // is still at its empty defaults, so nothing may treat it as loaded data.
+  const [offlineSnapshot, setOfflineSnapshot] = useState(false);
+  const queryClient = useQueryClient();
+  const isRestoring = useIsRestoring();
 
   useEffect(() => {
-    if (isAuthPage || hydrated || status !== "authenticated") return;
+    if (isAuthPage || (hydrated && !offlineSnapshot) || status !== "authenticated") return;
     let cancelled = false;
     setLoadError(false);
     getInitialState()
       .then((state) => {
-        if (!cancelled) hydrate(state);
+        if (cancelled) return;
+        hydrate(state);
+        setOfflineSnapshot(false);
       })
       .catch((err) => {
         console.error("Failed to load Atlas data:", err);
@@ -46,7 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isAuthPage, hydrated, status, hydrate, retryToken]);
+  }, [isAuthPage, hydrated, offlineSnapshot, status, hydrate, retryToken]);
 
   const retry = useCallback(() => setRetryToken((t) => t + 1), []);
 
@@ -70,6 +83,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [isAuthPage, status]);
 
+  // Offline cold start: once the IndexedDB restore has landed, open the app
+  // on the saved learning index instead of a "no connection" dead end.
+  useEffect(() => {
+    if (!serverUnreachable || isRestoring || hydrated) return;
+    if (hydrateFromLearningSnapshot(queryClient.getQueryData<LearningIndexSnapshot>(learningIndexQueryKey))) setOfflineSnapshot(true);
+  }, [serverUnreachable, isRestoring, hydrated, queryClient]);
+
   // Keep the stored timezone in step with the device.
   //
   // Scheduled work runs with no browser, so the server has no other way to
@@ -80,7 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const storedTimezone = useAtlasStore((s) => s.personalDNA.timezone);
   const setStoredTimezone = useAtlasStore((s) => s.setPersonalDnaTimezone);
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || offlineSnapshot) return;
     const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (!deviceTimezone || deviceTimezone === storedTimezone) return;
     setTimezoneAction(deviceTimezone)
@@ -91,7 +111,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         // Best-effort: the engine falls back to the app default zone, which
         // is right for most of this app's users anyway. Never block the UI.
       });
-  }, [hydrated, storedTimezone, setStoredTimezone]);
+  }, [hydrated, offlineSnapshot, storedTimezone, setStoredTimezone]);
 
   // The splash overlay self-manages (once per session, skippable) and sits
   // above whichever state the shell is in, so it renders alongside every
@@ -108,6 +128,27 @@ export function AppShell({ children }: { children: ReactNode }) {
     // those pages hung on the hydration spinner forever, since hydration only
     // ever runs for an authenticated session.
     if (status === "unauthenticated") {
+      if (offlineSnapshot && hydrated) {
+        return (
+          <div className="flex min-h-screen">
+            <div className="contents print:hidden">
+              <Sidebar />
+              <MobileTabBar />
+            </div>
+            <AppWindow className="min-w-0 flex-1 pb-20 sm:pb-0 print:pb-0">
+              <OfflineContent pathname={pathname}>{children}</OfflineContent>
+            </AppWindow>
+          </div>
+        );
+      }
+      // Still reading the device snapshot — don't flash "no connection" first.
+      if (serverUnreachable && isRestoring) {
+        return (
+          <div className="flex min-h-screen items-center justify-center">
+            <Logo size={32} className="animate-pulse" />
+          </div>
+        );
+      }
       if (serverUnreachable) {
         return (
           <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
@@ -142,7 +183,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       );
     }
 
-    if (!hydrated) {
+    // offlineSnapshot here means the connection is back and the real
+    // bootstrap is loading: the store still holds only the learning slice
+    // (with onboardingComplete at its false default), so the full chrome must
+    // not render on it yet.
+    if (!hydrated || offlineSnapshot) {
       return (
         <div className="flex min-h-screen items-center justify-center">
           <Logo size={32} className="animate-pulse" />
@@ -164,6 +209,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <QuickCapture />
           <WelcomeSlides />
           <OnboardingFlow />
+          <InstallPwaBanner />
+          {!offlineSnapshot && <LearningIndexPersister />}
         </div>
         <AppWindow className="min-w-0 flex-1 pb-20 sm:pb-0 print:pb-0">{children}</AppWindow>
       </div>

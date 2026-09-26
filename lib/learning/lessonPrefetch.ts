@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type { LessonGenerateResponse } from "@/app/api/learning/lesson/generate/route";
-import { lessonQueryKey } from "@/lib/query/aiContentKeys";
+import { lessonQueryKey } from "@/lib/query/offlineKeys";
 import { readStoredAgeGroup, readStoredTeachingMode } from "@/lib/learning/masterclassPrefs";
 import type { LessonBlockContent } from "@/types/learning";
 import type { LearningResource } from "@/types";

@@ -10,7 +10,7 @@ const { claimOfflineData, clearOfflineData } = await import("./offlineStore");
 
 function seeded(): QueryClient {
   const client = new QueryClient();
-  client.setQueryData(["ai-content", "step-brief", "s1"], { summary: "private" });
+  client.setQueryData(["offline", "step-brief", "s1"], { summary: "private" });
   return client;
 }
 
@@ -31,7 +31,7 @@ describe("offline data ownership", () => {
     const client = seeded();
     await claimOfflineData(client, "a@example.com");
     await claimOfflineData(client, "A@example.com ");
-    expect(client.getQueryData(["ai-content", "step-brief", "s1"])).toEqual({ summary: "private" });
+    expect(client.getQueryData(["offline", "step-brief", "s1"])).toEqual({ summary: "private" });
     expect(storeClear).not.toHaveBeenCalled();
   });
 
@@ -39,14 +39,14 @@ describe("offline data ownership", () => {
     const client = seeded();
     await claimOfflineData(client, "a@example.com");
     await claimOfflineData(client, "b@example.com");
-    expect(client.getQueryData(["ai-content", "step-brief", "s1"])).toBeUndefined();
+    expect(client.getQueryData(["offline", "step-brief", "s1"])).toBeUndefined();
     expect(storeClear).toHaveBeenCalledOnce();
   });
 
   it("wipes everything when nobody is signed in", async () => {
     const client = seeded();
     await claimOfflineData(client, null);
-    expect(client.getQueryData(["ai-content", "step-brief", "s1"])).toBeUndefined();
+    expect(client.getQueryData(["offline", "step-brief", "s1"])).toBeUndefined();
     expect(storeClear).toHaveBeenCalledOnce();
   });
 
@@ -84,5 +84,17 @@ describe("isConfirmedSignedOut", () => {
     expect(await isConfirmedSignedOut()).toBe(true);
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ user: { email: "a@b.c" } }), { status: 200 })));
     expect(await isConfirmedSignedOut()).toBe(false);
+  });
+});
+
+describe("probeSession", () => {
+  it("tells signed-in, signed-out and unreachable apart", async () => {
+    const { probeSession } = await import("./offlineStore");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ user: { email: "a@b.c" } }))));
+    expect(await probeSession()).toBe("signed-in");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
+    expect(await probeSession()).toBe("signed-out");
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+    expect(await probeSession()).toBe("unreachable");
   });
 });

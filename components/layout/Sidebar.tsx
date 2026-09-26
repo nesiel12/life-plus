@@ -32,6 +32,7 @@ import { useT, type TranslationKey } from "@/lib/i18n/useT";
 import { requestVoiceAssistant } from "@/lib/voice/voiceAssistantEvent";
 import { cn } from "@/lib/utils";
 import { clearOfflineData } from "@/lib/query/offlineStore";
+import { InstallPwaButton } from "@/components/ui/InstallPwaButton";
 
 // The עוזר קולי's global trigger (components/features/voice/
 // VoiceAssistantModal.tsx, mounted once in AppShell.tsx): a plain button
@@ -207,6 +208,7 @@ export function Sidebar() {
             >
               <Settings size={17} aria-hidden />
             </Link>
+            <InstallPwaButton variant="icon" />
           </div>
           <div className="flex items-center gap-2 lg:justify-between">
             <div className="flex items-center gap-2">

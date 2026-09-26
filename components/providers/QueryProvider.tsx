@@ -5,7 +5,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useSession } from "next-auth/react";
-import { shouldPersistQuery } from "@/lib/query/aiContentKeys";
+import { shouldPersistQuery } from "@/lib/query/offlineKeys";
 import { makeQueryClient } from "@/lib/query/queryClient";
 import { claimOfflineData, isConfirmedSignedOut, OFFLINE_CACHE_BUSTER, OFFLINE_MAX_AGE_MS, offlinePersister } from "@/lib/query/offlineStore";
 

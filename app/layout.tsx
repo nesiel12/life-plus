@@ -27,6 +27,13 @@ export const metadata: Metadata = {
   // Console's "HTML tag" method (distinct from the public/ file method's
   // token); both methods stay in place, since removing a verified one can
   // un-verify the property.
+  // iOS ignores the web manifest for home-screen installs; these are what
+  // make "הוסף למסך הבית" open standalone with the right title.
+  appleWebApp: {
+    capable: true,
+    title: "Life Plus",
+    statusBarStyle: "default",
+  },
   verification: {
     google: "hu1yXiRy9cLRr1E5zCh83reeAov7fV3FLBnU7mCStGY",
   },

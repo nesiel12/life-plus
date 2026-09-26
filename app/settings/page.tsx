@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Bell, CalendarRange, Check, Clock, Globe, Languages, Loader2, Mail } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { InstallPwaButton } from "@/components/ui/InstallPwaButton";
+import { useInstallState } from "@/lib/pwa/installPrompt";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { EmailDiagnostics } from "@/components/features/settings/EmailDiagnostics";
 import { GoogleConnections } from "@/components/features/settings/GoogleConnections";
@@ -51,6 +53,8 @@ export default function SettingsPage() {
   const [reloadToken, setReloadToken] = useState(0);
   const { preferences, setPreference } = usePreferences();
   const t = useT();
+  const installState = useInstallState();
+  const installable = installState.kind === "prompt" || installState.kind === "ios";
 
   useEffect(() => {
     let cancelled = false;
@@ -115,6 +119,14 @@ export default function SettingsPage() {
       <BackToHome className="mb-6 -ms-2.5" />
       <h1 className="mb-1 text-2xl font-medium tracking-tight">{t("settings.title")}</h1>
       <p className="mb-8 text-sm text-muted">{t("settings.subtitle")}</p>
+
+      {installable && (
+        <GlassCard className="mb-5 flex max-w-2xl flex-col items-start gap-2">
+          <h2 className="text-sm font-medium text-foreground">אפליקציה במכשיר</h2>
+          <p className="text-xs text-muted">פתיחה מהמסך הראשי, בלי שורת כתובת — והשיעורים ששמרת זמינים גם בלי חיבור.</p>
+          <InstallPwaButton />
+        </GlassCard>
+      )}
 
       {loading ? (
         <GlassCard>

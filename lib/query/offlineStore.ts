@@ -8,7 +8,7 @@ export const OFFLINE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
 
 // Bump when a persisted AI-content shape changes incompatibly: a mismatched
 // buster makes the restore discard the old blob instead of rendering it.
-export const OFFLINE_CACHE_BUSTER = "ai-content-v1";
+export const OFFLINE_CACHE_BUSTER = "offline-v2";
 
 const OWNER_KEY = "lifeplus.offlineOwner";
 
@@ -52,22 +52,34 @@ export async function clearOfflineData(queryClient: QueryClient): Promise<void> 
   ]);
 }
 
+export type SessionProbe = "signed-in" | "signed-out" | "unreachable";
+
 /**
- * next-auth reports "unauthenticated" both when the server says there is no
- * session AND when it simply could not reach /api/auth/session — i.e. every
- * time the device is offline. Treating the latter as a sign-out wiped the
- * whole offline store the moment the network dropped (live-caught). Only a
- * real answer from the server with no user counts.
+ * Asks the server directly whether there is a session. next-auth's own
+ * status can't answer this: it reports "unauthenticated" both when the
+ * server says there is no session AND whenever it simply could not reach
+ * /api/auth/session — i.e. every time the device is offline.
+ */
+export async function probeSession(): Promise<SessionProbe> {
+  try {
+    // Bounded: on a connection that hangs rather than fails, "no answer in
+    // 5s" is treated as offline instead of stalling the shell indefinitely.
+    const res = await fetch("/api/auth/session", { cache: "no-store", signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return "unreachable";
+    const body = (await res.json()) as { user?: unknown } | null;
+    return body?.user ? "signed-in" : "signed-out";
+  } catch {
+    return "unreachable";
+  }
+}
+
+/**
+ * Only a real answer from the server with no user counts as signed out.
+ * Treating an unreachable server as a sign-out wiped the whole offline store
+ * the moment the network dropped (live-caught).
  */
 export async function isConfirmedSignedOut(): Promise<boolean> {
-  try {
-    const res = await fetch("/api/auth/session", { cache: "no-store" });
-    if (!res.ok) return false;
-    const body = (await res.json()) as { user?: unknown } | null;
-    return !body?.user;
-  } catch {
-    return false;
-  }
+  return (await probeSession()) === "signed-out";
 }
 
 /**
@@ -96,3 +108,6 @@ export async function claimOfflineData(queryClient: QueryClient, email: string |
     // ignore
   }
 }
+
+/** A fetch that never reached the server (offline, DNS, connection refused) rejects with a TypeError. */
+export const isNetworkFailure = (error: unknown) => error instanceof TypeError;
