@@ -165,14 +165,14 @@ export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const queryClient = useQueryClient();
-  const { theme, setTheme } = useTheme();
+  const { theme, setPreference } = useTheme();
 
   return (
     <aside className="glass-panel nav-liquid-rail sticky top-0 hidden h-screen w-20 shrink-0 flex-col items-center border-s px-2 py-6 sm:flex lg:w-64 lg:items-stretch lg:px-4">
       <div className="relative mb-8 flex w-full flex-col items-center">
         <AnimatedThemeToggler
           theme={theme}
-          onThemeChange={setTheme}
+          onThemeChange={setPreference}
           className="absolute -top-1 start-0 hidden lg:flex"
         />
         <Link
@@ -481,24 +481,32 @@ export function MobileTabBar() {
  * second, independent control for the phone width where the sidebar isn't
  * rendered at all.
  *
+ * Top corner, not mid-screen: a mid-left floating button sat over whatever
+ * card happened to scroll underneath it (live-reported). The top corner is
+ * the one strip of the screen no scrollable card ever reaches under this
+ * app's own header layout. `env(safe-area-inset-top)` clears the iOS
+ * status-bar/notch area the same way MobileTabBar already clears the home
+ * indicator at the bottom.
+ *
  * Positioned by a plain wrapper, not by the button itself. `.glass-control`
  * used to force `position: relative` over Tailwind's `fixed` (now fixed at
  * the source in globals.css) — the "floating" button was really an in-flow
  * flex item, a 36px column that squeezed the whole app to 339px on a 375px
  * phone (the blank strip down one side) and pushed the button half off
  * screen. The wrapper still matters: `.glass-control:active` sets its own
- * `transform`, which would replace a `-translate-y-1/2` on the button and
- * make it jump on every press.
+ * `transform`, which would replace this position with a jump on every press.
  *
- * `end-3` is the left edge in RTL and the right edge when the English locale
+ * `end-4` is the left edge in RTL and the right edge when the English locale
  * switches <html dir> to ltr (PreferencesProvider), so it stays on the
- * trailing side either way.
+ * trailing side either way — InstallPwaBanner (also top, also mobile-only)
+ * leaves exactly this corner clear (its own end- inset) so the two never
+ * overlap when both are on screen.
  */
 export function MobileThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setPreference } = useTheme();
   return (
-    <div className="fixed end-3 top-1/2 z-40 -translate-y-1/2 sm:hidden print:hidden">
-      <AnimatedThemeToggler theme={theme} onThemeChange={setTheme} className="glass-control size-11 rounded-full text-foreground" />
+    <div className="fixed end-4 top-[max(1rem,env(safe-area-inset-top))] z-50 sm:hidden print:hidden">
+      <AnimatedThemeToggler theme={theme} onThemeChange={setPreference} className="glass-control size-11 rounded-full text-foreground" />
     </div>
   );
 }

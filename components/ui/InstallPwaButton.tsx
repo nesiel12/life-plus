@@ -119,7 +119,15 @@ export function InstallPwaBanner() {
   };
 
   return (
-    <div role="region" aria-label={LABEL} className="glass-panel fixed inset-x-3 top-3 z-40 flex items-start gap-3 rounded-2xl border border-glass-border p-3 shadow-xl sm:hidden print:hidden">
+    // start-3/end-16 (not inset-x-3): the theme toggle now lives fixed at
+    // end-4/top-4 (Sidebar.tsx's MobileThemeToggle) — the same top strip —
+    // so this banner leaves that exact corner clear instead of running
+    // under it. top- also now clears the safe area, same as the toggle.
+    <div
+      role="region"
+      aria-label={LABEL}
+      className="glass-panel fixed start-3 end-16 top-[max(0.75rem,env(safe-area-inset-top))] z-40 flex items-start gap-3 rounded-2xl border border-glass-border p-3 shadow-xl sm:hidden print:hidden"
+    >
       <InstallPwaButton variant="full" className="flex-1" />
       <button type="button" onClick={dismiss} aria-label="סגור" className="focus-ring grid size-8 shrink-0 place-items-center rounded-full text-muted hover:text-foreground">
         <X size={16} aria-hidden />

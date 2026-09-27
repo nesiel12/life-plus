@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, CalendarRange, Check, Clock, Globe, Languages, Loader2, Mail } from "lucide-react";
+import { Bell, CalendarRange, Check, Clock, Globe, Languages, Loader2, Mail, Monitor, Moon, Sun } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { InstallPwaButton } from "@/components/ui/InstallPwaButton";
 import { useInstallState } from "@/lib/pwa/installPrompt";
@@ -9,6 +9,7 @@ import { BackToHome } from "@/components/layout/BackToHome";
 import { EmailDiagnostics } from "@/components/features/settings/EmailDiagnostics";
 import { GoogleConnections } from "@/components/features/settings/GoogleConnections";
 import { usePreferences, type AppLanguage } from "@/components/providers/PreferencesProvider";
+import { useTheme, type ThemePreference } from "@/components/providers/ThemeProvider";
 import { useT } from "@/lib/i18n/useT";
 import {
   getNotificationSettingsAction,
@@ -52,6 +53,7 @@ export default function SettingsPage() {
   const [justSaved, setJustSaved] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const { preferences, setPreference } = usePreferences();
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const t = useT();
   const installState = useInstallState();
   const installable = installState.kind === "prompt" || installState.kind === "ios";
@@ -162,6 +164,38 @@ export default function SettingsPage() {
             )}
             {saveError && <span className="text-red-500">{saveError}</span>}
           </div>
+
+          <GlassCard>
+            <p className="mb-1 flex items-center gap-2 text-sm font-medium text-muted">
+              <Sun size={16} className="text-accent-learning" aria-hidden />
+              {t("settings.appearance")}
+            </p>
+            <p className="mb-4 text-xs text-muted">{t("settings.appearanceHelp")}</p>
+            <div className="flex gap-1.5" role="group" aria-label={t("settings.appearance")}>
+              {(
+                [
+                  { value: "light", label: t("settings.appearanceLight"), icon: Sun },
+                  { value: "dark", label: t("settings.appearanceDark"), icon: Moon },
+                  { value: "system", label: t("settings.appearanceSystem"), icon: Monitor },
+                ] as { value: ThemePreference; label: string; icon: typeof Sun }[]
+              ).map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setThemePreference(option.value)}
+                  aria-pressed={themePreference === option.value}
+                  className={cn(
+                    "focus-ring flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                    themePreference === option.value
+                      ? "border-gold-line bg-gold-soft font-medium text-gold-ink"
+                      : "border-hairline-card text-muted hover:text-foreground"
+                  )}
+                >
+                  <option.icon size={14} aria-hidden />
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </GlassCard>
 
           <GlassCard>
             <p className="mb-1 flex items-center gap-2 text-sm font-medium text-muted">
