@@ -20,11 +20,14 @@ export type PushSendResult =
   | { ok: true; skipped?: boolean; delivered: number }
   | { ok: false; error: string };
 
-function routeFor(action: NotificationAction | null | undefined): string {
+export function routeFor(
+  action: NotificationAction | null | undefined,
+): string {
   if (!action) return "/";
   switch (action.type) {
     case "open_route": {
-      const route = typeof action.payload?.route === "string" ? action.payload.route : "/";
+      const route =
+        typeof action.payload?.route === "string" ? action.payload.route : "/";
       return route.startsWith("/") ? route : "/";
     }
     case "create_calendar_event":
@@ -47,7 +50,10 @@ export async function sendPush(input: PushSendInput): Promise<PushSendResult> {
   try {
     subs = await pushSubscriptionsRepo.listForUser(input.userId);
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "cannot read subscriptions" };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "cannot read subscriptions",
+    };
   }
   if (subs.length === 0) return { ok: true, skipped: true, delivered: 0 };
 
@@ -65,9 +71,12 @@ export async function sendPush(input: PushSendInput): Promise<PushSendResult> {
     subs.map(async (sub) => {
       try {
         await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh, auth: sub.auth },
+          },
           payload,
-          { TTL: 15 * 60, urgency: "high" }
+          { TTL: 15 * 60, urgency: "high" },
         );
         delivered++;
         void pushSubscriptionsRepo.touch(sub.endpoint).catch(() => {});
@@ -76,12 +85,16 @@ export async function sendPush(input: PushSendInput): Promise<PushSendResult> {
         // The push service says this endpoint is gone — the user cleared site
         // data or uninstalled the PWA. Drop it so it is never retried.
         if (status === 404 || status === 410) {
-          void pushSubscriptionsRepo.pruneDeadEndpoint(sub.endpoint).catch(() => {});
+          void pushSubscriptionsRepo
+            .pruneDeadEndpoint(sub.endpoint)
+            .catch(() => {});
         } else {
-          errors.push(`${status ?? "?"}: ${err instanceof Error ? err.message : "push failed"}`);
+          errors.push(
+            `${status ?? "?"}: ${err instanceof Error ? err.message : "push failed"}`,
+          );
         }
       }
-    })
+    }),
   );
 
   if (delivered === 0) {

@@ -8,6 +8,8 @@ import { useInstallState } from "@/lib/pwa/installPrompt";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { EmailDiagnostics } from "@/components/features/settings/EmailDiagnostics";
 import { PushToggle } from "@/components/features/settings/PushToggle";
+import { WhatsAppToggle } from "@/components/features/settings/WhatsAppToggle";
+import { WhatsAppDiagnostics } from "@/components/features/settings/WhatsAppDiagnostics";
 import { GoogleConnections } from "@/components/features/settings/GoogleConnections";
 import { usePreferences, type AppLanguage } from "@/components/providers/PreferencesProvider";
 import { useTheme, type ThemePreference } from "@/components/providers/ThemeProvider";
@@ -93,6 +95,8 @@ export default function SettingsPage() {
       ...settings,
       ...(patch.channelEmail !== undefined ? { channelEmail: patch.channelEmail } : {}),
       ...(patch.channelPush !== undefined ? { channelPush: patch.channelPush } : {}),
+      ...(patch.channelWhatsapp !== undefined ? { channelWhatsapp: patch.channelWhatsapp } : {}),
+      ...(patch.whatsappNumber !== undefined ? { whatsappNumber: patch.whatsappNumber } : {}),
       ...(patch.quietHoursStart !== undefined ? { quietHoursStart: patch.quietHoursStart } : {}),
       ...(patch.quietHoursEnd !== undefined ? { quietHoursEnd: patch.quietHoursEnd } : {}),
       ...(patch.maxPerDay !== undefined ? { maxPerDay: patch.maxPerDay } : {}),
@@ -252,7 +256,16 @@ export default function SettingsPage() {
 
           <PushToggle enabled={settings.channelPush} onChangePref={(enabled) => save({ channelPush: enabled })} />
 
+          <WhatsAppToggle
+            whatsappNumber={settings.whatsappNumber}
+            enabled={settings.channelWhatsapp}
+            saving={saving}
+            onSave={(patch) => save(patch)}
+          />
+
           <EmailDiagnostics />
+
+          <WhatsAppDiagnostics />
 
           <GoogleConnections />
 

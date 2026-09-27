@@ -112,7 +112,8 @@ lib/notify/
   channels/email.ts   — Resend over REST; never throws, returns {ok}|{ok:false,error}
   email/renderNotificationEmail.ts — pure RTL Hebrew template [tested]
   email/unsubscribeToken.ts        — HMAC one-click unsubscribe, RFC 8058 [tested]
-  channels/whatsapp.ts— WhatsApp Business send — STUB until creds
+  channels/webpush.ts — Web Push (VAPID); never throws, returns {ok}|{ok:false,error}
+  channels/whatsapp.ts— Twilio WhatsApp send; never throws, returns {ok}|{ok:false,error}
 app/api/cron/[job]/route.ts — POST, Bearer CRON_SECRET, calls runJob(job). The only external trigger.
 ```
 
@@ -232,7 +233,8 @@ closes this:
 
 | Layer | M2 deliverable | Needs |
 |---|---|---|
-| **WhatsApp** | `lib/notify/channels/whatsapp.ts` stub + inbound webhook route `app/api/whatsapp/webhook` (signature verify, message → command parse via existing `/api/commands/interpret`, reply). No longer called by `notify()` — delivery goes through `notification_dispatch`, which is email-only today. | Meta WhatsApp Business API **or** Twilio creds → **founder stop**. |
+| **WhatsApp (outbound)** | `lib/notify/channels/whatsapp.ts` — real Twilio Messages API send, wired into `notification_dispatch` alongside email and push. Opt-in per user (`channel_whatsapp` + a saved `whatsapp_number`, set in `/settings`). | `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_WHATSAPP_NUMBER` in the deploy environment. |
+| **WhatsApp (inbound)** | Still a stretch item, not built: a webhook route `app/api/whatsapp/webhook` (signature verify, message → command parse via existing `/api/commands/interpret`, reply) for two-way conversation. | Design decision on inbound routing + Twilio webhook config. |
 | **Second Brain** | `lib/secondBrain/` — parsers for markdown / Obsidian / Notion export; maps notes → `knowledge_entries` with backlinks preserved as `moments`/links. Import route `app/api/second-brain/import`. | A file upload UX (M4). |
 | **Screen Time** | `lib/health/screenTime.ts` — ingest endpoint `app/api/health/screen-time` accepting daily totals + per‑category; writes to `health_logs` (or a new `screen_time_logs`); feeds the M6 correlation engine. | Client capture (web: Atlas‑tab time, honestly labelled; native/OS export later). |
 
@@ -257,7 +259,8 @@ closes this:
       the free tier cannot schedule).
 - [ ] Personal DNA visibly changes ranking + chat tone.
 - [ ] Semantic chat memory returns relevant past items (needs pgvector).
-- [ ] WhatsApp scaffold — still awaiting Business API credentials.
+- [x] WhatsApp channel (outbound) live via Twilio, opt-in per user.
+- [ ] WhatsApp inbound webhook (two-way) — still a stretch item.
 - [x] `lint && typecheck && test && build` green.
 
 **Not done, and worth naming:** email delivery has never been observed

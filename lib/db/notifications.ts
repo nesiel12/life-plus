@@ -1,7 +1,10 @@
 import "server-only";
 import { getSupabaseClient } from "@/lib/supabase";
 import { createUserScopedRepo } from "@/lib/db/createUserScopedRepo";
-import type { DraftNotification, NotificationChannel } from "@/lib/proactive/types";
+import type {
+  DraftNotification,
+  NotificationChannel,
+} from "@/lib/proactive/types";
 
 const repo = createUserScopedRepo("notifications");
 
@@ -29,7 +32,7 @@ export const notificationsRepo = {
   async create(
     draft: DraftNotification,
     channels: NotificationChannel[],
-    scheduledFor?: Date
+    scheduledFor?: Date,
   ) {
     const { data, error } = await getSupabaseClient()
       .from("notifications")
@@ -39,13 +42,19 @@ export const notificationsRepo = {
         title: draft.title,
         body: draft.body,
         reason: draft.reason ?? null,
-        action: draft.action ? (draft.action as unknown as Record<string, unknown>) : null,
+        action: draft.action
+          ? (draft.action as unknown as Record<string, unknown>)
+          : null,
         channels,
         dedupe_key: draft.dedupeKey,
         // Resolved by notify() against the user's quiet hours in their own
         // timezone, so a 03:00 nightly job queues an email for the morning
         // rather than sending one at 03:00.
-        scheduled_for: (scheduledFor ?? draft.scheduledFor ?? new Date()).toISOString(),
+        scheduled_for: (
+          scheduledFor ??
+          draft.scheduledFor ??
+          new Date()
+        ).toISOString(),
         expires_at: draft.expiresAt ? draft.expiresAt.toISOString() : null,
       })
       .select()
@@ -60,15 +69,23 @@ export const notificationsRepo = {
 
   /**
    * The dispatcher's work queue: this user's notifications that are due, not
-   * yet sent, and want at least one of `channels` (email and/or push — the
-   * two outbound transports; `in_app`/`whatsapp` are not handled here).
+   * yet sent, and want at least one of `channels` (email, push and/or
+   * whatsapp — the three outbound transports; `in_app` is not handled here,
+   * it's implicit in the row existing).
    *
    * `sent_at IS NULL` rather than only `status = 'pending'` because a failed
    * send leaves the row pending for retry — the timestamp is what actually
    * records "this one already went out".
    */
-  async listDueOutbound(userId: string, now: Date, channels: NotificationChannel[] = ["email"], limit = 20) {
-    const wanted = channels.filter((c) => c === "email" || c === "push");
+  async listDueOutbound(
+    userId: string,
+    now: Date,
+    channels: NotificationChannel[] = ["email"],
+    limit = 20,
+  ) {
+    const wanted = channels.filter(
+      (c) => c === "email" || c === "push" || c === "whatsapp",
+    );
     if (wanted.length === 0) return [];
 
     const query = getSupabaseClient()
@@ -84,7 +101,10 @@ export const notificationsRepo = {
       // on any existing deployment would email the entire backlog at once,
       // starting with a daily insight from weeks ago. The in-app copy stays
       // in the centre either way; only the outbound send is skipped.
-      .gte("scheduled_for", new Date(now.getTime() - STALE_OUTBOUND_MS).toISOString())
+      .gte(
+        "scheduled_for",
+        new Date(now.getTime() - STALE_OUTBOUND_MS).toISOString(),
+      )
       .overlaps("channels", wanted)
       // Keep a row while at least one wanted channel is still viable (never
       // attempted, or attempted but not permanently failed). A row whose
@@ -92,9 +112,18 @@ export const notificationsRepo = {
       // queue without being dishonestly stamped as sent — the in-app copy is
       // still live and unread. The staleness floor above bounds the rare
       // case where one dead channel keeps a row visible.
-      .or(wanted.flatMap((c) => [`delivery->${c}->>status.is.null`, `delivery->${c}->>status.neq.failed`]).join(","));
+      .or(
+        wanted
+          .flatMap((c) => [
+            `delivery->${c}->>status.is.null`,
+            `delivery->${c}->>status.neq.failed`,
+          ])
+          .join(","),
+      );
 
-    const { data, error } = await query.order("scheduled_for", { ascending: true }).limit(limit);
+    const { data, error } = await query
+      .order("scheduled_for", { ascending: true })
+      .limit(limit);
     if (error) throw error;
     return data ?? [];
   },
@@ -112,7 +141,11 @@ export const notificationsRepo = {
     userId: string,
     id: string,
     channel: NotificationChannel,
-    outcome: { status: "sent" | "pending" | "failed"; error?: string; attempts?: number }
+    outcome: {
+      status: "sent" | "pending" | "failed";
+      error?: string;
+      attempts?: number;
+    },
   ) {
     const client = getSupabaseClient();
     const { data: current, error: readError } = await client
@@ -123,7 +156,9 @@ export const notificationsRepo = {
       .maybeSingle();
     if (readError) throw readError;
 
-    const delivery = { ...((current?.delivery as Record<string, unknown>) ?? {}) };
+    const delivery = {
+      ...((current?.delivery as Record<string, unknown>) ?? {}),
+    };
     delivery[channel] = {
       status: outcome.status,
       at: new Date().toISOString(),
@@ -140,7 +175,10 @@ export const notificationsRepo = {
   },
 
   /** One page of the notification centre, newest first. */
-  async listPage(userId: string, options: { limit?: number; before?: string } = {}) {
+  async listPage(
+    userId: string,
+    options: { limit?: number; before?: string } = {},
+  ) {
     const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
     let query = getSupabaseClient()
       .from("notifications")
@@ -160,7 +198,10 @@ export const notificationsRepo = {
     const rows = data ?? [];
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
-    return { rows: page, nextCursor: hasMore ? page[page.length - 1].created_at : null };
+    return {
+      rows: page,
+      nextCursor: hasMore ? page[page.length - 1].created_at : null,
+    };
   },
 
   /**
@@ -172,7 +213,9 @@ export const notificationsRepo = {
   async recentForDiagnostics(userId: string, limit = 8) {
     const { data, error } = await getSupabaseClient()
       .from("notifications")
-      .select("id, kind, title, created_at, scheduled_for, sent_at, status, channels, delivery")
+      .select(
+        "id, kind, title, created_at, scheduled_for, sent_at, status, channels, delivery",
+      )
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(Math.min(Math.max(limit, 1), 25));
@@ -233,7 +276,7 @@ export const notificationsRepo = {
   async markStatus(
     userId: string,
     id: string,
-    status: "sent" | "read" | "acted" | "dismissed" | "expired"
+    status: "sent" | "read" | "acted" | "dismissed" | "expired",
   ) {
     const stamp: Record<string, string> = {};
     if (status === "sent") stamp.sent_at = new Date().toISOString();

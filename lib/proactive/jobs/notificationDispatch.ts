@@ -5,9 +5,18 @@ import { personalDnaRepo } from "@/lib/db/personalDna";
 import { getUserById } from "@/lib/db/users";
 import { sendEmail } from "@/lib/notify/channels/email";
 import { sendPush } from "@/lib/notify/channels/webpush";
+import { sendWhatsApp } from "@/lib/notify/channels/whatsapp";
 import { canSendNow, isUnderDailyCap } from "@/lib/proactive/schedule";
-import { localHourIn, resolveUserTimezone, startOfLocalDay } from "@/lib/proactive/timezone";
-import type { Job, NotificationAction, NotificationChannel } from "@/lib/proactive/types";
+import {
+  localHourIn,
+  resolveUserTimezone,
+  startOfLocalDay,
+} from "@/lib/proactive/timezone";
+import type {
+  Job,
+  NotificationAction,
+  NotificationChannel,
+} from "@/lib/proactive/types";
 
 /** Give up on a channel after this many failed sends. */
 const MAX_ATTEMPTS = 3;
@@ -18,7 +27,8 @@ interface DeliveryRecord {
 }
 
 /**
- * Delivers queued notifications over their outbound channels (email, push).
+ * Delivers queued notifications over their outbound channels (email, push,
+ * whatsapp).
  *
  * This is the half of notification delivery that `notify()` deliberately does
  * not do. Splitting them is what finally makes three things work that were
@@ -32,11 +42,11 @@ interface DeliveryRecord {
  *    and that job's idempotency key then prevented it ever being retried.
  *
  * Each due row is fanned out over every channel it was queued for that the
- * user still has enabled — a row queued when both email and push were on
- * gets both attempted every pass. The row is stamped `sent` (and drops out of
- * future passes) the moment ANY channel gets it out; a channel that failed in
- * the same pass simply doesn't get retried afterwards — the in-app copy is
- * still live and unread regardless, and "sent" means "the person was
+ * user still has enabled — a row queued when email, push and whatsapp were
+ * all on gets all three attempted every pass. The row is stamped `sent` (and
+ * drops out of future passes) the moment ANY channel gets it out; a channel
+ * that failed in the same pass simply doesn't get retried afterwards — the
+ * in-app copy is still live and unread regardless, and "sent" means "the person was
  * reachably notified," not "every channel succeeded."
  *
  * Self-ledgered: it runs on every sweep, and its idempotency is `sent_at` on
@@ -54,6 +64,11 @@ export const notificationDispatchJob: Job = {
     const wantedChannels: NotificationChannel[] = [
       ...(prefs.channelEmail ? (["email"] as const) : []),
       ...(prefs.channelPush ? (["push"] as const) : []),
+      // Mirrors resolveChannels()'s own condition (lib/proactive/schedule.ts)
+      // exactly: a number alone or a toggle alone is not enough.
+      ...(prefs.channelWhatsapp && prefs.whatsappNumber
+        ? (["whatsapp"] as const)
+        : []),
     ];
     if (wantedChannels.length === 0) {
       // In-app notifications still exist; there is simply nothing to send.
@@ -69,16 +84,22 @@ export const notificationDispatchJob: Job = {
       return { itemsProduced: 0, detail: { skipped: "quiet_hours" } };
     }
 
-    const due = await notificationsRepo.listDueOutbound(userId, now, wantedChannels);
+    const due = await notificationsRepo.listDueOutbound(
+      userId,
+      now,
+      wantedChannels,
+    );
     if (due.length === 0) return { itemsProduced: 0 };
 
     // Only email needs the user's address resolved up front; push needs
     // nothing beyond the subscriptions sendPush already reads for itself.
-    const user = wantedChannels.includes("email") ? await getUserById(userId) : null;
+    const user = wantedChannels.includes("email")
+      ? await getUserById(userId)
+      : null;
 
     let sentToday = await notificationsRepo.countSentSince(
       userId,
-      startOfLocalDay(now, timeZone).toISOString()
+      startOfLocalDay(now, timeZone).toISOString(),
     );
 
     let sent = 0;
@@ -95,37 +116,56 @@ export const notificationDispatchJob: Job = {
       }
 
       const rowChannels = (row.channels ?? []) as NotificationChannel[];
-      const delivery = (row.delivery as Record<string, DeliveryRecord> | null) ?? {};
+      const delivery =
+        (row.delivery as Record<string, DeliveryRecord> | null) ?? {};
       let deliveredAny = false;
       let attemptedAny = false;
 
       for (const channel of wantedChannels) {
         if (!rowChannels.includes(channel)) continue;
         const previous = delivery[channel];
-        if (previous?.status === "failed" || previous?.status === "sent") continue;
+        if (previous?.status === "failed" || previous?.status === "sent")
+          continue;
 
         attemptedAny = true;
 
-        const result =
-          channel === "email"
-            ? user?.email
-              ? await sendEmail({
-                  userId,
-                  toEmail: user.email,
-                  kind: row.kind,
-                  title: row.title,
-                  body: row.body,
-                  reason: row.reason ?? undefined,
-                  action: row.action as NotificationAction | null,
-                })
-              : ({ ok: true, skipped: true } as const)
-            : await sendPush({
+        const result = await (async () => {
+          switch (channel) {
+            case "email":
+              return user?.email
+                ? sendEmail({
+                    userId,
+                    toEmail: user.email,
+                    kind: row.kind,
+                    title: row.title,
+                    body: row.body,
+                    reason: row.reason ?? undefined,
+                    action: row.action as NotificationAction | null,
+                  })
+                : ({ ok: true, skipped: true } as const);
+            case "push":
+              return sendPush({
                 userId,
                 kind: row.kind,
                 title: row.title,
                 body: row.body,
                 action: row.action as NotificationAction | null,
               });
+            case "whatsapp":
+              return prefs.whatsappNumber
+                ? sendWhatsApp({
+                    toNumber: prefs.whatsappNumber,
+                    kind: row.kind,
+                    title: row.title,
+                    body: row.body,
+                    reason: row.reason ?? undefined,
+                    action: row.action as NotificationAction | null,
+                  })
+                : ({ ok: true, skipped: true } as const);
+            default:
+              return { ok: true, skipped: true } as const;
+          }
+        })();
 
         if (result.ok) {
           if (result.skipped) {
@@ -135,7 +175,9 @@ export const notificationDispatchJob: Job = {
             skipped++;
             continue;
           }
-          await notificationsRepo.recordDelivery(userId, row.id, channel, { status: "sent" });
+          await notificationsRepo.recordDelivery(userId, row.id, channel, {
+            status: "sent",
+          });
           deliveredAny = true;
           continue;
         }

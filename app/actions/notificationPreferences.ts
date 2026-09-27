@@ -3,6 +3,7 @@
 import { getCurrentUserId } from "@/lib/currentUser";
 import { notificationPreferencesRepo } from "@/lib/db/notificationPreferences";
 import { personalDnaRepo } from "@/lib/db/personalDna";
+import { normalizePhone } from "@/lib/family/whatsapp";
 import { isValidTimezone, resolveUserTimezone } from "@/lib/proactive/timezone";
 import { NOTIFICATION_KINDS, type NotificationKind, type NotificationPreferences } from "@/lib/proactive/types";
 
@@ -22,6 +23,8 @@ export async function getNotificationSettingsAction(): Promise<NotificationSetti
 export interface NotificationSettingsPatch {
   channelEmail?: boolean;
   channelPush?: boolean;
+  channelWhatsapp?: boolean;
+  whatsappNumber?: string | null;
   quietHoursStart?: number;
   quietHoursEnd?: number;
   maxPerDay?: number;
@@ -32,6 +35,15 @@ export interface NotificationSettingsPatch {
 
 function clampHour(value: number): number {
   return Math.min(23, Math.max(0, Math.round(value)));
+}
+
+/** Accepts whatever a person types ("052-123-4567", "+972521234567") and
+ *  normalizes to E.164 for storage — reuses the same parser the family
+ *  contact wa.me feature already relies on (lib/family/whatsapp.ts), so
+ *  Israeli-local-number expansion behaves identically in both places. */
+function toE164(raw: string): string | null {
+  const digits = normalizePhone(raw);
+  return digits ? `+${digits}` : null;
 }
 
 /**
@@ -50,6 +62,19 @@ export async function updateNotificationSettingsAction(
   const prefsPatch: Record<string, unknown> = {};
   if (patch.channelEmail !== undefined) prefsPatch.channel_email = patch.channelEmail;
   if (patch.channelPush !== undefined) prefsPatch.channel_push = patch.channelPush;
+  if (patch.whatsappNumber !== undefined) {
+    prefsPatch.whatsapp_number = patch.whatsappNumber === null ? null : toE164(patch.whatsappNumber);
+  }
+  if (patch.channelWhatsapp !== undefined) {
+    // Never let the toggle turn on without a real number already on file —
+    // this same patch's own whatsappNumber (if present) or whatever the row
+    // already has. Mirrors resolveChannels()'s own condition
+    // (lib/proactive/schedule.ts) exactly, so "the toggle is on" and "the
+    // dispatcher will actually attempt it" can never disagree.
+    const existing = await notificationPreferencesRepo.get(userId);
+    const willHaveNumber = (prefsPatch.whatsapp_number as string | null | undefined) ?? existing.whatsappNumber;
+    prefsPatch.channel_whatsapp = patch.channelWhatsapp && Boolean(willHaveNumber);
+  }
   if (patch.quietHoursStart !== undefined) prefsPatch.quiet_hours_start = clampHour(patch.quietHoursStart);
   if (patch.quietHoursEnd !== undefined) prefsPatch.quiet_hours_end = clampHour(patch.quietHoursEnd);
   if (patch.maxPerDay !== undefined) {
