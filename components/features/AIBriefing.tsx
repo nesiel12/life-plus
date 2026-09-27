@@ -5,9 +5,14 @@ import { Sparkles, AlertCircle } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BriefingSignalList, type BriefingSignal } from "@/components/features/BriefingSignalList";
 
+interface BriefingConflict {
+  note: string;
+  signalIds: string[];
+}
+
 interface Briefing {
   signals: BriefingSignal[];
-  conflicts: string[];
+  conflicts: BriefingConflict[];
 }
 
 // The Experience Layer's flagship surface (docs/ATLAS_ARCHITECTURE_
@@ -92,10 +97,11 @@ export function AIBriefing({ bare = false }: AIBriefingProps = {}) {
         <div className="mt-4 flex items-start gap-2 rounded-lg bg-fill-subtle p-3 text-xs text-muted">
           <AlertCircle size={14} className="mt-0.5 shrink-0" aria-hidden />
           <div className="flex flex-col gap-1">
-            {/* Conflict notes are free text from the ranking pipeline and can
-                legitimately repeat, so the text alone isn't a unique key. */}
-            {briefing.conflicts.map((note, idx) => (
-              <p key={`${note}-${idx}`}>{note}</p>
+            {/* detectPriorityConflicts keeps selection id-disjoint — a signal
+                anchors at most one conflict — so signalIds is always a
+                stable, unique key here. */}
+            {briefing.conflicts.map((conflict) => (
+              <p key={conflict.signalIds.join("|")}>{conflict.note}</p>
             ))}
           </div>
         </div>

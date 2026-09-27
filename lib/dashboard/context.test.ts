@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   CONTEXT_PROFILES,
   MAX_BAND_CARDS,
-  MAX_PROMOTED,
+  cardsForWindow,
   contextAt,
-  contextualWidgets,
   energyGuidance,
   intensityHint,
   interleave,
@@ -14,7 +13,6 @@ import {
   windowRangeLabel,
   type ContextWindow,
 } from "@/lib/dashboard/context";
-import { DEFAULT_LAYOUT, WIDGETS, normalizeLayout, setHidden, type DashboardLayout } from "@/lib/dashboard/layout";
 import { energyCurve } from "@/lib/health/energyCurve";
 
 const at = (h: number, m = 0) => h * 60 + m;
@@ -99,17 +97,9 @@ describe("interleave", () => {
 });
 
 describe("profiles", () => {
-  it("only promote widgets that exist in the dashboard registry", () => {
-    const known = new Set(WIDGETS.map((w) => w.id));
-    for (const profile of Object.values(CONTEXT_PROFILES)) {
-      for (const id of profile.promote) expect(known.has(id), id).toBe(true);
-    }
-  });
-
   it("carry every spec'd theme in its window", () => {
     expect(CONTEXT_PROFILES.morning.cards).toEqual(expect.arrayContaining(["torah", "water", "top-three", "energy"]));
     expect(CONTEXT_PROFILES.work.cards).toEqual(expect.arrayContaining(["priority-tasks", "focus", "fuel"]));
-    expect(CONTEXT_PROFILES.work.promote).toEqual(expect.arrayContaining(["now-next", "today-structure"]));
     expect(CONTEXT_PROFILES.evening.cards).toEqual(
       expect.arrayContaining(["family", "reflection", "gratitude", "habits"])
     );
@@ -191,7 +181,6 @@ describe("resolveContext", () => {
     expect(r.window).toBe("morning");
     expect(r.transition).toBeNull();
     expect(r.label).toBe("בוקר");
-    expect(r.promote).toEqual(CONTEXT_PROFILES.morning.promote);
     expect(new Set(r.cards)).toEqual(new Set(CONTEXT_PROFILES.morning.cards));
   });
 
@@ -210,9 +199,6 @@ describe("resolveContext", () => {
     // Early: a morning card still leads the band, with a work card folded in.
     expect(CONTEXT_PROFILES.morning.cards).toContain(early.cards[0]);
     expect(early.cards.some((c) => CONTEXT_PROFILES.work.cards.includes(c) && !CONTEXT_PROFILES.morning.cards.includes(c))).toBe(true);
-    // Late: work leads, with a morning card still trailing.
-    expect(CONTEXT_PROFILES.work.promote).toContain(late.promote[0]);
-    expect(late.promote).toEqual(expect.arrayContaining(["hebrew-calendar"]));
   });
 
   it("blends work into evening during 16:00–17:00", () => {
@@ -254,80 +240,33 @@ describe("resolveContext", () => {
   });
 });
 
-describe("contextualWidgets — layered over the user's layout", () => {
-  const ids = (layout: DashboardLayout, promote: string[]) => contextualWidgets(layout, promote).map((w) => w.id);
+describe("cardsForWindow", () => {
+  // A flat, mid-energy curve isolates window selection from the energy re-rank.
+  const steady = energyGuidance(steadyCurve, clock(13));
 
-  it("floats promoted widgets up and leaves the rest in the user's order", () => {
-    const result = ids(DEFAULT_LAYOUT, ["today-structure", "motivation"]);
-    // command-bar keeps its lead; the promoted pair follow it; the rest keep default order.
-    expect(result[0]).toBe("command-bar");
-    expect(result.slice(1, 3)).toEqual(["today-structure", "motivation"]);
-    const others = result.slice(3);
-    expect(others).toEqual(
-      DEFAULT_LAYOUT.order.filter((id) => !["command-bar", "today-structure", "motivation"].includes(id))
-    );
-  });
-
-  it("never mutates the stored layout", () => {
-    const before = JSON.stringify(DEFAULT_LAYOUT);
-    contextualWidgets(DEFAULT_LAYOUT, ["goals", "memories"]);
-    expect(JSON.stringify(DEFAULT_LAYOUT)).toBe(before);
-  });
-
-  it("keeps a widget the user hid hidden, however well it suits the hour", () => {
-    const layout = setHidden(DEFAULT_LAYOUT, "today-structure", true);
-    expect(ids(layout, ["today-structure", "now-next"])).not.toContain("today-structure");
-    expect(ids(layout, ["today-structure", "now-next"]).length).toBe(layout.order.length - 1);
-  });
-
-  it("keeps the user's own relative order among the widgets it promotes", () => {
-    const layout: DashboardLayout = normalizeLayout({
-      order: ["command-bar", "goals", "memories", "now-next", "today-structure"],
-      hidden: [],
-      spans: {},
-    });
-    // Profile lists today-structure before now-next, but the user put now-next first.
-    const result = ids(layout, ["today-structure", "now-next"]);
-    expect(result.indexOf("now-next")).toBeLessThan(result.indexOf("today-structure"));
-    expect(result.slice(1, 3)).toEqual(["now-next", "today-structure"]);
-  });
-
-  it("keeps a leading command bar leading, and a non-leading one where it is", () => {
-    expect(ids(DEFAULT_LAYOUT, ["goals"])[0]).toBe("command-bar");
-
-    const moved: DashboardLayout = normalizeLayout({
-      order: ["goals", "command-bar", ...DEFAULT_LAYOUT.order.filter((id) => id !== "goals" && id !== "command-bar")],
-      hidden: [],
-      spans: {},
-    });
-    // Not leading, so it is not pinned — it is just another widget.
-    expect(ids(moved, ["memories"])[0]).toBe("memories");
-  });
-
-  it("caps how many widgets move", () => {
-    const result = ids(DEFAULT_LAYOUT, ["hebrew-calendar", "intention", "now-next", "goals", "memories"]);
-    const moved = result.filter((id, i) => id !== DEFAULT_LAYOUT.order[i]);
-    expect(moved.length).toBeGreaterThan(0);
-    // Only the first MAX_PROMOTED promoted ids float; 'goals' and 'memories' stay in place.
-    expect(result.indexOf("goals")).toBeGreaterThan(MAX_PROMOTED);
-    expect(result.slice(1, 1 + MAX_PROMOTED).every((id) => ["hebrew-calendar", "intention", "now-next"].includes(id))).toBe(true);
-  });
-
-  it("is a permutation: nothing lost, nothing duplicated", () => {
+  it("returns the requested window's cards regardless of the real time", () => {
     for (const window of Object.keys(CONTEXT_PROFILES) as ContextWindow[]) {
-      const result = ids(DEFAULT_LAYOUT, CONTEXT_PROFILES[window].promote);
-      expect([...result].sort()).toEqual([...DEFAULT_LAYOUT.order].sort());
+      expect(new Set(cardsForWindow(window, steady))).toEqual(new Set(CONTEXT_PROFILES[window].cards));
     }
   });
 
-  it("changes nothing when nothing promoted is visible, or nothing is promoted", () => {
-    expect(ids(DEFAULT_LAYOUT, [])).toEqual(DEFAULT_LAYOUT.order);
-    expect(ids(DEFAULT_LAYOUT, ["not-a-widget"])).toEqual(DEFAULT_LAYOUT.order);
+  it("never returns more than the band can hold", () => {
+    for (const window of Object.keys(CONTEXT_PROFILES) as ContextWindow[]) {
+      expect(cardsForWindow(window, steady).length).toBeLessThanOrEqual(MAX_BAND_CARDS);
+    }
   });
 
-  it("respects spans-only customisation (order untouched)", () => {
-    const layout = normalizeLayout({ ...DEFAULT_LAYOUT, spans: { goals: 2 } });
-    expect(ids(layout, [])).toEqual(layout.order);
+  it("re-ranks the requested window by the energy passed in, not the window's own typical energy", () => {
+    const curve = energyCurve();
+    const peak = energyGuidance(curve, clock(11));
+    const low = energyGuidance(curve, clock(14, 30));
+
+    expect(cardsForWindow("work", peak).indexOf("priority-tasks")).toBeLessThan(
+      cardsForWindow("work", peak).indexOf("fuel")
+    );
+    expect(cardsForWindow("work", low).indexOf("fuel")).toBeLessThan(
+      cardsForWindow("work", low).indexOf("priority-tasks")
+    );
   });
 });
 

@@ -6,18 +6,18 @@ import {
   type EnergyPoint,
   type EnergyWindow,
 } from "@/lib/health/energyCurve";
-import { visibleWidgets, type DashboardLayout, type WidgetDefinition } from "@/lib/dashboard/layout";
 
 // The context-aware dashboard: what the day is asking for right now.
 //
-// Layered OVER lib/dashboard/layout.ts, never into it. The user's saved
-// arrangement is data they made; this module only ever produces a *derived*
-// display order from it (contextualWidgets) and a set of extra cards to show
-// beside it. Nothing here writes a layout, so turning the feature off — or a
-// bug in it — costs the user nothing they had.
-//
-// Pure and clock-free (`now` is always a parameter), like the rest of lib/, so
-// every boundary below is testable without mocking time.
+// Produces a resolved window, a compact set of cards for it, and an energy
+// reading — all pure and clock-free (`now` is always a parameter), like the
+// rest of lib/, so every boundary below is testable without mocking time.
+// This used to also decide which of lib/dashboard/layout.ts's registry
+// widgets to float to the front of the main grid (`promote`/
+// `contextualWidgets`) — removed once the widgets it floated (ai-briefing,
+// today-structure, hebrew-calendar, intention, plus the evening band itself)
+// moved into a fixed, always-shown secondary zone instead of competing for a
+// spot in the user's own arranged grid. See SecondaryZone.tsx.
 
 export type ContextWindow = "morning" | "work" | "evening" | "night";
 
@@ -47,8 +47,6 @@ interface ContextProfile {
   tagline: string;
   /** Band cards, most important first. */
   cards: ContextCardId[];
-  /** Ids from the dashboard registry (lib/dashboard/layout.ts WIDGETS) worth floating up. */
-  promote: string[];
 }
 
 export const CONTEXT_PROFILES: Record<ContextWindow, ContextProfile> = {
@@ -56,26 +54,21 @@ export const CONTEXT_PROFILES: Record<ContextWindow, ContextProfile> = {
     label: "בוקר",
     tagline: "התחלה מרוכזת — תורה, מים, שלושת הדברים החשובים ותחזית האנרגיה",
     cards: ["torah", "water", "top-three", "energy"],
-    promote: ["hebrew-calendar", "intention", "now-next"],
   },
   work: {
     label: "שעות עבודה",
     tagline: "ביצוע — משימות בעדיפות, טיימר מיקוד ותדלוק קל",
     cards: ["priority-tasks", "focus", "fuel", "energy"],
-    // The Smart Calendar surfaces: where I am now, and the shape of the day.
-    promote: ["now-next", "today-structure", "upcoming-moments"],
   },
   evening: {
     label: "ערב",
     tagline: "בית ומשפחה — קשר, הרהור על היום, הכרת תודה וסיכום הרגלים",
     cards: ["family", "reflection", "gratitude", "habits"],
-    promote: ["memories", "recent-activity", "today-structure"],
   },
   night: {
     label: "לילה",
     tagline: "רגיעה — הכנה לשינה ומבט אל מחר",
     cards: ["sleep", "tomorrow"],
-    promote: ["upcoming-moments", "motivation"],
   },
 };
 
@@ -244,7 +237,6 @@ function rankByEnergy(cards: ContextCardId[], band: EnergyBand): ContextCardId[]
 // --- Putting it together ----------------------------------------------------
 
 export const MAX_BAND_CARDS = 4;
-export const MAX_PROMOTED = 3;
 
 export interface ResolvedContext {
   window: ContextWindow;
@@ -252,13 +244,12 @@ export interface ResolvedContext {
   label: string;
   tagline: string;
   cards: ContextCardId[];
-  promote: string[];
   energy: EnergyGuidance;
 }
 
 /**
- * The whole answer for one moment: which window, what to show in the band, what
- * to float up in the grid, and how hard the next task should be.
+ * The whole answer for one moment: which window, what to show in the band, and
+ * how hard the next task should be.
  *
  * During a handover both windows contribute — the leading one first, woven
  * with the other — and the band is capped, so the change of scene is a slow
@@ -270,14 +261,12 @@ export function resolveContext(now: Date, curve: readonly EnergyPoint[]): Resolv
 
   const profile = CONTEXT_PROFILES[window];
   let cards = profile.cards;
-  let promote = profile.promote;
 
   if (transition) {
     const from = CONTEXT_PROFILES[transition.from];
     const to = CONTEXT_PROFILES[transition.to];
     const [lead, follow] = window === transition.from ? [from, to] : [to, from];
     cards = interleave(lead.cards, follow.cards);
-    promote = interleave(lead.promote, follow.promote);
   }
 
   return {
@@ -286,39 +275,22 @@ export function resolveContext(now: Date, curve: readonly EnergyPoint[]): Resolv
     label: profile.label,
     tagline: transition ? `${profile.tagline} · מעבר הדרגתי` : profile.tagline,
     cards: rankByEnergy(cards.slice(0, MAX_BAND_CARDS), energy.band),
-    promote,
     energy,
   };
 }
 
-// --- The grid, layered over the user's layout --------------------------------
-
-/** Widgets that keep a leading slot if the user put them there. */
-const PINNED_LEAD = new Set(["command-bar"]);
-
 /**
- * The user's visible widgets, with context-relevant ones floated up.
+ * `CONTEXT_PROFILES[window].cards`, energy-reranked, for an arbitrary window —
+ * not just whichever one `resolveContext` says is live.
  *
- * What is preserved, and how:
- *  - The stored layout is not touched — this returns a new display order.
- *  - Hidden stays hidden. A widget the user put away is not un-hidden because
- *    it suits the hour.
- *  - A leading command bar stays leading; it is the input everything else hangs off.
- *  - At most MAX_PROMOTED widgets move, and they keep the user's own relative
- *    order among themselves. Everything else stays exactly where it was.
+ * Needed because the secondary zone (SecondaryZone.tsx) lets a person browse
+ * any time-of-day's cards, not only the current hour's: it opens on the live
+ * window by default but the other three stay one tab away. Energy is always
+ * read live regardless of which tab is open — "how much energy there is right
+ * now" doesn't change depending on which window's cards you're looking at.
  */
-export function contextualWidgets(layout: DashboardLayout, promote: readonly string[]): WidgetDefinition[] {
-  const visible = visibleWidgets(layout);
-
-  let lead = 0;
-  while (lead < visible.length && PINNED_LEAD.has(visible[lead].id)) lead++;
-  const head = visible.slice(0, lead);
-  const rest = visible.slice(lead);
-
-  const restIds = new Set(rest.map((w) => w.id));
-  const chosen = new Set(promote.filter((id) => restIds.has(id)).slice(0, MAX_PROMOTED));
-
-  return [...head, ...rest.filter((w) => chosen.has(w.id)), ...rest.filter((w) => !chosen.has(w.id))];
+export function cardsForWindow(window: ContextWindow, energy: EnergyGuidance): ContextCardId[] {
+  return rankByEnergy(CONTEXT_PROFILES[window].cards.slice(0, MAX_BAND_CARDS), energy.band);
 }
 
 // --- Tasks, by energy ---------------------------------------------------------

@@ -42,6 +42,6 @@ export async function GET() {
       summary: signal.summary,
       confidence: signal.confidence,
     })),
-    conflicts: conflicts.map((conflict) => conflict.note),
+    conflicts: conflicts.map((conflict) => ({ note: conflict.note, signalIds: conflict.signalIds })),
   });
 }

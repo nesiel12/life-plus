@@ -31,20 +31,28 @@ export interface DashboardLayout {
 
 export const MAX_SPAN: WidgetSpan = 3;
 
-/** The dashboard as shipped. Order here is the default order. */
+/**
+ * The dashboard as shipped. Order here is the default order.
+ *
+ * The command bar, AI briefing, today-structure, Hebrew calendar and
+ * daily-intention widgets used to live here too. The command bar is now a
+ * fixed fixture directly under the Hero Focus Card (app/page.tsx) — always
+ * present, never draggable or hideable, the one input everything else hangs
+ * off. The other four moved into SecondaryZone.tsx, a fixed, always-shown
+ * compact tab group. Neither is a draggable/hideable/resizable part of this
+ * registry any more, because being independently arrangeable was exactly the
+ * per-widget clutter the dashboard redesign set out to remove. Their ids are
+ * simply gone from this array; normalizeLayout already drops unknown ids
+ * from anyone's stored order/hidden/spans gracefully (see its own comment),
+ * so no migration was needed.
+ */
 export const WIDGETS: WidgetDefinition[] = [
-  // Leads everything: the fastest path from "I need to remember this" to
-  // it being captured, replacing a dozen separate add-forms.
-  { id: "command-bar", title: "שורת פקודה", defaultSpan: 2, minSpan: 2 },
-  // Then: "where am I in my day" is the question the dashboard
-  // is opened to answer, and it is the one thing here that changes by the
-  // hour rather than by the day.
+  // "Where am I in my day" is the first question the remaining grid answers,
+  // and it is the one thing here that changes by the hour rather than by the day.
   { id: "now-next", title: "עכשיו והבא", defaultSpan: 1, minSpan: 1 },
-  { id: "ai-briefing", title: "תדריך AI", defaultSpan: 2, minSpan: 2 },
-  { id: "today-structure", title: "מבנה היום", defaultSpan: 1, minSpan: 1 },
-  { id: "hebrew-calendar", title: "לוח עברי", defaultSpan: 1, minSpan: 1 },
-  { id: "motivation", title: "השראה יומית", defaultSpan: 1, minSpan: 1 },
-  { id: "intention", title: "כוונת היום", defaultSpan: 1, minSpan: 1 },
+  // Presentational only (a quote of the day) — the clearest cut when
+  // trimming the default view. Reachable from the hide/restore tray.
+  { id: "motivation", title: "השראה יומית", defaultSpan: 1, minSpan: 1, optional: true },
   { id: "upcoming-moments", title: "רגעים משמעותיים", defaultSpan: 2, minSpan: 1 },
   { id: "recent-activity", title: "פעילות אחרונה", defaultSpan: 1, minSpan: 1 },
   { id: "memories", title: "זיכרונות", defaultSpan: 3, minSpan: 2 },

@@ -56,13 +56,37 @@ describe("detectPriorityConflicts", () => {
     expect(conflicts.some((c) => c.signalIds.includes("rel1"))).toBe(false);
   });
 
-  it("flags every competing pair among more than two top signals", () => {
+  it("never lets one signal anchor more than one conflict, even when it competes with several", () => {
+    // goal1 competes with both rel1 (goal/relationship) and event1
+    // (goal/upcomingEvent) — all three top signals collide pairwise — but
+    // each signal may anchor at most one reported conflict, so only one of
+    // the two pairs sharing goal1 can survive, and the other signal in that
+    // dropped pair (rel1 or event1) is left unpaired rather than double-booked.
     const ranked = rankSignals([
       signal({ id: "goal1", category: "goal" }),
       signal({ id: "rel1", category: "relationship" }),
       signal({ id: "event1", category: "upcomingEvent" }),
     ]);
     const conflicts = detectPriorityConflicts(ranked);
-    expect(conflicts).toHaveLength(3);
+    expect(conflicts).toHaveLength(1);
+    const usedIds = conflicts.flatMap((c) => c.signalIds);
+    expect(new Set(usedIds).size).toBe(usedIds.length);
+  });
+
+  it("caps the number of conflicts reported even with many colliding signals", () => {
+    // Three disjoint competing pairs among six top signals — every pair
+    // qualifies, but only MAX_CONFLICTS (2) may be reported.
+    const ranked = rankSignals([
+      signal({ id: "goal1", category: "goal", importance: 0.9 }),
+      signal({ id: "rel1", category: "relationship", importance: 0.9 }),
+      signal({ id: "goal2", category: "goal", importance: 0.7 }),
+      signal({ id: "event1", category: "upcomingEvent", importance: 0.7 }),
+      signal({ id: "rel2", category: "relationship", importance: 0.5 }),
+      signal({ id: "event2", category: "upcomingEvent", importance: 0.5 }),
+    ]);
+    const conflicts = detectPriorityConflicts(ranked);
+    expect(conflicts.length).toBeLessThanOrEqual(2);
+    const usedIds = conflicts.flatMap((c) => c.signalIds);
+    expect(new Set(usedIds).size).toBe(usedIds.length);
   });
 });

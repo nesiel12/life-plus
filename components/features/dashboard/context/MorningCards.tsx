@@ -118,17 +118,28 @@ export function WaterCard({ withMeal = false }: { withMeal?: boolean }) {
   );
 }
 
+interface TopThreeCardProps {
+  /**
+   * Leaves out the top `skip` priority goals — the Hero Focus Card already
+   * shows the single highest one, so this card's job on the dashboard is the
+   * *rest* of "today's three things", not a repeat of the first.
+   */
+  skip?: number;
+}
+
 /** שלושת הדברים החשובים — the next step on each of the three goals closest to due. */
-export function TopThreeCard() {
+export function TopThreeCard({ skip = 0 }: TopThreeCardProps = {}) {
   const goals = useAtlasStore((s) => s.goals);
   const toggleMilestone = useAtlasStore((s) => s.toggleMilestone);
   const [error, setError] = useState<string | null>(null);
-  const focus = useMemo(() => pickTopGoals(goals, 3), [goals]);
+  const focus = useMemo(() => pickTopGoals(goals, 3 + skip).slice(skip), [goals, skip]);
 
   return (
-    <ContextCardShell icon={Target} title="שלושת הדברים היום" iconClass="text-accent-career">
+    <ContextCardShell icon={Target} title={skip > 0 ? "גם היום" : "שלושת הדברים היום"} iconClass="text-accent-career">
       {focus.length === 0 ? (
-        <p className="text-xs text-muted">אין יעדים פתוחים — אפשר להגדיר יעד חדש בלוח היעדים.</p>
+        <p className="text-xs text-muted">
+          {skip > 0 ? "אין עוד יעדים פתוחים כרגע." : "אין יעדים פתוחים — אפשר להגדיר יעד חדש בלוח היעדים."}
+        </p>
       ) : (
         <ol className="flex flex-col gap-1.5">
           {focus.map(({ goal, next }) => (

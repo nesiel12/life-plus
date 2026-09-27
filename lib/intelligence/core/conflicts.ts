@@ -29,20 +29,43 @@ function isCompetingPair(a: SignalCategory, b: SignalCategory): boolean {
   return COMPETING_CATEGORY_PAIRS.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
 }
 
+/** How many conflict notes the briefing will ever show at once. */
+const MAX_CONFLICTS = 2;
+
+/**
+ * Every qualifying pair among the top signals competes to be reported, but a
+ * signal that already anchors one kept conflict cannot anchor a second — that
+ * disjointness is what stops the same title turning up in two or three
+ * conflict sentences at once (on top of already appearing once in the plain
+ * signal list above them). Candidates are tried strongest collision first
+ * (combined rank score), so when a signal collides with more than one other,
+ * only its single strongest collision survives.
+ */
 export function detectPriorityConflicts(rankedSignals: RankedSignal[]): PriorityConflict[] {
   const topSignals = rankedSignals.slice(0, TOP_N_FOR_CONFLICT_CHECK);
-  const conflicts: PriorityConflict[] = [];
 
+  const candidates: { a: RankedSignal; b: RankedSignal; score: number }[] = [];
   for (let i = 0; i < topSignals.length; i++) {
     for (let j = i + 1; j < topSignals.length; j++) {
       const a = topSignals[i];
       const b = topSignals[j];
       if (!isCompetingPair(a.category, b.category)) continue;
-      conflicts.push({
-        signalIds: [a.id, b.id],
-        note: `שני איתותים בעדיפות גבוהה מתחרים על תשומת הלב: "${a.title}" ו"${b.title}".`,
-      });
+      candidates.push({ a, b, score: a.score + b.score });
     }
+  }
+  candidates.sort((x, y) => y.score - x.score);
+
+  const used = new Set<string>();
+  const conflicts: PriorityConflict[] = [];
+  for (const { a, b } of candidates) {
+    if (used.has(a.id) || used.has(b.id)) continue;
+    used.add(a.id);
+    used.add(b.id);
+    conflicts.push({
+      signalIds: [a.id, b.id],
+      note: `שני איתותים בעדיפות גבוהה מתחרים על תשומת הלב: "${a.title}" ו"${b.title}".`,
+    });
+    if (conflicts.length >= MAX_CONFLICTS) break;
   }
 
   return conflicts;

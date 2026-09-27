@@ -441,8 +441,10 @@ body::before {
   position: absolute;
   z-index: 0;
   inset-block: 0.25rem;
-  inline-size: calc((100% - 0.5rem) / 4);
-  inset-inline-start: calc(0.25rem + var(--cir-index, 0) * (100% - 0.5rem) / 4);
+  /* --cir-count defaults to 4 so every existing 4-tab instance (RangeTabs,
+     TorahTabs) keeps working without publishing it. */
+  inline-size: calc((100% - 0.5rem) / var(--cir-count, 4));
+  inset-inline-start: calc(0.25rem + var(--cir-index, 0) * (100% - 0.5rem) / var(--cir-count, 4));
   border-radius: 999px;
   background: var(--surface);
   border: 1px solid var(--gold-line);

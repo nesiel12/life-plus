@@ -5,22 +5,20 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
-import { CalendarHeart, ArrowLeft, Check, LayoutGrid, RotateCcw } from "lucide-react";
-import { useAtlasStore, categoryLabel } from "@/store/useAtlasStore";
-import { AIBriefing } from "@/components/features/AIBriefing";
+import { ArrowLeft, Check, LayoutGrid, RotateCcw } from "lucide-react";
+import { useAtlasStore } from "@/store/useAtlasStore";
 import { EnergyLevelBadge } from "@/components/features/EnergyLevelBadge";
 import { ScreenTimeWidget } from "@/components/features/ScreenTimeWidget";
 import { GoalsPanel } from "@/components/features/GoalsPanel";
 import { RecentActivityCard } from "@/components/features/RecentActivityCard";
 import { MemoryCards } from "@/components/features/memories/MemoryCards";
 import { NowNextCard } from "@/components/features/dashboard/NowNextCard";
-import { TodayStructureCard } from "@/components/features/dashboard/TodayStructureCard";
-import { HebrewCalendarCard } from "@/components/features/dashboard/HebrewCalendarCard";
 import { MotivationCard } from "@/components/features/dashboard/MotivationCard";
+import { UpcomingMomentsCard } from "@/components/features/dashboard/UpcomingMomentsCard";
+import { HeroFocusCard } from "@/components/features/dashboard/HeroFocusCard";
+import { SecondaryZone } from "@/components/features/dashboard/SecondaryZone";
 import { UniversalInputBar } from "@/components/features/dashboard/UniversalInputBar";
-import { IntentionComposer } from "@/components/features/dashboard/IntentionComposer";
 import { WidgetFrame } from "@/components/features/dashboard/WidgetFrame";
-import { ContextSwitcher } from "@/components/features/dashboard/ContextSwitcher";
 import { BentoCard } from "@/components/magicui/bento-grid";
 import { MasonryGrid } from "@/components/features/dashboard/MasonryGrid";
 import { RetroGrid } from "@/components/magicui/retro-grid";
@@ -28,16 +26,12 @@ import { LightRays } from "@/components/magicui/light-rays";
 import { Confetti, type ConfettiRef } from "@/components/magicui/confetti";
 import { KineticText } from "@/components/magicui/kinetic-text";
 import { Logo } from "@/components/ui/Logo";
-import { daysUntil } from "@/lib/utils";
 import { timeOfDayFromHour } from "@/lib/greeting";
 import { useT, type TranslationKey } from "@/lib/i18n/useT";
 import { useDashboardLayout } from "@/hooks/useDashboardLayout";
 import { useDashboardContext } from "@/hooks/useDashboardContext";
 import { hiddenWidgets, isCustomised, spanOf, visibleWidgets } from "@/lib/dashboard/layout";
-import { contextualWidgets } from "@/lib/dashboard/context";
 import type { ReactNode } from "react";
-
-const MAX_UPCOMING_ON_DASHBOARD = 3;
 
 const CONFETTI_GOLD = ["#b89355", "#e6d3a4", "#876628", "#cc1f78", "#1a72bb", "#2f9e44"];
 
@@ -45,7 +39,6 @@ export default function Home() {
   const { data: session } = useSession();
   const user = useAtlasStore((s) => s.user);
   const goals = useAtlasStore((s) => s.goals);
-  const upcomingEvents = useAtlasStore((s) => s.upcomingEvents);
 
   const { layout, move, moveTo, hide, restore, resize, reset } = useDashboardLayout();
   const [editing, setEditing] = useState(false);
@@ -210,16 +203,20 @@ export default function Home() {
 
       {/* ─── Bento dashboard ──────────────────────────────────────────────── */}
       <div className="mx-auto max-w-6xl px-6 pb-16 sm:px-10 lg:px-16">
-        {/* The context band. Hidden while editing: rearranging the grid should
-            work on the order the user actually saved, not the order the hour
-            happens to prefer. */}
-        {!editing && dashboardContext.ready && dashboardContext.context && dashboardContext.now && (
-          <ContextSwitcher
-            context={dashboardContext.context}
-            now={dashboardContext.now}
-            enabled={dashboardContext.enabled}
-            onToggle={dashboardContext.setEnabled}
-          />
+        {/* The single top priority, leading everything — Widget Strategy §1. */}
+        <HeroFocusCard />
+
+        {/* Quick capture stays right under the Hero, outside the masonry grid
+            entirely, so a drag/reorder of the widgets below can never bury it. */}
+        <div className="mb-6">
+          <UniversalInputBar />
+        </div>
+
+        {/* Everything that isn't the Hero, quick capture, or one of the
+            full-size grid widgets below — a fixed, always-shown compact tab
+            group (replaces the old time-of-day band and its grid-floating). */}
+        {dashboardContext.ready && dashboardContext.context && dashboardContext.now && (
+          <SecondaryZone context={dashboardContext.context} now={dashboardContext.now} />
         )}
 
         {/* Widget bodies, keyed by registry id. The grid below renders
@@ -227,63 +224,15 @@ export default function Home() {
             the arrangement lives in data, not in this JSX. */}
         {(() => {
           const CONTENT: Record<string, { node: ReactNode; tilt?: boolean; href?: string; cta?: string }> = {
-            "command-bar": { node: <UniversalInputBar /> },
             "now-next": { node: <NowNextCard /> },
-            "today-structure": { node: <TodayStructureCard /> },
-            "hebrew-calendar": { node: <HebrewCalendarCard /> },
-            "motivation": { node: <MotivationCard /> },
-            "ai-briefing": { node: <AIBriefing bare /> },
-            intention: { node: <IntentionComposer />, tilt: false },
-            "upcoming-moments": {
-              href: "/calendar",
-              cta: "ליומן החכם",
-              node: (
-                <>
-                  <p className="mb-5 flex items-center gap-2 text-sm font-medium text-muted">
-                    <CalendarHeart size={16} className="text-accent-family" aria-hidden />
-                    רגעים משמעותיים בקרוב
-                  </p>
-                  {upcomingEvents.length === 0 ? (
-                    <p className="text-xs text-muted">אין כרגע רגעים מתוזמנים.</p>
-                  ) : (
-                    <ul className="flex flex-col gap-3">
-                      {upcomingEvents.slice(0, MAX_UPCOMING_ON_DASHBOARD).map((event) => {
-                        const diff = daysUntil(event.date);
-                        const label =
-                          diff === 0 ? "היום" : diff === 1 ? "מחר" : diff > 1 ? `בעוד ${diff} ימים` : "עבר";
-                        return (
-                          <li
-                            key={event.id}
-                            className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-hairline-card bg-surface-sunken/60 px-3.5 py-2.5 text-sm"
-                          >
-                            <span className="flex min-w-0 items-center gap-2 text-foreground/90">
-                              <CalendarHeart size={15} className="shrink-0 text-accent-family" aria-hidden />
-                              <span className="truncate">{event.title}</span>
-                              <span className="shrink-0 text-xs text-muted">
-                                · {categoryLabel(event.category)}
-                              </span>
-                            </span>
-                            <span className="ltr shrink-0 whitespace-nowrap text-xs text-muted">{label}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </>
-              ),
-            },
+            motivation: { node: <MotivationCard /> },
+            "upcoming-moments": { href: "/calendar", cta: "ליומן החכם", node: <UpcomingMomentsCard /> },
             "recent-activity": { node: <RecentActivityCard /> },
             memories: { node: <MemoryCards />, tilt: false },
             goals: { node: <GoalsPanel bare />, tilt: false },
           };
 
-          // Context reorders only what is DISPLAYED, only when enabled, and never
-          // in edit mode. The saved layout is untouched either way.
-          const contextOrdered =
-            !editing && dashboardContext.ready && dashboardContext.enabled && dashboardContext.context !== null;
-          const visible = contextOrdered
-            ? contextualWidgets(layout, dashboardContext.context!.promote)
-            : visibleWidgets(layout);
+          const visible = visibleWidgets(layout);
           const hiddenList = hiddenWidgets(layout);
 
           return (
