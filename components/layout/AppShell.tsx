@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import type { ReactNode } from "react";
@@ -20,6 +20,8 @@ import { isConfirmedSignedOut } from "@/lib/query/offlineStore";
 import { offlineBootstrapQueryKey, type OfflineBootstrapSnapshot } from "@/lib/query/offlineKeys";
 import { OfflineBanner, OfflineBootstrapPersister } from "@/components/layout/OfflineShell";
 import { hydrateFromOfflineSnapshot } from "@/lib/query/offlineSnapshot";
+import { warmInsightsCache } from "@/lib/api/warmInsights";
+import { onIdle } from "@/lib/dom/idle";
 import { InstallPwaBanner } from "@/components/ui/InstallPwaButton";
 import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 
@@ -62,6 +64,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [isAuthPage, hydrated, offlineSnapshot, status, hydrate, retryToken]);
 
   const retry = useCallback(() => setRetryToken((t) => t + 1), []);
+
+  // Once, after a real (not offline-snapshot) bootstrap: warms every
+  // screen's own AI-insight fetch (lib/api/warmInsights.ts) at idle, so the
+  // first visit to a tab this session already has its data cached instead
+  // of starting the request only once the tab mounts.
+  const warmedInsights = useRef(false);
+  useEffect(() => {
+    if (!hydrated || offlineSnapshot || warmedInsights.current) return;
+    warmedInsights.current = true;
+    return onIdle(warmInsightsCache);
+  }, [hydrated, offlineSnapshot]);
 
   // With the service worker, a cold start with no connection now renders this
   // shell from cache — and next-auth, unable to reach the server, reports

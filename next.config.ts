@@ -32,6 +32,20 @@ const nextConfig: NextConfig = {
   // (the install banner's button and close). Off entirely: build and runtime
   // errors still surface through Next's error overlay, which is separate.
   devIndicators: false,
+  experimental: {
+    // Every page here is a client component reading from the Zustand store
+    // (hydrated once by getInitialState, kept current by optimistic updates
+    // on every mutation) — none of them need the App Router's own client
+    // cache invalidated just because a few minutes passed. The default
+    // (dynamic: 0) treats every non-`prefetch` navigation as stale, so
+    // switching to a tab already visited this session re-fetched its RSC
+    // payload from the network every time, even though nothing on that page
+    // could have changed except through the store the client already has.
+    // 30 minutes: long enough that a normal session never pays this cost
+    // twice, short enough that a stale session left open overnight still
+    // self-heals as soon as it revisits a route with something to re-render.
+    staleTimes: { dynamic: 1800, static: 1800 },
+  },
   env: {
     NEXT_PUBLIC_LOGO_MARK: `/${logoMark}`,
   },

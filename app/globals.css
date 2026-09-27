@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/* NOTE for the next person touching sticky-hover-on-touch here: Tailwind's
+   documented fix — `@custom-variant hover { @media (hover: hover) { &:hover
+   { @slot; } } }` right after the import above — compiles correctly when
+   run through the plain `tailwindcss` package's own compile() API (verified
+   directly, live, 2026-09-28: it produces exactly the wrapped media query),
+   but this project builds with `next build --turbopack`, and Turbopack's own
+   Tailwind v4 integration silently does not apply the override — every
+   `hover:*` utility class still compiles to a bare `:hover` selector, with
+   no build error or warning either. Left OUT rather than shipped
+   non-functional-but-looking-fixed. The plain hand-written `:hover` rules
+   below (not routed through Tailwind's variant compiler — this project
+   writes its own CSS for glass-control/nav-liquid-item/cir-tabs/etc.) ARE
+   each wrapped in `@media (hover: hover) and (pointer: fine)` explicitly,
+   and that part is confirmed working. Re-attempt the @custom-variant
+   approach once the project builds with webpack (@tailwindcss/postcss) or
+   Turbopack's Tailwind support matures — until then, a real app-wide fix
+   for the Tailwind-utility case means touching each `hover:` call site (the
+   codebase has on the order of 100). */
+
 /* ============================================================================
    LIFE PLUS — Luxe design system
    Crisp white · metallic gold · deep black. Light is the primary surface;
@@ -311,6 +330,11 @@
 
 html {
   direction: rtl;
+  /* The other half of the sticky-hover fix above: without this, a tap on
+     Chrome/Safari for Android/iOS still flashes the browser's own default
+     grey tap-highlight box over the element for a moment, which reads as
+     the same "stuck" feeling even once the CSS :hover itself is gated. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -461,8 +485,10 @@ body::before {
   transition: color 180ms ease;
 }
 
-.cir-tabs__t:hover {
-  color: var(--foreground);
+@media (hover: hover) and (pointer: fine) {
+  .cir-tabs__t:hover {
+    color: var(--foreground);
+  }
 }
 
 .cir-tabs__r:checked + .cir-tabs__t {
@@ -627,9 +653,11 @@ body::before {
   will-change: transform;
 }
 
-.glass-control:hover {
-  background: var(--control-glass-bg-hover);
-  border-color: var(--control-glass-rim-hover);
+@media (hover: hover) and (pointer: fine) {
+  .glass-control:hover {
+    background: var(--control-glass-bg-hover);
+    border-color: var(--control-glass-rim-hover);
+  }
 }
 
 .glass-control:active {
@@ -646,11 +674,13 @@ body::before {
     border-color 180ms ease,
     backdrop-filter 180ms ease;
 }
-.glass-control-hover:hover {
-  background: var(--control-glass-bg);
-  border-color: var(--control-glass-rim);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  backdrop-filter: blur(14px) saturate(1.4);
+@media (hover: hover) and (pointer: fine) {
+  .glass-control-hover:hover {
+    background: var(--control-glass-bg);
+    border-color: var(--control-glass-rim);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
+  }
 }
 
 /* The selected state of a tab toggle or an active nav item — same material,
@@ -748,6 +778,24 @@ body::before {
   background: linear-gradient(180deg, var(--nav-rail-sheen) 0%, transparent 28%);
 }
 
+/* The mobile tab bar specifically (the element selector, not just the
+   class, keeps this off the desktop <aside> — which is `hidden` below `sm`
+   anyway, so this would cost nothing there either way): it's `position:
+   fixed`, translates on every scroll-direction change, and sits over
+   scrolling content the whole time it's on screen, which is the one glass
+   surface in the app actually worth spending a GPU hint and a lighter blur
+   on. Sidebar and the "עוד" sheet keep the full blur — neither repaints on
+   scroll the way this does. */
+nav.nav-liquid-rail {
+  will-change: transform;
+}
+@media (max-width: 639px) {
+  nav.nav-liquid-rail {
+    -webkit-backdrop-filter: blur(10px) saturate(1.3);
+    backdrop-filter: blur(10px) saturate(1.3);
+  }
+}
+
 .nav-liquid-item {
   position: relative;
   isolation: isolate;
@@ -767,9 +815,13 @@ body::before {
   transition: opacity 220ms ease;
   pointer-events: none;
 }
-.nav-liquid-item:hover::before,
 .nav-liquid-item:focus-visible::before {
   opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .nav-liquid-item:hover::before {
+    opacity: 1;
+  }
 }
 
 .nav-liquid-active {
@@ -1122,11 +1174,31 @@ body::before {
     background-color 0.15s ease;
 }
 
-.auto-book-link:hover,
+/* Plain equivalent of `hover:bg-fill-subtle hover:text-foreground` for the
+   two "עוד" sheet ghost buttons (close, sign out) — genuinely mobile-only
+   surfaces (MoreSheet only ever renders inside MobileTabBar, sm:hidden), so
+   unlike the shared desktop/mobile controls above there's no hover-capable
+   consumer to preserve; Tailwind's own `hover:` utilities can't be gated
+   the same way here (see the note after the @import at the top of this
+   file), so this one is hand-written instead of a class swap risking
+   desktop behaviour elsewhere. */
+@media (hover: hover) and (pointer: fine) {
+  .sheet-ghost-hover:hover {
+    background: var(--fill-subtle);
+    color: var(--foreground);
+  }
+}
+
 .auto-book-link:focus-visible {
   text-decoration-color: var(--gold);
   background: var(--gold-soft);
   outline: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .auto-book-link:hover {
+    text-decoration-color: var(--gold);
+    background: var(--gold-soft);
+  }
 }
 
 /* ============================================================================

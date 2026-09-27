@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { usePathname } from "next/navigation";
+import { memo, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { clearOfflineData } from "@/lib/query/offlineStore";
 import { InstallPwaButton } from "@/components/ui/InstallPwaButton";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
+import { onIdle } from "@/lib/dom/idle";
 
 // The עוזר קולי's global trigger (components/features/voice/
 // VoiceAssistantModal.tsx, mounted once in AppShell.tsx): a plain button
@@ -252,7 +253,23 @@ export function Sidebar() {
 const PRIMARY_MOBILE_ITEMS: NavItem[] = [HOME_ITEM, NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2]];
 const OVERFLOW_MOBILE_ITEMS: NavItem[] = NAV_ITEMS.slice(3);
 
-function MobileTabBarLink({ item, active, reduceMotion }: { item: NavItem; active: boolean; reduceMotion: boolean }) {
+// Memoized: MobileTabBar re-renders on every pathname/optimistic-target
+// change, which is every tap, but only the tab whose *own* active flag
+// actually flipped needs to re-render — item/reduceMotion are stable
+// references, so the other 3-4 tabs bail out on shallow-equal props instead
+// of redoing their framer-motion variants and layout work for no reason.
+const MobileTabBarLink = memo(function MobileTabBarLink({
+  item,
+  active,
+  reduceMotion,
+  onPressStart,
+}: {
+  item: NavItem;
+  active: boolean;
+  reduceMotion: boolean;
+  /** Fires on pointerdown/touchstart — before Next's own navigation even starts — so the tab bar itself decides who lights up, not the router. */
+  onPressStart: (href: string) => void;
+}) {
   const t = useT();
   const Icon = item.icon;
   return (
@@ -260,6 +277,7 @@ function MobileTabBarLink({ item, active, reduceMotion }: { item: NavItem; activ
       href={item.href}
       aria-current={active ? "page" : undefined}
       whileTap={reduceMotion ? undefined : { scale: 0.92 }}
+      onPointerDown={() => onPressStart(item.href)}
       // min-h/min-w-11 (44px) meets the platform's own touch-target
       // guideline; the liquid pill is still sized to this exact box via
       // absolute inset-0, so it never grows past what four items plus the
@@ -286,7 +304,7 @@ function MobileTabBarLink({ item, active, reduceMotion }: { item: NavItem; activ
       <span className={cn("relative z-10 text-[0.65rem] font-medium leading-none", active ? "text-foreground" : "text-muted")}>{t(item.labelKey)}</span>
     </MotionLink>
   );
-}
+});
 
 // Settings has no place in the desktop nav list (it's an icon under the rail)
 // but on a phone it's one of the destinations people look for in "עוד".
@@ -310,7 +328,7 @@ function MoreSheet({ open, onClose, pathname }: { open: boolean; onClose: () => 
           type="button"
           onClick={onClose}
           aria-label={t("nav.close")}
-          className="focus-ring grid size-11 place-items-center rounded-full text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
+          className="focus-ring sheet-ghost-hover grid size-11 place-items-center rounded-full text-muted transition-colors"
         >
           <X size={18} aria-hidden />
         </button>
@@ -356,7 +374,7 @@ function MoreSheet({ open, onClose, pathname }: { open: boolean; onClose: () => 
         <button
           type="button"
           onClick={() => void clearOfflineData(queryClient).finally(() => signOut({ callbackUrl: "/login" }))}
-          className="focus-ring mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl text-sm text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
+          className="focus-ring sheet-ghost-hover mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl text-sm text-muted transition-colors"
         >
           <LogOut size={16} aria-hidden />
           {t("nav.signOut")}
@@ -368,14 +386,47 @@ function MoreSheet({ open, onClose, pathname }: { open: boolean; onClose: () => 
 
 export function MobileTabBar() {
   const t = useT();
+  const router = useRouter();
   const pathname = usePathname();
   const reduceMotion = Boolean(useReducedMotion());
   const [moreOpen, setMoreOpen] = useState(false);
-  const moreActive = MORE_SHEET_ITEMS.some((item) => pathname.startsWith(item.href));
+
+  // Moves the active pill the instant a finger touches a tab — pointerdown
+  // fires before Next's own navigation even starts, let alone commits —
+  // instead of waiting on usePathname() to catch up once the route
+  // transition lands. Cleared the moment the real pathname agrees (the
+  // navigation actually landed) or the person touches a different tab,
+  // whichever comes first; a ref-tracked timeout is the backstop for a tap
+  // whose navigation never lands (offline, a dropped chunk) so the bar
+  // can't get stuck pointing at a route the app never reached.
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onPressStart = (href: string) => {
+    setPendingHref(href);
+    if (pendingTimer.current) clearTimeout(pendingTimer.current);
+    pendingTimer.current = setTimeout(() => setPendingHref(null), 4000);
+  };
+  useEffect(() => {
+    setPendingHref(null);
+    return () => {
+      if (pendingTimer.current) clearTimeout(pendingTimer.current);
+    };
+  }, [pathname]);
+  const activeHref = pendingHref ?? pathname;
+
+  const moreActive = MORE_SHEET_ITEMS.some((item) => activeHref.startsWith(item.href));
   // Hides while reading (scrolling down), returns on the first scroll up, and
   // is always shown on a newly opened page, at the top and at the bottom
   // (lib/ui/scrollDirection.ts). Never while the sheet it opens is up.
   const hidden = useScrollDirection(pathname) === "down" && !moreOpen;
+
+  // Every destination reachable from a phone, not just the four visible
+  // tabs — Next already prefetches those on its own since they're <Link>s
+  // sitting in the viewport. The six behind "עוד" are inside a closed
+  // sheet, never in the DOM until opened, so Next never sees them to
+  // prefetch. Warmed once at idle so opening the sheet and tapping into it
+  // costs no route-chunk or RSC round trip either.
+  useEffect(() => onIdle(() => [...PRIMARY_MOBILE_ITEMS, ...MORE_SHEET_ITEMS].forEach((item) => router.prefetch(item.href))), [router]);
 
   return (
     <>
@@ -395,8 +446,8 @@ export function MobileTabBar() {
         )}
       >
         {PRIMARY_MOBILE_ITEMS.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          return <MobileTabBarLink key={item.href} item={item} active={active} reduceMotion={reduceMotion} />;
+          const active = item.href === "/" ? activeHref === "/" : activeHref.startsWith(item.href);
+          return <MobileTabBarLink key={item.href} item={item} active={active} reduceMotion={reduceMotion} onPressStart={onPressStart} />;
         })}
         <button
           type="button"
