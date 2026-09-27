@@ -4,19 +4,21 @@ import { notificationPreferencesRepo } from "@/lib/db/notificationPreferences";
 import { personalDnaRepo } from "@/lib/db/personalDna";
 import { getUserById } from "@/lib/db/users";
 import { sendEmail } from "@/lib/notify/channels/email";
+import { sendPush } from "@/lib/notify/channels/webpush";
 import { canSendNow, isUnderDailyCap } from "@/lib/proactive/schedule";
 import { localHourIn, resolveUserTimezone, startOfLocalDay } from "@/lib/proactive/timezone";
-import type { Job, NotificationAction } from "@/lib/proactive/types";
+import type { Job, NotificationAction, NotificationChannel } from "@/lib/proactive/types";
 
-/** Give up on a notification after this many failed sends. */
+/** Give up on a channel after this many failed sends. */
 const MAX_ATTEMPTS = 3;
 
 interface DeliveryRecord {
+  status?: "sent" | "pending" | "failed";
   attempts?: number;
 }
 
 /**
- * Delivers queued notifications over their outbound channels.
+ * Delivers queued notifications over their outbound channels (email, push).
  *
  * This is the half of notification delivery that `notify()` deliberately does
  * not do. Splitting them is what finally makes three things work that were
@@ -28,6 +30,14 @@ interface DeliveryRecord {
  *    `countSentSince` reads `sent_at`, which nothing ever stamped.
  *  - **Retry.** A send that failed inside the producing job was simply lost,
  *    and that job's idempotency key then prevented it ever being retried.
+ *
+ * Each due row is fanned out over every channel it was queued for that the
+ * user still has enabled — a row queued when both email and push were on
+ * gets both attempted every pass. The row is stamped `sent` (and drops out of
+ * future passes) the moment ANY channel gets it out; a channel that failed in
+ * the same pass simply doesn't get retried afterwards — the in-app copy is
+ * still live and unread regardless, and "sent" means "the person was
+ * reachably notified," not "every channel succeeded."
  *
  * Self-ledgered: it runs on every sweep, and its idempotency is `sent_at` on
  * the row rather than a per-day job_runs entry.
@@ -41,9 +51,13 @@ export const notificationDispatchJob: Job = {
     if (!userId) return { itemsProduced: 0 };
 
     const prefs = await notificationPreferencesRepo.get(userId);
-    if (!prefs.channelEmail) {
+    const wantedChannels: NotificationChannel[] = [
+      ...(prefs.channelEmail ? (["email"] as const) : []),
+      ...(prefs.channelPush ? (["push"] as const) : []),
+    ];
+    if (wantedChannels.length === 0) {
       // In-app notifications still exist; there is simply nothing to send.
-      return { itemsProduced: 0, detail: { skipped: "email_disabled" } };
+      return { itemsProduced: 0, detail: { skipped: "no_outbound_channel" } };
     }
 
     const dna = await personalDnaRepo.get(userId).catch(() => null);
@@ -55,11 +69,12 @@ export const notificationDispatchJob: Job = {
       return { itemsProduced: 0, detail: { skipped: "quiet_hours" } };
     }
 
-    const due = await notificationsRepo.listDueOutbound(userId, now);
+    const due = await notificationsRepo.listDueOutbound(userId, now, wantedChannels);
     if (due.length === 0) return { itemsProduced: 0 };
 
-    const user = await getUserById(userId);
-    if (!user?.email) return { itemsProduced: 0, detail: { skipped: "no_email_address" } };
+    // Only email needs the user's address resolved up front; push needs
+    // nothing beyond the subscriptions sendPush already reads for itself.
+    const user = wantedChannels.includes("email") ? await getUserById(userId) : null;
 
     let sentToday = await notificationsRepo.countSentSince(
       userId,
@@ -79,48 +94,71 @@ export const notificationDispatchJob: Job = {
         break;
       }
 
-      const result = await sendEmail({
-        userId,
-        toEmail: user.email,
-        kind: row.kind,
-        title: row.title,
-        body: row.body,
-        reason: row.reason ?? undefined,
-        action: row.action as NotificationAction | null,
-      });
+      const rowChannels = (row.channels ?? []) as NotificationChannel[];
+      const delivery = (row.delivery as Record<string, DeliveryRecord> | null) ?? {};
+      let deliveredAny = false;
+      let attemptedAny = false;
 
-      if (result.ok) {
-        if (result.skipped) {
-          // Email isn't configured on this deployment. Nothing was sent, so
-          // nothing is recorded as sent — stamping sent_at here would mean
-          // that the day someone adds RESEND_API_KEY, every notification
-          // produced before then is permanently marked delivered. The
-          // staleness floor in listDueOutbound is what stops the backlog
-          // going out in one burst instead.
-          skipped++;
+      for (const channel of wantedChannels) {
+        if (!rowChannels.includes(channel)) continue;
+        const previous = delivery[channel];
+        if (previous?.status === "failed" || previous?.status === "sent") continue;
+
+        attemptedAny = true;
+
+        const result =
+          channel === "email"
+            ? user?.email
+              ? await sendEmail({
+                  userId,
+                  toEmail: user.email,
+                  kind: row.kind,
+                  title: row.title,
+                  body: row.body,
+                  reason: row.reason ?? undefined,
+                  action: row.action as NotificationAction | null,
+                })
+              : ({ ok: true, skipped: true } as const)
+            : await sendPush({
+                userId,
+                kind: row.kind,
+                title: row.title,
+                body: row.body,
+                action: row.action as NotificationAction | null,
+              });
+
+        if (result.ok) {
+          if (result.skipped) {
+            // This channel isn't usable (no email configured on this
+            // deployment, no address on file, or no push subscription) —
+            // nothing was sent, so nothing is recorded as sent for it.
+            skipped++;
+            continue;
+          }
+          await notificationsRepo.recordDelivery(userId, row.id, channel, { status: "sent" });
+          deliveredAny = true;
           continue;
         }
-        await notificationsRepo.recordDelivery(userId, row.id, "email", { status: "sent" });
-        // Stamps sent_at, which is both the "already delivered" guard for the
-        // next sweep and the input to the daily cap.
+
+        const attempts = (previous?.attempts ?? 0) + 1;
+        // `delivery.<channel>.status === "failed"` is what listDueOutbound
+        // excludes on the next pass for this specific channel.
+        await notificationsRepo.recordDelivery(userId, row.id, channel, {
+          status: attempts >= MAX_ATTEMPTS ? "failed" : "pending",
+          error: result.error,
+          attempts,
+        });
+      }
+
+      if (deliveredAny) {
+        // Stamps sent_at, which is both the "already delivered" guard for
+        // the next sweep and the input to the daily cap.
         await notificationsRepo.markStatus(userId, row.id, "sent");
         sentToday++;
         sent++;
-        continue;
+      } else if (attemptedAny) {
+        failed++;
       }
-
-      const previous = (row.delivery as Record<string, DeliveryRecord> | null)?.email;
-      const attempts = (previous?.attempts ?? 0) + 1;
-      // The row's own status stays `pending`: the in-app notification is
-      // still valid and unread even when email is failing, and marking it
-      // "sent" to get it out of the queue would be a lie the user can see.
-      // `delivery.email.status === "failed"` is what listDueOutbound excludes.
-      await notificationsRepo.recordDelivery(userId, row.id, "email", {
-        status: attempts >= MAX_ATTEMPTS ? "failed" : "pending",
-        error: result.error,
-        attempts,
-      });
-      failed++;
     }
 
     return {

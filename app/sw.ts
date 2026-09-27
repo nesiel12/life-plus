@@ -40,3 +40,58 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+// Web Push — Daily Backbone alerts (routine-block reminders) reaching the OS
+// notification tray, including when the app is closed. Serwist owns install/
+// activate/fetch above; these two events are outside its scope, so they're
+// registered directly, the same way the old standalone public/sw.js did.
+interface PushPayload {
+  title?: string;
+  body?: string;
+  kind?: string;
+  url?: string;
+}
+
+self.addEventListener("push", (event: PushEvent) => {
+  let data: PushPayload = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: "Life Plus", body: event.data ? event.data.text() : "" };
+  }
+
+  const title = data.title || "Life Plus";
+  // `renotify` is standard (MDN, all evergreen browsers) but missing from
+  // lib.webworker.d.ts's NotificationOptions as of this TS version.
+  const options = {
+    body: data.body || "",
+    icon: "/icon.png",
+    badge: "/icon.png",
+    dir: "rtl",
+    lang: "he",
+    tag: data.kind || "life-plus",
+    renotify: true,
+    data: { url: data.url || "/" },
+  } as NotificationOptions;
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event: NotificationEvent) => {
+  event.notification.close();
+  const target = (event.notification.data as { url?: string } | undefined)?.url || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        // Focus an already-open tab and route it, rather than opening another.
+        if ("focus" in client) {
+          client.focus();
+          if ("navigate" in client) (client as WindowClient).navigate(target).catch(() => {});
+          return;
+        }
+      }
+      return self.clients.openWindow(target);
+    })
+  );
+});

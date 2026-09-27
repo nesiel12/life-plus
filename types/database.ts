@@ -1567,6 +1567,37 @@ export interface Database {
         }
       >;
 
+      // Web Push (VAPID) subscriptions. See
+      // supabase/migrations/20260909300000_push_subscriptions.sql.
+      push_subscriptions: TableDef<
+        {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent: string | null;
+          created_at: string;
+          last_used_at: string | null;
+        },
+        {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent?: string | null;
+          last_used_at?: string | null;
+        },
+        {
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          user_agent?: string | null;
+          last_used_at?: string | null;
+        }
+      >;
+
       // Sprint 3 — Google Photos. See supabase/migrations/20260903000000_photo_memories.sql.
       photo_memories: TableDef<
         {

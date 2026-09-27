@@ -7,6 +7,7 @@ import { InstallPwaButton } from "@/components/ui/InstallPwaButton";
 import { useInstallState } from "@/lib/pwa/installPrompt";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { EmailDiagnostics } from "@/components/features/settings/EmailDiagnostics";
+import { PushToggle } from "@/components/features/settings/PushToggle";
 import { GoogleConnections } from "@/components/features/settings/GoogleConnections";
 import { usePreferences, type AppLanguage } from "@/components/providers/PreferencesProvider";
 import { useTheme, type ThemePreference } from "@/components/providers/ThemeProvider";
@@ -91,6 +92,7 @@ export default function SettingsPage() {
     setSettings({
       ...settings,
       ...(patch.channelEmail !== undefined ? { channelEmail: patch.channelEmail } : {}),
+      ...(patch.channelPush !== undefined ? { channelPush: patch.channelPush } : {}),
       ...(patch.quietHoursStart !== undefined ? { quietHoursStart: patch.quietHoursStart } : {}),
       ...(patch.quietHoursEnd !== undefined ? { quietHoursEnd: patch.quietHoursEnd } : {}),
       ...(patch.maxPerDay !== undefined ? { maxPerDay: patch.maxPerDay } : {}),
@@ -247,6 +249,8 @@ export default function SettingsPage() {
               />
             </label>
           </GlassCard>
+
+          <PushToggle enabled={settings.channelPush} onChangePref={(enabled) => save({ channelPush: enabled })} />
 
           <EmailDiagnostics />
 

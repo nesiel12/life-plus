@@ -60,14 +60,18 @@ export const notificationsRepo = {
 
   /**
    * The dispatcher's work queue: this user's notifications that are due, not
-   * yet sent, and want an outbound channel.
+   * yet sent, and want at least one of `channels` (email and/or push — the
+   * two outbound transports; `in_app`/`whatsapp` are not handled here).
    *
    * `sent_at IS NULL` rather than only `status = 'pending'` because a failed
    * send leaves the row pending for retry — the timestamp is what actually
    * records "this one already went out".
    */
-  async listDueOutbound(userId: string, now: Date, limit = 20) {
-    const { data, error } = await getSupabaseClient()
+  async listDueOutbound(userId: string, now: Date, channels: NotificationChannel[] = ["email"], limit = 20) {
+    const wanted = channels.filter((c) => c === "email" || c === "push");
+    if (wanted.length === 0) return [];
+
+    const query = getSupabaseClient()
       .from("notifications")
       .select("*")
       .eq("user_id", userId)
@@ -79,16 +83,18 @@ export const notificationsRepo = {
       // `pending` forever — so without this floor, the first dispatcher run
       // on any existing deployment would email the entire backlog at once,
       // starting with a daily insight from weeks ago. The in-app copy stays
-      // in the centre either way; only the email is skipped.
+      // in the centre either way; only the outbound send is skipped.
       .gte("scheduled_for", new Date(now.getTime() - STALE_OUTBOUND_MS).toISOString())
-      .contains("channels", ["email"])
-      // Rows whose email attempts are exhausted drop out of the queue without
-      // being dishonestly stamped as sent. The in-app notification is still
-      // live and unread; only the email gave up.
-      .or("delivery->email->>status.is.null,delivery->email->>status.neq.failed")
-      .order("scheduled_for", { ascending: true })
-      .limit(limit);
+      .overlaps("channels", wanted)
+      // Keep a row while at least one wanted channel is still viable (never
+      // attempted, or attempted but not permanently failed). A row whose
+      // every outbound channel has exhausted its retries drops out of the
+      // queue without being dishonestly stamped as sent — the in-app copy is
+      // still live and unread. The staleness floor above bounds the rare
+      // case where one dead channel keeps a row visible.
+      .or(wanted.flatMap((c) => [`delivery->${c}->>status.is.null`, `delivery->${c}->>status.neq.failed`]).join(","));
 
+    const { data, error } = await query.order("scheduled_for", { ascending: true }).limit(limit);
     if (error) throw error;
     return data ?? [];
   },

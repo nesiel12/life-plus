@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Heebo } from "next/font/google";
 import { MotionConfig } from "framer-motion";
 import "./globals.css";
@@ -37,6 +37,17 @@ export const metadata: Metadata = {
   verification: {
     google: "hu1yXiRy9cLRr1E5zCh83reeAov7fV3FLBnU7mCStGY",
   },
+};
+
+// Tints the browser chrome / iOS status bar to match the app rather than
+// showing the OS default. Tracks the two base theme tokens (globals.css);
+// the further skins under ActiveSkinProvider don't get their own entry here
+// since this only has light/dark to key off, not skin identity.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8f7f4" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0b0d" },
+  ],
 };
 
 export default function RootLayout({
