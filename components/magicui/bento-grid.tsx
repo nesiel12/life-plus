@@ -34,7 +34,7 @@ const CELL_VARIANTS: Variants = {
 // grey box), a soft diffuse lift, and generous internal padding.
 const CARD_SURFACE = cn(
   "group/card relative flex h-full flex-col overflow-hidden rounded-2xl",
-  "border border-hairline-card bg-surface p-6 sm:p-7",
+  "border border-hairline-card bg-surface p-3 sm:p-6 lg:p-7",
   "shadow-[0_1px_2px_rgba(16,16,20,0.03),0_18px_44px_-28px_rgba(16,16,20,0.22)]"
 );
 

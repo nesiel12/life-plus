@@ -60,8 +60,14 @@ export function MasonryGrid({ children, className }: { children: ReactNode; clas
         data-masonry={active ? "on" : "off"}
         style={active ? { gridAutoRows: `${MASONRY_ROW_UNIT}px` } : undefined}
         className={cn(
-          "grid w-full grid-cols-1 items-start gap-x-5 sm:grid-cols-2 sm:gap-x-6 lg:grid-cols-3 lg:gap-x-7",
-          active ? "grid-flow-row-dense" : "gap-y-5 sm:gap-y-6 lg:gap-y-7",
+          // 2 columns from the base breakpoint up (not 1): on a phone, a
+          // column of full-width span-1 cards was a long scroll of small
+          // widgets that a 2-up grid fits two per row — the span system
+          // (WidgetFrame.tsx's SPAN_CLASS) already exists to mark the
+          // genuinely-wide ones (command-bar, ai-briefing, memories, goals),
+          // so this only changes how the narrow ones pack, not which ones are wide.
+          "grid w-full grid-cols-2 items-start gap-x-2.5 sm:gap-x-6 lg:grid-cols-3 lg:gap-x-7",
+          active ? "grid-flow-row-dense" : "gap-y-2.5 sm:gap-y-6 lg:gap-y-7",
           className
         )}
       >
@@ -133,6 +139,6 @@ export function useMasonryItem() {
     ref,
     active,
     style: active ? { gridRowEnd: `span ${span}` } : undefined,
-    className: active ? "pb-5 sm:pb-6 lg:pb-7" : "",
+    className: active ? "pb-2.5 sm:pb-6 lg:pb-7" : "",
   };
 }

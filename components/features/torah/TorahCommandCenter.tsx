@@ -524,8 +524,13 @@ export function TorahCommandCenter({ defaultScope = "all", className }: TorahCom
               className="peer w-full bg-transparent text-[0.95rem] text-foreground outline-none"
             />
             {!query && (
-              <span className="pointer-events-none absolute inset-y-0 start-0 flex items-center gap-1 truncate text-[0.95rem] text-muted">
-                חפש ספר, רב או נושא — למשל:
+              // `end-0`, not just `start-0`: with only one side pinned this
+              // absolutely positioned span had no bounded width, so on a
+              // narrow phone the rotating example text ran straight past the
+              // card's own rounded edge instead of wrapping or clipping —
+              // live-reported as text spilling outside the search bar.
+              <span className="pointer-events-none absolute inset-y-0 start-0 end-0 flex items-center gap-1 overflow-hidden text-[0.95rem] text-muted">
+                <span className="shrink-0 whitespace-nowrap">חפש ספר, רב או נושא — למשל:</span>
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span
                     key={EXAMPLES[exampleIndex]}
@@ -533,7 +538,7 @@ export function TorahCommandCenter({ defaultScope = "all", className }: TorahCom
                     animate={{ opacity: 1, y: 0 }}
                     exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
                     transition={{ duration: 0.22 }}
-                    className="font-medium text-gold-ink"
+                    className="min-w-0 truncate font-medium text-gold-ink"
                   >
                     {EXAMPLES[exampleIndex]}
                   </motion.span>

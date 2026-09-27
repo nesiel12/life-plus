@@ -181,7 +181,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.42, ease: "easeOut" }}
-            className="mt-8 flex flex-wrap items-center gap-2.5"
+            className="mt-5 flex flex-wrap items-center gap-1.5 sm:mt-8 sm:gap-2.5"
           >
             {session?.user?.image && (
               <Image
@@ -193,8 +193,12 @@ export default function Home() {
                 aria-hidden
               />
             )}
+            {/* The life-stage pill is a nice-to-have, not information the
+                widgets below depend on — on a phone it's the one badge worth
+                dropping first to give the actual dashboard more room above
+                the fold. */}
             {user.lifeStage && (
-              <span className="inline-flex items-center rounded-full border border-hairline-card bg-surface/70 px-3 py-1.5 text-xs text-muted">
+              <span className="hidden items-center rounded-full border border-hairline-card bg-surface/70 px-3 py-1.5 text-xs text-muted sm:inline-flex">
                 {user.lifeStage}
               </span>
             )}

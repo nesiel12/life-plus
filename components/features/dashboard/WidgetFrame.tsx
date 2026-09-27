@@ -23,8 +23,11 @@ interface WidgetFrameProps {
 
 const SPAN_CLASS: Record<WidgetSpan, string> = {
   1: "",
-  2: "sm:col-span-2",
-  3: "sm:col-span-2 lg:col-span-3",
+  // Mobile is 2 columns now too (MasonryGrid.tsx), the same count as sm:, so
+  // a span-2 widget is just col-span-2 everywhere below lg — no separate
+  // sm: variant needed since the column count doesn't change until then.
+  2: "col-span-2",
+  3: "col-span-2 lg:col-span-3",
 };
 
 // Edit-mode chrome around one dashboard widget.

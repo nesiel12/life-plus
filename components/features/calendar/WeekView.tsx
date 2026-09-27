@@ -155,7 +155,9 @@ export function WeekView({ anchor }: WeekViewProps) {
               <div key={dateKey(day)} className="flex min-w-0 flex-1 flex-col gap-1 px-1">
                 {(allDay.get(dateKey(day)) ?? []).map((event) => (
                   <span
-                    key={event.id}
+                    // calendarId, not just id: the same Google event id can
+                    // appear once per subscribed calendar it's visible on.
+                    key={`${event.calendarId}-${event.id}`}
                     title={event.title}
                     className="group flex items-center gap-0.5 rounded bg-gold-soft px-1.5 py-0.5 text-[0.65rem] text-gold-ink"
                   >
@@ -206,7 +208,9 @@ export function WeekView({ anchor }: WeekViewProps) {
 
                 {placed.map(({ event, top, height, column, columns }) => (
                   <div
-                    key={event.id}
+                    // calendarId, not just id: the same Google event id can
+                    // appear once per subscribed calendar it's visible on.
+                    key={`${event.calendarId}-${event.id}`}
                     title={`${event.title} · ${clockTime(event.start)}`}
                     className="group absolute overflow-hidden rounded-md border border-gold-line bg-surface px-1 py-0.5 text-[0.65rem] leading-tight text-foreground shadow-sm"
                     style={{

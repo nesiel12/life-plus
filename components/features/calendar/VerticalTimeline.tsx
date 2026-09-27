@@ -449,7 +449,9 @@ export function VerticalTimeline({
         {/* Events float above the banding, inset past the hour gutter. */}
         {positioned.map(({ event, topRem, heightRem }, i) => (
           <EventBlock
-            key={event.id}
+            // calendarId, not just id: the same Google event id can appear
+            // once per subscribed calendar it's visible on.
+            key={`${event.calendarId}-${event.id}`}
             event={event}
             topRem={topRem}
             heightRem={heightRem}

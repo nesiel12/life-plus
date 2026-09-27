@@ -270,7 +270,10 @@ export function DayView({ anchor, chronotype, editMode = false }: DayViewProps) 
           <span className="text-xs text-muted">כל היום</span>
           {allDay.map((event) => (
             <span
-              key={event.id}
+              // calendarId, not just id: the same Google event id can appear
+              // once per subscribed calendar it's visible on — id alone
+              // collided (live-reported "two children with the same key").
+              key={`${event.calendarId}-${event.id}`}
               className="group flex items-center gap-1 rounded-lg bg-gold-soft px-2 py-1 text-xs text-gold-ink"
             >
               {event.title}

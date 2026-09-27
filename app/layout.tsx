@@ -50,7 +50,7 @@ export default function RootLayout({
         {/* Sets <html data-theme> before first paint — no flash of wrong theme. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className={`${heebo.variable} antialiased`}>
+      <body className={`${heebo.variable} antialiased overflow-x-hidden`}>
         {/* Offline shell: registers /serwist/sw.js (production only — a dev
             service worker would serve stale Turbopack chunks). reloadOnOnline
             is off so regaining signal never throws away a lesson mid-read. */}
