@@ -860,17 +860,22 @@ export function RetroGrid({
       {...props}
     >
       <style>{FALLBACK_STYLES}</style>
+      {/* The no-WebGL fallback plane: 6× the container's width, centred on it.
+          Physical left/right insets, not the upstream `w-[600vw] ml-[-200%]`
+          with `left: 0; right: 0`: that box is over-constrained, and in an
+          RTL document the browser drops `left` and anchors it on the right,
+          so the whole plane hung ~5 screen-widths off the left edge. */}
       {!isWebGlReady ? (
         <div className="absolute inset-0" style={fallbackProjectionStyles}>
           <div className="absolute inset-0" style={fallbackRotationStyles}>
             <div
               data-retro-grid-scroll="true"
-              className="absolute inset-[0%_0px] ml-[-200%] h-[300vh] w-[600vw] origin-[100%_0_0] dark:hidden"
+              className="absolute -left-[250%] -right-[250%] top-0 h-[300vh] origin-[100%_0_0] dark:hidden"
               style={lightFallbackGridStyles}
             />
             <div
               data-retro-grid-scroll="true"
-              className="absolute inset-[0%_0px] ml-[-200%] hidden h-[300vh] w-[600vw] origin-[100%_0_0] dark:block"
+              className="absolute -left-[250%] -right-[250%] top-0 hidden h-[300vh] origin-[100%_0_0] dark:block"
               style={darkFallbackGridStyles}
             />
           </div>

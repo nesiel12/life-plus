@@ -182,7 +182,7 @@ export function NotificationCenter() {
         origin={origin}
         label="מרכז ההתראות"
         backdropClassName="bg-black/35 backdrop-blur-[3px]"
-        panelClassName="flex max-h-[min(80vh,600px)] w-[min(28rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl"
+        panelClassName="flex max-h-[min(80vh,600px)] w-[min(28rem,calc(100%-2rem))] flex-col overflow-hidden rounded-3xl"
       >
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-glass-border px-5 py-3.5">
           <p className="text-base font-semibold text-foreground">התראות</p>

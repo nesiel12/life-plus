@@ -45,12 +45,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="he" dir="rtl" suppressHydrationWarning>
+    // overflow-x-clip, not -hidden, on html/body and the shell: `hidden`
+    // turns an element into a scroll container, and with it on body the
+    // desktop Sidebar's `position: sticky` would stick to body (which never
+    // scrolls) instead of the viewport. `clip` cuts horizontal overflow
+    // without creating one.
+    <html lang="he" dir="rtl" className="max-w-full overflow-x-clip" suppressHydrationWarning>
       <head>
         {/* Sets <html data-theme> before first paint — no flash of wrong theme. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className={`${heebo.variable} antialiased overflow-x-hidden`}>
+      <body className={`${heebo.variable} antialiased max-w-full overflow-x-clip`}>
         {/* Offline shell: registers /serwist/sw.js (production only — a dev
             service worker would serve stale Turbopack chunks). reloadOnOnline
             is off so regaining signal never throws away a lesson mid-read. */}

@@ -131,7 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (offlineSnapshot && hydrated) {
         const savedAt = queryClient.getQueryData<OfflineBootstrapSnapshot>(offlineBootstrapQueryKey)?.savedAt;
         return (
-          <div className="flex min-h-screen">
+          <div className="flex min-h-screen max-w-full overflow-x-clip">
             <div className="contents print:hidden">
               <Sidebar />
               <MobileTabBar />
@@ -199,7 +199,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
 
     return (
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen max-w-full overflow-x-clip">
         {/* The app chrome is screen furniture: printing a page (הדפסה לשבת)
             must put the page's own content on the paper and nothing else.
             `contents` keeps the flex layout identical on screen; `print:hidden`

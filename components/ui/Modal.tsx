@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion, type PanInfo, type Variants } from "framer-motion";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { macBackdropVariants, macLaunchVariants } from "@/lib/motion/macLaunch";
@@ -43,6 +43,32 @@ interface ModalProps {
   origin?: string;
   /** Accessible name for the dialog. */
   label?: string;
+  /**
+   * A native-style bottom sheet instead of a launched window: pinned to the
+   * bottom edge, slides up rather than scaling in, and can be swiped down to
+   * dismiss. Everything else — portal, focus trap, Escape, focus return — is
+   * the same dialog.
+   */
+  sheet?: boolean;
+}
+
+/** Swipe-down past either of these dismisses a sheet; anything less springs back. */
+const SHEET_DISMISS_OFFSET_PX = 90;
+const SHEET_DISMISS_VELOCITY = 550;
+
+function sheetVariants(reducedMotion: boolean): Variants {
+  if (reducedMotion) {
+    return {
+      hidden: { opacity: 0 },
+      visible: { opacity: 1, transition: { duration: 0.15 } },
+      exit: { opacity: 0, transition: { duration: 0.12 } },
+    };
+  }
+  return {
+    hidden: { y: "100%" },
+    visible: { y: 0, transition: { type: "spring", visualDuration: 0.32, bounce: 0.08 } },
+    exit: { y: "100%", transition: { duration: 0.2, ease: [0.4, 0, 1, 1] } },
+  };
 }
 
 export function Modal({
@@ -58,9 +84,10 @@ export function Modal({
   align = "top",
   origin,
   label,
+  sheet = false,
 }: ModalProps) {
   const reduceMotion = Boolean(useReducedMotion());
-  const panelVariants = macLaunchVariants(reduceMotion);
+  const panelVariants = sheet ? sheetVariants(reduceMotion) : macLaunchVariants(reduceMotion);
 
   // Portalled to <body>. A `position: fixed` element is only fixed to the
   // viewport when no ancestor has a transform, filter or backdrop-filter —
@@ -166,7 +193,7 @@ export function Modal({
           exit="exit"
           className={cn(
             "fixed inset-0 flex justify-center bg-black/50 backdrop-blur-sm",
-            align === "center" ? "items-center p-4 sm:p-6" : "items-start px-6 pt-32",
+            sheet ? "items-end p-0" : align === "center" ? "items-center p-4 sm:p-6" : "items-start px-6 pt-32",
             zIndex,
             backdropClassName
           )}
@@ -183,8 +210,26 @@ export function Modal({
             animate="visible"
             exit="exit"
             style={{ transformOrigin: origin }}
-            className={cn("focus-ring glass-panel glass-glow w-full rounded-2xl will-change-transform", panelClassName)}
+            className={cn(
+              "focus-ring glass-panel glass-glow w-full rounded-2xl will-change-transform",
+              sheet && "rounded-b-none rounded-t-3xl pb-[max(1rem,env(safe-area-inset-bottom))]",
+              panelClassName
+            )}
             onClick={(e) => e.stopPropagation()}
+            // A sheet follows the finger down (never up — it's already fully
+            // open) and dismisses past a distance or a flick; anything less
+            // springs back. Taps on links/buttons inside still register:
+            // framer only starts a drag after a few px of movement.
+            {...(sheet && !reduceMotion
+              ? {
+                  drag: "y" as const,
+                  dragConstraints: { top: 0, bottom: 0 },
+                  dragElastic: { top: 0, bottom: 0.6 },
+                  onDragEnd: (_: unknown, info: PanInfo) => {
+                    if (info.offset.y > SHEET_DISMISS_OFFSET_PX || info.velocity.y > SHEET_DISMISS_VELOCITY) onClose?.();
+                  },
+                }
+              : {})}
           >
             {children}
           </motion.div>

@@ -2,12 +2,14 @@
 
 import { Fragment, useId } from "react";
 import { CALENDAR_RANGES, RANGE_LABELS, type CalendarRange } from "@/lib/calendar/ranges";
+import { cn } from "@/lib/utils";
 
 interface RangeTabsProps {
   value: CalendarRange;
   onChange: (range: CalendarRange) => void;
   /** Names the control for screen readers. */
   label?: string;
+  className?: string;
 }
 
 // The cir-tabs range selector — Day / Week / Month / Year.
@@ -39,13 +41,13 @@ interface RangeTabsProps {
 // The active index is published as a custom property rather than derived in
 // CSS with :has(), so the sliding indicator needs no selector support and
 // stays exactly in step with the React state that actually owns the value.
-export function RangeTabs({ value, onChange, label = "טווח תצוגה" }: RangeTabsProps) {
+export function RangeTabs({ value, onChange, label = "טווח תצוגה", className }: RangeTabsProps) {
   const groupId = useId();
   const activeIndex = CALENDAR_RANGES.indexOf(value);
 
   return (
     <div
-      className="cir-tabs"
+      className={cn("cir-tabs", className)}
       role="radiogroup"
       aria-label={label}
       style={{ "--cir-index": activeIndex } as React.CSSProperties}

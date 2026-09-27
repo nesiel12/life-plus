@@ -157,7 +157,15 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Below sm this group takes its own row and the range tabs a
+                  full-width line of their own, so all four fit with no
+                  scrolling — the edit button plus four tabs (~325px) never
+                  fit beside the date on a phone and ran off the screen's
+                  edge. The scroll wrapper is only a backstop for very
+                  narrow screens; it wraps the tabs rather than being them,
+                  because the sliding pill (.cir-tabs::before) is sized from
+                  the tabs' own width and would drift inside a scroller. */}
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                 {range === "day" && (
                   <button
                     onClick={() => setEditMode((v) => !v)}
@@ -173,7 +181,9 @@ export default function CalendarPage() {
                     {editMode ? "סיום עריכה" : "מצב עריכה"}
                   </button>
                 )}
-                <RangeTabs value={range} onChange={setRange} />
+                <div className="no-scrollbar w-full max-w-full overflow-x-auto sm:w-auto">
+                  <RangeTabs value={range} onChange={setRange} className="min-w-full" />
+                </div>
               </div>
             </div>
 

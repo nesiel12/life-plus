@@ -15,12 +15,13 @@ import {
   HeartPulse,
   History,
   Home,
+  LayoutGrid,
   LogOut,
-  MoreHorizontal,
   Mic,
   Settings,
   ShieldCheck,
   Wallet,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
@@ -35,6 +36,7 @@ import { requestVoiceAssistant } from "@/lib/voice/voiceAssistantEvent";
 import { cn } from "@/lib/utils";
 import { clearOfflineData } from "@/lib/query/offlineStore";
 import { InstallPwaButton } from "@/components/ui/InstallPwaButton";
+import { useScrollDirection } from "@/hooks/useScrollDirection";
 
 // The עוזר קולי's global trigger (components/features/voice/
 // VoiceAssistantModal.tsx, mounted once in AppShell.tsx): a plain button
@@ -286,42 +288,36 @@ function MobileTabBarLink({ item, active, reduceMotion }: { item: NavItem; activ
   );
 }
 
-/** The "עוד" tab's own bottom sheet: everything that didn't fit the primary four. */
+// Settings has no place in the desktop nav list (it's an icon under the rail)
+// but on a phone it's one of the destinations people look for in "עוד".
+const SETTINGS_ITEM: NavItem = { href: "/settings", labelKey: "nav.settings", icon: Settings, colorVar: "--muted" };
+const MORE_SHEET_ITEMS: NavItem[] = [...OVERFLOW_MOBILE_ITEMS, SETTINGS_ITEM];
+
+/** The "עוד" tab's bottom sheet: every destination that didn't fit the primary four. */
 function MoreSheet({ open, onClose, pathname }: { open: boolean; onClose: () => void; pathname: string }) {
   const t = useT();
   const { data: session } = useSession();
   const queryClient = useQueryClient();
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      label={t("nav.more")}
-      align="center"
-      backdropClassName="items-end p-0 sm:p-0"
-      panelClassName="w-full max-w-none rounded-b-none rounded-t-3xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
-      origin="bottom center"
-    >
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-medium text-foreground">{t("nav.more")}</p>
-        <button type="button" onClick={onClose} aria-label={t("nav.close")} className="focus-ring grid size-9 place-items-center rounded-full text-muted hover:text-foreground">
-          <MoreHorizontal size={18} className="rotate-90" aria-hidden />
+    <Modal open={open} onClose={onClose} label={t("nav.more")} sheet panelClassName="max-w-none px-4 pt-2">
+      {/* The grabber: the familiar "this can be swiped down" handle. */}
+      <div aria-hidden className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-hairline" />
+
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-base font-semibold text-foreground">{t("nav.more")}</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("nav.close")}
+          className="focus-ring grid size-11 place-items-center rounded-full text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
+        >
+          <X size={18} aria-hidden />
         </button>
       </div>
 
-      {/* Quick actions unreachable elsewhere on a phone, since the desktop
-          sidebar (where these normally live) isn't rendered below `sm`. */}
-      <div className="mb-3 flex items-center gap-2 border-b border-hairline-card pb-3">
-        <VoiceAssistantTrigger className="size-11" />
-        <NotificationCenter />
-        <InstallPwaButton variant="icon" />
-        <Link href="/settings" onClick={onClose} aria-label={t("nav.settings")} className="focus-ring nav-liquid-item glass-control-hover grid size-11 place-items-center rounded-full text-muted transition-colors hover:text-foreground">
-          <Settings size={18} aria-hidden />
-        </Link>
-      </div>
-
-      <nav className="grid grid-cols-3 gap-2">
-        {OVERFLOW_MOBILE_ITEMS.map((item) => {
+      <nav aria-label={t("nav.more")} className="grid grid-cols-3 gap-2.5">
+        {MORE_SHEET_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = pathname.startsWith(item.href);
           return (
@@ -329,24 +325,38 @@ function MoreSheet({ open, onClose, pathname }: { open: boolean; onClose: () => 
               key={item.href}
               href={item.href}
               onClick={onClose}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "focus-ring flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border text-xs font-medium transition-colors",
-                active ? "border-transparent text-foreground" : "border-hairline-card text-muted hover:text-foreground"
+                "focus-ring flex min-h-[5.25rem] flex-col items-center justify-center gap-2 rounded-2xl border px-1 text-center text-xs font-medium leading-tight transition-[transform,border-color] active:scale-[0.97]",
+                active ? "text-foreground" : "border-hairline-card bg-surface/60 text-foreground"
               )}
-              style={active ? { background: `color-mix(in srgb, var(${item.colorVar}) 16%, transparent)`, color: `var(${item.colorVar})` } : undefined}
+              style={active ? { borderColor: `var(${item.colorVar})`, background: `color-mix(in srgb, var(${item.colorVar}) 10%, var(--surface))` } : undefined}
             >
-              <Icon size={19} aria-hidden />
+              <span
+                className="grid size-10 place-items-center rounded-full"
+                style={{ background: `color-mix(in srgb, var(${item.colorVar}) 15%, transparent)`, color: `var(${item.colorVar})` }}
+              >
+                <Icon size={19} aria-hidden />
+              </span>
               {t(item.labelKey)}
             </Link>
           );
         })}
       </nav>
 
+      {/* Actions the desktop rail holds under the nav, which a phone never
+          renders — the voice assistant, notifications, install. */}
+      <div className="mt-4 flex items-center justify-center gap-3 border-t border-hairline-card pt-4">
+        <VoiceAssistantTrigger className="size-11" />
+        <NotificationCenter />
+        <InstallPwaButton variant="icon" />
+      </div>
+
       {session?.user && (
         <button
           type="button"
           onClick={() => void clearOfflineData(queryClient).finally(() => signOut({ callbackUrl: "/login" }))}
-          className="focus-ring mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-hairline-card text-sm text-muted transition-colors hover:text-foreground"
+          className="focus-ring mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl text-sm text-muted transition-colors hover:bg-fill-subtle hover:text-foreground"
         >
           <LogOut size={16} aria-hidden />
           {t("nav.signOut")}
@@ -361,15 +371,29 @@ export function MobileTabBar() {
   const pathname = usePathname();
   const reduceMotion = Boolean(useReducedMotion());
   const [moreOpen, setMoreOpen] = useState(false);
-  const moreActive = OVERFLOW_MOBILE_ITEMS.some((item) => pathname.startsWith(item.href));
+  const moreActive = MORE_SHEET_ITEMS.some((item) => pathname.startsWith(item.href));
+  // Hides while reading (scrolling down), returns on the first scroll up, and
+  // is always shown on a newly opened page, at the top and at the bottom
+  // (lib/ui/scrollDirection.ts). Never while the sheet it opens is up.
+  const hidden = useScrollDirection(pathname) === "down" && !moreOpen;
 
   return (
     <>
-      {/* Taller and edge-to-edge: the safe-area padding is on the bar itself
-          (not a spacer below it), so the glass background — not a gap of
-          plain page background — is what actually reaches the home
-          indicator on an iPhone or the gesture bar on Android. */}
-      <nav className="glass-panel nav-liquid-rail fixed inset-x-0 bottom-0 z-30 flex items-center gap-0.5 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 shadow-lg sm:hidden">
+      {/* Edge-to-edge: the safe-area padding is on the bar itself (not a
+          spacer below it), so the glass — not plain page background — is
+          what reaches the home indicator. `translate`, not `transform`, is
+          what Tailwind's translate-y utilities set, so nothing in the glass
+          classes' CSS can override the slide. A keyboard user tabbing into
+          it while it's tucked away brings it back — :focus-visible, not
+          focus-within: closing the "עוד" sheet returns focus to its tab
+          (correct dialog behaviour), and a plain focus rule then pinned the
+          bar on screen for good (caught live). */}
+      <nav
+        className={cn(
+          "glass-panel nav-liquid-rail fixed inset-x-0 bottom-0 z-30 flex items-center gap-0.5 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 shadow-lg transition-transform duration-300 ease-out has-[:focus-visible]:translate-y-0 motion-reduce:transition-none sm:hidden",
+          hidden && "translate-y-full"
+        )}
+      >
         {PRIMARY_MOBILE_ITEMS.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return <MobileTabBarLink key={item.href} item={item} active={active} reduceMotion={reduceMotion} />;
@@ -391,7 +415,7 @@ export function MobileTabBar() {
             />
           )}
           <span className="relative z-10 flex items-center justify-center">
-            <MoreHorizontal size={20} className={moreActive ? "text-foreground" : "text-muted"} aria-hidden />
+            <LayoutGrid size={20} className={moreActive ? "text-foreground" : "text-muted"} aria-hidden />
           </span>
           <span className={cn("relative z-10 text-[0.65rem] font-medium leading-none", moreActive ? "text-foreground" : "text-muted")}>{t("nav.more")}</span>
         </button>
@@ -404,19 +428,26 @@ export function MobileTabBar() {
 /**
  * The desktop toggle (Sidebar, above) stays completely untouched — this is a
  * second, independent control for the phone width where the sidebar isn't
- * rendered at all. Anchored to the inline-end edge at mid-height (`end-2`,
- * not `right-2`: the app is RTL, and a logical property keeps this the
- * correct physical side if that ever changes) rather than living in
- * MobileTabBar or the "עוד" sheet, so it's reachable in one tap from any
- * screen without opening anything first.
+ * rendered at all.
+ *
+ * Positioned by a plain wrapper, not by the button itself. `.glass-control`
+ * used to force `position: relative` over Tailwind's `fixed` (now fixed at
+ * the source in globals.css) — the "floating" button was really an in-flow
+ * flex item, a 36px column that squeezed the whole app to 339px on a 375px
+ * phone (the blank strip down one side) and pushed the button half off
+ * screen. The wrapper still matters: `.glass-control:active` sets its own
+ * `transform`, which would replace a `-translate-y-1/2` on the button and
+ * make it jump on every press.
+ *
+ * `end-3` is the left edge in RTL and the right edge when the English locale
+ * switches <html dir> to ltr (PreferencesProvider), so it stays on the
+ * trailing side either way.
  */
 export function MobileThemeToggle() {
   const { theme, setTheme } = useTheme();
   return (
-    <AnimatedThemeToggler
-      theme={theme}
-      onThemeChange={setTheme}
-      className="glass-control fixed end-2 top-1/2 z-40 -translate-y-1/2 rounded-full p-2.5 sm:hidden"
-    />
+    <div className="fixed end-3 top-1/2 z-40 -translate-y-1/2 sm:hidden print:hidden">
+      <AnimatedThemeToggler theme={theme} onThemeChange={setTheme} className="glass-control size-11 rounded-full text-foreground" />
+    </div>
   );
 }

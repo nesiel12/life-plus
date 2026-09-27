@@ -597,8 +597,19 @@ body::before {
    fill that label text sits on colour rather than on whatever happens to be
    behind the control, and the whole effect drops to an opaque fill under
    both @supports and prefers-reduced-transparency. */
+/* position: relative is only a default — it lives in the components layer so
+   a Tailwind position utility (fixed, absolute, sticky) on the same element
+   wins. As a plain unlayered rule it beat every utility: a `glass-control
+   fixed` element silently computed to relative and sat in the page flow
+   instead of floating (the mobile theme toggle took a 36px column beside the
+   whole app; the focus-mode close button, the theater fullscreen button and
+   the @mention popup were displaced the same way). */
+@layer components {
+  .glass-control {
+    position: relative;
+  }
+}
 .glass-control {
-  position: relative;
   isolation: isolate;
   background: var(--control-glass-bg);
   border: 1px solid var(--control-glass-rim);

@@ -25,6 +25,13 @@ const nextConfig: NextConfig = {
   // processes writing one .next directory corrupt each other's manifests and
   // both start answering 500.
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // `next dev` only (production has no badge at all). Next's "N" dev-tools
+  // badge defaulted to bottom-left — exactly where MobileTabBar's "עוד" tab
+  // is on a phone, so tapping "עוד" on the dev server hit the badge instead;
+  // and in a phone-width app every other corner covers something real too
+  // (the install banner's button and close). Off entirely: build and runtime
+  // errors still surface through Next's error overlay, which is separate.
+  devIndicators: false,
   env: {
     NEXT_PUBLIC_LOGO_MARK: `/${logoMark}`,
   },
