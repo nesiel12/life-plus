@@ -24,6 +24,7 @@ import type { StepBriefContent, StepConcept } from "@/types/learning";
 import type { LearningResource, LearningTopic } from "@/types";
 import { cn } from "@/lib/utils";
 import { useLessonPrefetchHandlers } from "@/lib/learning/lessonPrefetch";
+import { DownloadResourceButton } from "@/components/features/learning/DownloadResourceButton";
 
 // The mind map is the heaviest, least-needed-first part of the canvas: split
 // out so the step's text paints without waiting for it. retryImport: a
@@ -107,6 +108,7 @@ export const StepPreview = memo(function StepPreview({ topic, resource, index, t
             <GraduationCap size={15} aria-hidden />
             שיעור אמן מלא
           </button>
+          <DownloadResourceButton topicId={resource.topicId} stepId={resource.id} />
           {resource.url && resource.type !== "youtube" && <ResourceLauncher url={resource.url} title={resource.title} />}
         </div>
         {error && (

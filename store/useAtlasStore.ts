@@ -156,7 +156,7 @@ export interface HydratedState {
   notificationUnreadCount: number;
 }
 
-interface AtlasState extends HydratedState {
+export interface AtlasState extends HydratedState {
   hydrated: boolean;
   suggestedActions: SuggestedAction[];
   // Session-lived cache only, keyed by date string ("2026-07-26") — not

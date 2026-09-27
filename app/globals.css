@@ -1302,3 +1302,14 @@ body::before {
     animation: none !important;
   }
 }
+
+/* Horizontal chip rows (mobile category/tab strips — the Learning Lab's own
+   tab bar, resource filters): scrollable with the thumb, no visible
+   scrollbar track cluttering a strip that's already visually a set of pills. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -37,7 +37,9 @@ export function GlassCard({ children, className, delay = 0, onClick, bare = fals
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       className={cn(
-        bare ? "flex h-full w-full min-w-0 flex-col" : "glass-card rounded-2xl p-6",
+        // Tighter on a phone (native-app density) without shrinking font
+        // sizes or the grid itself — sm: and up is the original p-6.
+        bare ? "flex h-full w-full min-w-0 flex-col" : "glass-card rounded-2xl p-4 sm:p-6",
         onClick && "focus-ring cursor-pointer transition-transform hover:scale-[1.01]",
         className
       )}

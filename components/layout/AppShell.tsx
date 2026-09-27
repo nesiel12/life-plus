@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import type { ReactNode } from "react";
-import { Sidebar, MobileTabBar } from "@/components/layout/Sidebar";
+import { Sidebar, MobileTabBar, MobileThemeToggle } from "@/components/layout/Sidebar";
 import { AppWindow } from "@/components/layout/AppWindow";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { AICompanion } from "@/components/layout/AICompanion";
@@ -17,9 +17,9 @@ import { useAtlasStore } from "@/store/useAtlasStore";
 import { getInitialState } from "@/app/actions/bootstrap";
 import { setTimezoneAction } from "@/app/actions/timezone";
 import { isConfirmedSignedOut } from "@/lib/query/offlineStore";
-import { learningIndexQueryKey, type LearningIndexSnapshot } from "@/lib/query/offlineKeys";
-import { LearningIndexPersister, OfflineContent } from "@/components/layout/OfflineShell";
-import { hydrateFromLearningSnapshot } from "@/lib/learning/offlineSnapshot";
+import { offlineBootstrapQueryKey, type OfflineBootstrapSnapshot } from "@/lib/query/offlineKeys";
+import { OfflineBanner, OfflineBootstrapPersister } from "@/components/layout/OfflineShell";
+import { hydrateFromOfflineSnapshot } from "@/lib/query/offlineSnapshot";
 import { InstallPwaBanner } from "@/components/ui/InstallPwaButton";
 import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 
@@ -35,9 +35,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   // knowing to hard-refresh. Now it's a real, retryable error state.
   const [loadError, setLoadError] = useState(false);
   const [retryToken, setRetryToken] = useState(0);
-  // True while the store holds only the device's learning snapshot (an
-  // offline cold start), not a real bootstrap. Everything else in the store
-  // is still at its empty defaults, so nothing may treat it as loaded data.
+  // True while the store holds the device's offline snapshot (an offline
+  // cold start) rather than a live bootstrap — a real, if possibly stale,
+  // copy of every domain, superseded the moment a real online load succeeds.
   const [offlineSnapshot, setOfflineSnapshot] = useState(false);
   const queryClient = useQueryClient();
   const isRestoring = useIsRestoring();
@@ -84,10 +84,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [isAuthPage, status]);
 
   // Offline cold start: once the IndexedDB restore has landed, open the app
-  // on the saved learning index instead of a "no connection" dead end.
+  // on the saved bootstrap snapshot instead of a "no connection" dead end.
   useEffect(() => {
     if (!serverUnreachable || isRestoring || hydrated) return;
-    if (hydrateFromLearningSnapshot(queryClient.getQueryData<LearningIndexSnapshot>(learningIndexQueryKey))) setOfflineSnapshot(true);
+    if (hydrateFromOfflineSnapshot(queryClient.getQueryData<OfflineBootstrapSnapshot>(offlineBootstrapQueryKey))) setOfflineSnapshot(true);
   }, [serverUnreachable, isRestoring, hydrated, queryClient]);
 
   // Keep the stored timezone in step with the device.
@@ -129,14 +129,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     // ever runs for an authenticated session.
     if (status === "unauthenticated") {
       if (offlineSnapshot && hydrated) {
+        const savedAt = queryClient.getQueryData<OfflineBootstrapSnapshot>(offlineBootstrapQueryKey)?.savedAt;
         return (
           <div className="flex min-h-screen">
             <div className="contents print:hidden">
               <Sidebar />
               <MobileTabBar />
+              <MobileThemeToggle />
             </div>
-            <AppWindow className="min-w-0 flex-1 pb-20 sm:pb-0 print:pb-0">
-              <OfflineContent pathname={pathname}>{children}</OfflineContent>
+            <AppWindow className="min-w-0 flex-1 pb-24 sm:pb-0 print:pb-0">
+              <OfflineBanner savedAt={savedAt} />
+              {children}
             </AppWindow>
           </div>
         );
@@ -204,15 +207,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="contents print:hidden">
           <Sidebar />
           <MobileTabBar />
+          <MobileThemeToggle />
           <AICompanion />
           <VoiceAssistantModal />
           <QuickCapture />
           <WelcomeSlides />
           <OnboardingFlow />
           <InstallPwaBanner />
-          {!offlineSnapshot && <LearningIndexPersister />}
+          {!offlineSnapshot && <OfflineBootstrapPersister />}
         </div>
-        <AppWindow className="min-w-0 flex-1 pb-20 sm:pb-0 print:pb-0">{children}</AppWindow>
+        <AppWindow className="min-w-0 flex-1 pb-24 sm:pb-0 print:pb-0">{children}</AppWindow>
       </div>
     );
   })();

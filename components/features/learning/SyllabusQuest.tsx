@@ -15,6 +15,7 @@ import { youtubeSearchUrl } from "@/lib/learning/youtube";
 import { topicProgress, topicXp, xpForResource } from "@/lib/learning/xp";
 import { cn } from "@/lib/utils";
 import { useLessonPrefetchHandlers } from "@/lib/learning/lessonPrefetch";
+import { DownloadResourceButton } from "@/components/features/learning/DownloadResourceButton";
 import type { LearningResource, LearningTopic } from "@/types";
 
 interface SyllabusQuestProps {
@@ -152,7 +153,18 @@ export const SyllabusQuest = memo(function SyllabusQuest({ topic, resources, sel
           חצים למעלה ולמטה עוברים בין השלבים ומציגים אותם.
         </p>
       )}
-      <ol aria-label="שלבי המסלול" aria-describedby={`timeline-help-${topic.id}`} onKeyDown={onKeyDown} className="relative flex flex-col gap-3">
+      {/* Below lg, this list sits stacked above the lesson content in one
+          shared scroll (TopicCanvasModal.tsx) rather than in its own sidebar
+          column — a long syllabus would otherwise push the whole lesson
+          area out of view before it's even reached. Capped there only;
+          lg: and up is the original, uncapped, independently-scrolling
+          sidebar column, unchanged. */}
+      <ol
+        aria-label="שלבי המסלול"
+        aria-describedby={`timeline-help-${topic.id}`}
+        onKeyDown={onKeyDown}
+        className="relative flex max-h-64 flex-col gap-3 overflow-y-auto pe-0.5 lg:max-h-none lg:overflow-visible"
+      >
         <AnimatePresence initial={false}>
           {resources.map((resource, index) => (
             <QuestStep
@@ -321,6 +333,7 @@ const QuestStep = memo(function QuestStep({ resource, index, isLast, current, se
             <GraduationCap size={11} aria-hidden />
             שיעור אמן
           </button>
+          <DownloadResourceButton topicId={resource.topicId} stepId={resource.id} className="ms-auto size-8 min-h-8 min-w-8" />
           {!resource.url && resource.type === "youtube" && (
             // A generated video row is a search term, not a link — say where to look.
             <a

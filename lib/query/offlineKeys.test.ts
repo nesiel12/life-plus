@@ -20,9 +20,9 @@ describe("shouldPersistQuery", () => {
   });
 });
 
-describe("learning index", () => {
-  it("is persisted, so an offline cold start can list topics", async () => {
-    const { learningIndexQueryKey } = await import("./offlineKeys");
-    expect(shouldPersistQuery(query(learningIndexQueryKey, "success", { topics: [], resources: [], savedAt: "x" }))).toBe(true);
+describe("offline bootstrap snapshot", () => {
+  it("is persisted, so an offline cold start can open into the whole app", async () => {
+    const { offlineBootstrapQueryKey } = await import("./offlineKeys");
+    expect(shouldPersistQuery(query(offlineBootstrapQueryKey, "success", { state: {}, savedAt: "x" }))).toBe(true);
   });
 });

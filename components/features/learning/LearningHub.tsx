@@ -267,10 +267,15 @@ export function LearningHub() {
             </div>
           </motion.header>
 
+          {/* Five tabs with real Hebrew labels don't fit five equal-width
+              columns on a phone without wrapping onto a cramped second row —
+              a horizontal, thumb-scrollable strip is the native pattern for
+              exactly this, same as a filter-chip row. sm: and up keeps the
+              original flex-wrap grid; nothing about the desktop layout changes. */}
           <nav
             role="tablist"
             aria-label="מרחבי הלמידה"
-            className="mb-8 flex flex-wrap gap-1.5 rounded-2xl border border-hairline-card bg-surface/70 p-1.5"
+            className="no-scrollbar mb-8 flex touch-pan-x gap-1.5 overflow-x-auto rounded-2xl border border-hairline-card bg-surface/70 p-1.5 sm:flex-wrap sm:overflow-visible"
           >
             {TABS.map(({ key, label, icon: Icon }) => (
               <button
@@ -279,7 +284,7 @@ export function LearningHub() {
                 aria-selected={tab === key}
                 onClick={() => changeTab(key)}
                 className={cn(
-                  "focus-ring relative flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:px-4",
+                  "focus-ring relative flex min-h-11 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors sm:flex-none",
                   tab === key ? "text-background" : "text-muted hover:text-foreground"
                 )}
               >
