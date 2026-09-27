@@ -10,6 +10,7 @@ const base: NotificationPreferences = {
   channelPush: false,
   channelWhatsapp: false,
   mutedKinds: [],
+  emailMutedKinds: [],
   whatsappNumber: null,
   maxPerDay: 6,
   scheduleAlertMinutes: 15,
@@ -32,6 +33,24 @@ describe("resolveChannels", () => {
 
   it("a muted kind gets no channels at all", () => {
     expect(resolveChannels("busy_week", { ...base, mutedKinds: ["busy_week"] })).toEqual([]);
+  });
+
+  it("emailMutedKinds withholds only email, not in_app or other channels", () => {
+    expect(
+      resolveChannels("daily_insight", { ...base, emailMutedKinds: ["daily_insight"] })
+    ).toEqual(["in_app"]);
+    expect(
+      resolveChannels("daily_insight", {
+        ...base,
+        channelPush: true,
+        emailMutedKinds: ["daily_insight"],
+      })
+    ).toEqual(["in_app", "push"]);
+    // A different kind is unaffected.
+    expect(resolveChannels("suggestion", { ...base, emailMutedKinds: ["daily_insight"] })).toEqual([
+      "in_app",
+      "email",
+    ]);
   });
 });
 

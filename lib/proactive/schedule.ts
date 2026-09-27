@@ -4,7 +4,9 @@ import { isWithinQuietHours } from "@/lib/proactive/quietHours";
 /**
  * Which channels a notification of `kind` should actually go out on, given the
  * user's prefs. `in_app` is unconditional (it just queues in the centre).
- * A muted kind gets no channels at all — not even in_app.
+ * A muted kind gets no channels at all — not even in_app. `emailMutedKinds`
+ * is narrower: it only withholds email for that kind, the kind still queues
+ * in_app (and push/whatsapp, if those are on) exactly as normal.
  */
 export function resolveChannels(
   kind: NotificationKind,
@@ -12,7 +14,7 @@ export function resolveChannels(
 ): NotificationChannel[] {
   if (prefs.mutedKinds.includes(kind)) return [];
   const channels: NotificationChannel[] = ["in_app"];
-  if (prefs.channelEmail) channels.push("email");
+  if (prefs.channelEmail && !prefs.emailMutedKinds.includes(kind)) channels.push("email");
   if (prefs.channelPush) channels.push("push");
   if (prefs.channelWhatsapp && prefs.whatsappNumber) channels.push("whatsapp");
   return channels;

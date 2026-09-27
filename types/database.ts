@@ -1537,6 +1537,7 @@ export interface Database {
           channel_push: boolean;
           channel_whatsapp: boolean;
           muted_kinds: string[];
+          email_muted_kinds: string[];
           whatsapp_number: string | null;
           max_per_day: number;
           schedule_alert_minutes: number;
@@ -1550,6 +1551,7 @@ export interface Database {
           channel_push?: boolean;
           channel_whatsapp?: boolean;
           muted_kinds?: string[];
+          email_muted_kinds?: string[];
           whatsapp_number?: string | null;
           max_per_day?: number;
           schedule_alert_minutes?: number;
@@ -1561,6 +1563,7 @@ export interface Database {
           channel_push?: boolean;
           channel_whatsapp?: boolean;
           muted_kinds?: string[];
+          email_muted_kinds?: string[];
           whatsapp_number?: string | null;
           max_per_day?: number;
           schedule_alert_minutes?: number;

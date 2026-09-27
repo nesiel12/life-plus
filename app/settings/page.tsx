@@ -7,6 +7,7 @@ import { InstallPwaButton } from "@/components/ui/InstallPwaButton";
 import { useInstallState } from "@/lib/pwa/installPrompt";
 import { BackToHome } from "@/components/layout/BackToHome";
 import { EmailDiagnostics } from "@/components/features/settings/EmailDiagnostics";
+import { EmailPreferences } from "@/components/features/settings/EmailPreferences";
 import { PushToggle } from "@/components/features/settings/PushToggle";
 import { WhatsAppToggle } from "@/components/features/settings/WhatsAppToggle";
 import { WhatsAppDiagnostics } from "@/components/features/settings/WhatsAppDiagnostics";
@@ -105,6 +106,9 @@ export default function SettingsPage() {
         : {}),
       ...(patch.mutedKinds !== undefined
         ? { mutedKinds: patch.mutedKinds as NotificationSettings["mutedKinds"] }
+        : {}),
+      ...(patch.emailMutedKinds !== undefined
+        ? { emailMutedKinds: patch.emailMutedKinds as NotificationSettings["emailMutedKinds"] }
         : {}),
       ...(patch.timezone !== undefined ? { timezone: patch.timezone } : {}),
     });
@@ -253,6 +257,11 @@ export default function SettingsPage() {
               />
             </label>
           </GlassCard>
+
+          <EmailPreferences
+            emailMutedKinds={settings.emailMutedKinds}
+            onSave={(patch) => save(patch)}
+          />
 
           <PushToggle enabled={settings.channelPush} onChangePref={(enabled) => save({ channelPush: enabled })} />
 

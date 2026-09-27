@@ -16,6 +16,7 @@ import type {
   Job,
   NotificationAction,
   NotificationChannel,
+  NotificationKind,
 } from "@/lib/proactive/types";
 
 /** Give up on a channel after this many failed sends. */
@@ -132,7 +133,7 @@ export const notificationDispatchJob: Job = {
         const result = await (async () => {
           switch (channel) {
             case "email":
-              return user?.email
+              return user?.email && !prefs.emailMutedKinds.includes(row.kind as NotificationKind)
                 ? sendEmail({
                     userId,
                     toEmail: user.email,

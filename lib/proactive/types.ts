@@ -85,6 +85,10 @@ export interface NotificationPreferences {
   channelPush: boolean;
   channelWhatsapp: boolean;
   mutedKinds: NotificationKind[];
+  /** Kinds muted specifically for the email channel — still queued in-app
+   *  (and over push/whatsapp, if enabled), just not emailed. Distinct from
+   *  mutedKinds, which mutes a kind everywhere. */
+  emailMutedKinds: NotificationKind[];
   whatsappNumber: string | null;
   maxPerDay: number;
   /** Lead time for schedule-transition alerts, in minutes. 0 disables them. */

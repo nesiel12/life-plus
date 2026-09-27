@@ -29,6 +29,7 @@ export interface NotificationSettingsPatch {
   quietHoursEnd?: number;
   maxPerDay?: number;
   mutedKinds?: string[];
+  emailMutedKinds?: string[];
   timezone?: string;
   scheduleAlertMinutes?: number;
 }
@@ -91,6 +92,11 @@ export async function updateNotificationSettingsAction(
     // Drop anything that isn't a kind the app actually produces, so a stale
     // or crafted value can't accumulate in the column forever.
     prefsPatch.muted_kinds = patch.mutedKinds.filter((kind): kind is NotificationKind =>
+      NOTIFICATION_KINDS.includes(kind as NotificationKind)
+    );
+  }
+  if (patch.emailMutedKinds !== undefined) {
+    prefsPatch.email_muted_kinds = patch.emailMutedKinds.filter((kind): kind is NotificationKind =>
       NOTIFICATION_KINDS.includes(kind as NotificationKind)
     );
   }
