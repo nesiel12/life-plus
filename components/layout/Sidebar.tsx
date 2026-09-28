@@ -20,6 +20,7 @@ import {
   Mic,
   Settings,
   ShieldCheck,
+  TrendingUp,
   Wallet,
   X,
   type LucideIcon,
@@ -92,6 +93,10 @@ const NAV_ITEMS: NavItem[] = [
   // locked precisely so a bystander learns nothing from the screen.
   { href: "/areas/recovery", labelKey: "nav.recovery", icon: ShieldCheck, colorVar: "--muted" },
   { href: "/timeline", labelKey: "nav.timeline", icon: History, colorVar: "--muted" },
+  // The Momentum Dashboard (Statistics & Analytics Center) — same
+  // --accent-time teal its own heatmap uses (HeatmapGrid.tsx), so the nav
+  // entry and the screen it opens read as one thing.
+  { href: "/stats", labelKey: "nav.stats", icon: TrendingUp, colorVar: "--accent-time" },
 ];
 
 const HOME_ITEM: NavItem = { href: "/", labelKey: "nav.today", icon: Home, colorVar: "--gold" };
