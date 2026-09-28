@@ -24,16 +24,25 @@ export function toProgressView(row: Tables["lessons"]["Row"]): LessonProgressVie
   const windowsTotal = progress.windows?.length ?? 0;
   const windowsDone = Math.min(progress.nextWindow ?? 0, windowsTotal);
 
-  const phase: LessonProgressView["phase"] =
-    row.status === "ready"
-      ? "done"
-      : row.status === "transcribing"
-        ? "transcribe"
-        : row.status === "analyzing"
-          ? progress.phase === "write"
-            ? "write"
-            : "analyze"
-          : "waiting";
+  // A failed lesson keeps the progress it made — recordFailure (pipeline.ts)
+  // never clears progress.phase/windows/nextWindow, only sets lastError — so
+  // reading it here means the bar reflects how far the lesson actually got
+  // before failing, not a reset to zero. Without this, a lesson that failed
+  // on window 14 of 15 looked identical to one that never started, which is
+  // both misleading and makes a real, almost-finished failure look like
+  // nothing happened at all.
+  const activePhase =
+    row.status === "transcribing"
+      ? "transcribe"
+      : row.status === "analyzing"
+        ? progress.phase === "write"
+          ? "write"
+          : "analyze"
+        : row.status === "failed"
+          ? progress.phase
+          : undefined;
+
+  const phase: LessonProgressView["phase"] = row.status === "ready" ? "done" : (activePhase ?? "waiting");
 
   // Transcription is most of the wall-clock time, so it gets most of the bar.
   const fraction =
@@ -45,9 +54,7 @@ export function toProgressView(row: Tables["lessons"]["Row"]): LessonProgressVie
           ? 0.82
           : phase === "write"
             ? 0.93
-            : row.status === "failed"
-              ? 0
-              : 0.02;
+            : 0.02;
 
   return {
     phase,

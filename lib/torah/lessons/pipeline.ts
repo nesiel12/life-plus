@@ -3,6 +3,7 @@ import "server-only";
 import { YoutubeTranscript } from "youtube-transcript";
 import { generateStructuredData, isMediaTranscriptionConfigured, isProviderConfigured, transcribeMediaWindow } from "@/lib/ai";
 import { AiQuotaExceededError } from "@/lib/ai/service";
+import { statusOf } from "@/lib/ai/retryableError";
 import { deleteGeminiFile, getGeminiFile, uploadGeminiFile, waitForGeminiFileActive } from "@/lib/ai/geminiMedia";
 import type { AiActor } from "@/lib/ai/quota";
 import { booksRepo } from "@/lib/db/books";
@@ -354,7 +355,20 @@ async function transcribeNextWindow(row: LessonRow, progress: LessonProgress): P
     raw = await transcribeMediaWindow({ source, window: { ...window, ...windowRangeLabel(window) }, actor: actorFor(row) });
   } catch (err) {
     if (err instanceof AiQuotaExceededError) throw err;
-    const status = (err as { status?: number }).status;
+    // statusOf checks statusCode and a nested response.status too, not just
+    // .status — the AI SDK's own error shapes are inconsistent about which
+    // one carries the real HTTP status (see lib/ai/retryableError.ts). The
+    // narrower `(err as {status}).status` this used to read missed real
+    // 403s here often enough that a genuinely inaccessible (private,
+    // geo-blocked, age-restricted) video fell through to the generic
+    // "window transcription failed" message below instead of the specific,
+    // actionable one — indistinguishable from a transient blip, and retried
+    // three times for no reason before failing with no useful detail.
+    const status = statusOf(err);
+    console.error(
+      `[lessons] window ${index + 1}/${windows.length} transcription failed for ${row.id} (kind=${row.kind}, status=${status ?? "unknown"}):`,
+      err instanceof Error ? err.message : err
+    );
     if (row.kind === "youtube" && (status === 400 || status === 403 || status === 404)) {
       throw new LessonStepError("Gemini לא הצליח לגשת לסרטון. ודא שהוא ציבורי ולא מוגבל.", true);
     }
