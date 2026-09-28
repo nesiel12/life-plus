@@ -86,7 +86,7 @@ const SCHEMA_INCOMPATIBILITY_TEXT = ["invalid json schema", "response_format", "
 // advancing rather than surfacing to the user immediately.
 const SCHEMA_VALIDATION_CONTENT_TEXT = ["does not match the expected schema", "json_validate_failed", "does not validate"];
 
-function statusOf(error: unknown): number | null {
+export function statusOf(error: unknown): number | null {
   if (typeof error !== "object" || error === null) return null;
   const e = error as Record<string, unknown>;
   for (const key of ["statusCode", "status"]) {

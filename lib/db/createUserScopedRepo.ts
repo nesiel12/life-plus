@@ -24,6 +24,10 @@ type UserScopedTableName =
   | "tasks"
   | "habits"
   | "habit_logs"
+  // Momentum Dashboard (20260930000000).
+  | "task_completions"
+  | "momentum_badges"
+  | "momentum_streak_freezes"
   | "transactions"
   | "manual_events"
   | "learning_topics"

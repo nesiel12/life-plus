@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { KeyboardEvent, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,8 @@ interface GlassCardProps {
 }
 
 export function GlassCard({ children, className, delay = 0, onClick, bare = false }: GlassCardProps) {
+  const reduceMotion = useReducedMotion();
+
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (!onClick) return;
     if (e.key === "Enter" || e.key === " ") {
@@ -29,9 +31,15 @@ export function GlassCard({ children, className, delay = 0, onClick, bare = fals
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      // The global CSS motion guardrail (app/globals.css) only kills
+      // animation-duration/transition-duration — it can't reach framer's
+      // per-frame inline transform/opacity, so this card (33 call sites,
+      // one per dashboard widget) needs its own gate: no slide-and-fade
+      // entrance, just an instant appearance, for anyone who's asked for
+      // reduced motion.
+      initial={reduceMotion ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay, ease: "easeOut" }}
+      transition={reduceMotion ? { duration: 0 } : { duration: 0.5, delay, ease: "easeOut" }}
       onClick={onClick}
       onKeyDown={onClick ? handleKeyDown : undefined}
       role={onClick ? "button" : undefined}

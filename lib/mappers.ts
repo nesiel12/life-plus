@@ -33,6 +33,7 @@ import type {
   Summary,
   SummarySection,
   Task,
+  TaskPriority,
   Transaction,
   UpcomingEvent,
   UserContext,
@@ -451,8 +452,33 @@ export function toTask(row: TaskRow): Task {
     status: row.status,
     dueDate: row.due_date ?? undefined,
     isHighPriority: row.is_high_priority,
+    priority: row.priority,
+    estimatedDuration: row.estimated_duration,
+    actualDuration: row.actual_duration,
     createdAt: row.created_at,
   };
+}
+
+/**
+ * Keeps tasks.priority and tasks.is_high_priority in sync from whichever one
+ * a caller actually set — see the 20260930010000 migration's header for why
+ * both exist. Setting only `priority` (the Momentum Score, any future
+ * priority-tier UI) derives `is_high_priority` so the 30+ existing call
+ * sites that only ever read/write it (voice commands, the AI quick-log
+ * parser, scheduling heuristics) keep seeing a correct value with no edits
+ * to any of them. Setting only `isHighPriority` (those same call sites)
+ * derives `priority` so the Momentum Score reflects it too. Setting both
+ * respects both — explicit intent always wins over derivation.
+ */
+export function resolveTaskPriorityFields(patch: {
+  priority?: TaskPriority;
+  isHighPriority?: boolean;
+}): Pick<TaskUpdate, "priority" | "is_high_priority"> {
+  const { priority, isHighPriority } = patch;
+  if (priority !== undefined && isHighPriority !== undefined) return { priority, is_high_priority: isHighPriority };
+  if (priority !== undefined) return { priority, is_high_priority: priority === "P1" };
+  if (isHighPriority !== undefined) return { is_high_priority: isHighPriority, priority: isHighPriority ? "P1" : "P3" };
+  return {};
 }
 
 export function toTaskPatch(patch: Partial<Task>): TaskUpdate {
@@ -461,7 +487,9 @@ export function toTaskPatch(patch: Partial<Task>): TaskUpdate {
   if (patch.description !== undefined) row.description = patch.description || null;
   if (patch.status !== undefined) row.status = patch.status;
   if (patch.dueDate !== undefined) row.due_date = patch.dueDate || null;
-  if (patch.isHighPriority !== undefined) row.is_high_priority = patch.isHighPriority;
+  Object.assign(row, resolveTaskPriorityFields(patch));
+  if (patch.estimatedDuration !== undefined) row.estimated_duration = patch.estimatedDuration;
+  if (patch.actualDuration !== undefined) row.actual_duration = patch.actualDuration;
   return row;
 }
 

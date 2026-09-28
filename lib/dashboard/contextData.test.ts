@@ -135,6 +135,9 @@ describe("tomorrowOutlook", () => {
     status,
     dueDate,
     isHighPriority: false,
+    priority: "P3",
+    estimatedDuration: 0,
+    actualDuration: 0,
     createdAt: "2026-09-01T00:00:00Z",
   });
 

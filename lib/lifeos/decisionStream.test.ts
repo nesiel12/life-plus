@@ -6,7 +6,15 @@ import type { Goal, Person, Task } from "@/types";
 const NOW = new Date(2026, 8, 15); // 2026-09-15, local
 
 function task(overrides: Partial<Task> & Pick<Task, "id" | "title">): Task {
-  return { status: "todo", isHighPriority: false, createdAt: "2026-09-01T00:00:00Z", ...overrides };
+  return {
+    status: "todo",
+    isHighPriority: false,
+    priority: "P3",
+    estimatedDuration: 0,
+    actualDuration: 0,
+    createdAt: "2026-09-01T00:00:00Z",
+    ...overrides,
+  };
 }
 function person(overrides: Partial<Person> & Pick<Person, "id" | "name">): Person {
   return { relation: "friend", ...overrides };

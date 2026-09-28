@@ -279,6 +279,13 @@ export interface Summary {
 
 export type TaskStatus = "todo" | "in-progress" | "done";
 
+// P1 (urgent) > P2 (important) > P3 (default) — additive alongside
+// isHighPriority, not a replacement (see the 20260930010000 migration's
+// header): isHighPriority is still what voice commands, the AI quick-log
+// parser and the scheduling heuristics read and write, kept in sync with
+// priority by lib/mappers.ts.
+export type TaskPriority = "P1" | "P2" | "P3";
+
 export interface Task {
   id: string;
   title: string;
@@ -286,6 +293,9 @@ export interface Task {
   status: TaskStatus;
   dueDate?: string; // ISO datetime
   isHighPriority: boolean;
+  priority: TaskPriority;
+  estimatedDuration: number; // minutes
+  actualDuration: number; // minutes
   createdAt: string;
 }
 

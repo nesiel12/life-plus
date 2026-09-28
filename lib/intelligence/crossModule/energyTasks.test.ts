@@ -9,6 +9,9 @@ const task = (id: string, title: string, overrides: Partial<Task> = {}): Task =>
   title,
   status: "todo",
   isHighPriority: false,
+  priority: "P3",
+  estimatedDuration: 0,
+  actualDuration: 0,
   createdAt: "2026-09-01T00:00:00Z",
   ...overrides,
 });

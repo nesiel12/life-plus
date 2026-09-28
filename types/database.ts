@@ -12,6 +12,7 @@ export type MomentCategoryDb = LifeAreaKeyDb | "general";
 export type ChatRoleDb = "user" | "assistant" | "system";
 export type RecommendationStatusDb = "pending" | "accepted" | "rejected" | "modified" | "expired";
 export type TaskStatusDb = "todo" | "in-progress" | "done";
+export type TaskPriorityDb = "P1" | "P2" | "P3";
 export type TransactionTypeDb = "income" | "expense";
 export type LearningTopicStatusDb = "planning" | "active" | "completed";
 export type LearningResourceTypeDb = "youtube" | "podcast" | "article" | "equipment" | "summary";
@@ -857,6 +858,14 @@ export interface Database {
           status: TaskStatusDb;
           due_date: string | null;
           is_high_priority: boolean;
+          // Additive alongside is_high_priority (20260930010000) — see that
+          // migration's header for why the boolean stays rather than being
+          // replaced. priority is the new, richer field; is_high_priority
+          // keeps working everywhere it already does, synced by
+          // lib/mappers.ts's resolveTaskPriorityFields.
+          priority: TaskPriorityDb;
+          estimated_duration: number;
+          actual_duration: number;
           created_at: string;
           updated_at: string;
         },
@@ -868,6 +877,9 @@ export interface Database {
           status?: TaskStatusDb;
           due_date?: string | null;
           is_high_priority?: boolean;
+          priority?: TaskPriorityDb;
+          estimated_duration?: number;
+          actual_duration?: number;
         },
         {
           id?: string;
@@ -877,6 +889,9 @@ export interface Database {
           status?: TaskStatusDb;
           due_date?: string | null;
           is_high_priority?: boolean;
+          priority?: TaskPriorityDb;
+          estimated_duration?: number;
+          actual_duration?: number;
         }
       >;
       habits: TableDef<
@@ -918,6 +933,35 @@ export interface Database {
           habit_id?: string;
           completed_date?: string;
         }
+      >;
+      // Momentum Dashboard (20260930000000).
+      task_completions: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          task_id: string;
+          completed_date: string;
+          created_at: string;
+        },
+        "task_id" | "completed_date"
+      >;
+      momentum_badges: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          badge_id: string;
+          earned_at: string;
+        },
+        "badge_id"
+      >;
+      momentum_streak_freezes: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          covers_date: string;
+          consumed_at: string;
+        },
+        "covers_date"
       >;
       transactions: TableDef<
         {
