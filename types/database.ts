@@ -919,6 +919,35 @@ export interface Database {
           completed_date?: string;
         }
       >;
+      // Momentum Dashboard (20260930000000).
+      task_completions: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          task_id: string;
+          completed_date: string;
+          created_at: string;
+        },
+        "task_id" | "completed_date"
+      >;
+      momentum_badges: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          badge_id: string;
+          earned_at: string;
+        },
+        "badge_id"
+      >;
+      momentum_streak_freezes: GraphTable<
+        {
+          id: string;
+          user_id: string;
+          covers_date: string;
+          consumed_at: string;
+        },
+        "covers_date"
+      >;
       transactions: TableDef<
         {
           id: string;

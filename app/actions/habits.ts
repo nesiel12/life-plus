@@ -2,11 +2,13 @@
 
 import { getCurrentUserId } from "@/lib/currentUser";
 import { habitsRepo, habitLogsRepo } from "@/lib/db/habits";
+import { invalidateMomentumDashboard } from "@/lib/gamification/statsService";
 import { toHabit } from "@/lib/mappers";
 
 export async function addHabitAction(input: { title: string }) {
   const userId = await getCurrentUserId();
   const row = await habitsRepo.insert({ user_id: userId, title: input.title });
+  invalidateMomentumDashboard(userId);
   return toHabit(row);
 }
 
@@ -15,6 +17,7 @@ export async function addHabitAction(input: { title: string }) {
 export async function deleteHabitAction(habitId: string) {
   const userId = await getCurrentUserId();
   await habitsRepo.remove(userId, habitId);
+  invalidateMomentumDashboard(userId);
 }
 
 export async function toggleHabitCompletionAction(habitId: string, dateString: string, isCompleted: boolean) {
@@ -24,4 +27,5 @@ export async function toggleHabitCompletionAction(habitId: string, dateString: s
   } else {
     await habitLogsRepo.markIncomplete(userId, habitId, dateString);
   }
+  invalidateMomentumDashboard(userId);
 }
