@@ -4,21 +4,27 @@ import { getCurrentUserId } from "@/lib/currentUser";
 import { tasksRepo } from "@/lib/db/tasks";
 import { taskCompletionsRepo } from "@/lib/db/taskCompletions";
 import { invalidateMomentumDashboard } from "@/lib/gamification/statsService";
-import { toTask, toTaskPatch } from "@/lib/mappers";
+import { resolveTaskPriorityFields, toTask, toTaskPatch } from "@/lib/mappers";
 import { getLocalDateKey } from "@/lib/intelligence/personalDNA/timezone";
-import type { Task } from "@/types";
+import type { Task, TaskPriority } from "@/types";
 
 // Creation takes what the New Task modal asks for (title/description/due
 // date), plus priority — which the universal command bar can genuinely
 // determine at creation time ("תזכיר לי דחוף להתקשר..."), where the modal
 // could only offer another checkbox nobody would tick. `status` still
 // defaults to 'todo' at the DB level, and everything stays patchable via
-// updateTaskAction.
+// updateTaskAction. `priority` and `isHighPriority` both go through
+// resolveTaskPriorityFields (lib/mappers.ts) so whichever one a caller sets
+// (or neither) leaves the two fields consistent — see that function's own
+// comment for why both exist.
 export async function addTaskAction(input: {
   title: string;
   description?: string;
   dueDate?: string;
   isHighPriority?: boolean;
+  priority?: TaskPriority;
+  estimatedDuration?: number;
+  actualDuration?: number;
 }) {
   const userId = await getCurrentUserId();
   const row = await tasksRepo.insert({
@@ -26,7 +32,9 @@ export async function addTaskAction(input: {
     title: input.title,
     description: input.description ?? null,
     due_date: input.dueDate ?? null,
-    is_high_priority: input.isHighPriority ?? false,
+    ...resolveTaskPriorityFields(input),
+    estimated_duration: input.estimatedDuration ?? 0,
+    actual_duration: input.actualDuration ?? 0,
   });
   invalidateMomentumDashboard(userId);
   return toTask(row);

@@ -95,7 +95,7 @@ async function buildMomentumDashboard(userId: string): Promise<MomentumDashboard
       const dueKey = t.due_date ? getLocalDateKey(t.due_date) : null;
       return dueKey === todayKey || completedDateByTaskId.get(t.id) === todayKey;
     })
-    .map((t) => ({ isHighPriority: t.is_high_priority, isCompleted: t.status === "done" }));
+    .map((t) => ({ priority: t.priority, isCompleted: t.status === "done" }));
 
   const habitsCompletedToday = new Set(habitLogs.filter((l) => l.completed_date === todayKey).map((l) => l.habit_id));
   const todaysHabits = habits.map((h) => ({ isCompleted: habitsCompletedToday.has(h.id) }));

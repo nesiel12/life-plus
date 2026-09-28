@@ -3,8 +3,10 @@
 // the daily habit check-ins. Purely arithmetic over what's already in the
 // database; nothing here asks a model to judge anything.
 
+import type { TaskPriority } from "@/types";
+
 export interface MomentumTaskItem {
-  isHighPriority: boolean;
+  priority: TaskPriority;
   isCompleted: boolean;
 }
 
@@ -12,11 +14,14 @@ export interface MomentumHabitItem {
   isCompleted: boolean;
 }
 
-/** A plain task is worth one point; a high-priority one is worth two —
- *  finishing the thing that actually mattered should move the meter more
- *  than checking off something trivial. */
-export const TASK_WEIGHT = 1;
-export const HIGH_PRIORITY_WEIGHT = 2;
+/** P1 is worth double a default task, P2 sits between the two — finishing
+ *  the thing that actually mattered should move the meter more than
+ *  checking off something trivial. */
+export const PRIORITY_WEIGHT: Record<TaskPriority, number> = {
+  P1: 2,
+  P2: 1.5,
+  P3: 1,
+};
 
 /** Habits sit between the two task weights: consistency matters, but a
  *  single daily habit shouldn't out-swing a high-priority task. */
@@ -49,7 +54,7 @@ export function computeDailyMomentum(
   let tasksCompleted = 0;
 
   for (const task of tasks) {
-    const weight = task.isHighPriority ? HIGH_PRIORITY_WEIGHT : TASK_WEIGHT;
+    const weight = PRIORITY_WEIGHT[task.priority];
     pointsPossible += weight;
     if (task.isCompleted) {
       pointsEarned += weight;
