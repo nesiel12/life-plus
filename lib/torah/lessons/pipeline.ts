@@ -23,6 +23,7 @@ import {
 import { MAX_MEDIA_SECONDS } from "@/lib/torah/lessons/media";
 import { LESSON_ANALYSIS_SYSTEM_PROMPT, lessonAnalysisSchema } from "@/lib/torah/lessons/prompts";
 import { downloadLessonMedia } from "@/lib/torah/lessons/storage";
+import { downloadYoutubeAudio } from "@/lib/torah/lessons/youtubeAudio";
 import {
   appendWindowLines,
   linesToText,
@@ -73,8 +74,13 @@ const ANALYSIS_TIMEOUT_MS = 150_000;
 
 export interface LessonProgress {
   phase?: "transcribe" | "analyze" | "write";
-  /** How the transcript is being produced. */
-  source?: "captions" | "gemini";
+  /**
+   * How the transcript is being produced. "gemini-audio-fallback" is a
+   * youtube-kind lesson that fell back to downloading the video's own audio
+   * track after Gemini's direct URL fetch was blocked — see
+   * uploadYoutubeAudioFallback below.
+   */
+  source?: "captions" | "gemini" | "gemini-audio-fallback";
   windows?: TimeWindow[];
   nextWindow?: number;
   /** True when the windows were planned from an estimated duration. */
@@ -322,6 +328,22 @@ async function uploadAudioToGemini(row: LessonRow): Promise<NonNullable<LessonPr
   return { name: active.name, uri: active.uri, mimeType: active.mimeType, expiresAt: active.expirationTime };
 }
 
+/**
+ * The last resort for a youtube-kind lesson: Gemini's own direct-URL fetch of
+ * the video was blocked (see the 403/400/404 handling in
+ * transcribeNextWindow below), so the video's audio track is downloaded here
+ * and handed to Gemini's Files API instead — the same path an uploaded-audio
+ * lesson takes. Only reachable once per lesson; a failure here is permanent
+ * (thrown by the caller), since a video YouTube refuses to serve to this
+ * worker will not serve differently on a plain retry.
+ */
+async function uploadYoutubeAudioFallback(row: LessonRow): Promise<NonNullable<LessonProgress["geminiFile"]>> {
+  const { bytes, mimeType } = await downloadYoutubeAudio(row.source_url ?? "");
+  const uploaded = await uploadGeminiFile(bytes, mimeType, `lesson-${row.id}-audio`);
+  const active = uploaded.state === "ACTIVE" ? uploaded : await waitForGeminiFileActive(uploaded.name);
+  return { name: active.name, uri: active.uri, mimeType: active.mimeType, expiresAt: active.expirationTime };
+}
+
 // ---------------------------------------------------------------------------
 // Step 2 — transcribe one window
 // ---------------------------------------------------------------------------
@@ -335,20 +357,22 @@ async function transcribeNextWindow(row: LessonRow, progress: LessonProgress): P
   }
 
   let geminiFile = progress.geminiFile;
-  if (row.kind === "audio") {
+  // A youtube-kind lesson only carries a geminiFile once the audio-fallback
+  // below has already engaged for it — otherwise it transcribes straight
+  // from the URL, and this block does nothing for it.
+  if (row.kind === "audio" || geminiFile) {
     // Files API uploads expire after 48 hours; a lesson paused on quota for
     // two days needs a fresh one.
     const expiresSoon = !geminiFile?.expiresAt || new Date(geminiFile.expiresAt).getTime() < Date.now() + 10 * 60_000;
     if (!geminiFile || expiresSoon || !(await getGeminiFile(geminiFile.name).catch(() => null))) {
-      geminiFile = await uploadAudioToGemini(row);
+      geminiFile = row.kind === "audio" ? await uploadAudioToGemini(row) : await uploadYoutubeAudioFallback(row);
     }
   }
 
   const window = windows[index];
-  const source =
-    row.kind === "youtube"
-      ? ({ kind: "youtube", url: row.source_url ?? "" } as const)
-      : ({ kind: "file", uri: geminiFile!.uri, mimeType: geminiFile!.mimeType } as const);
+  const source = geminiFile
+    ? ({ kind: "file", uri: geminiFile.uri, mimeType: geminiFile.mimeType } as const)
+    : ({ kind: "youtube", url: row.source_url ?? "" } as const);
 
   let raw;
   try {
@@ -369,8 +393,26 @@ async function transcribeNextWindow(row: LessonRow, progress: LessonProgress): P
       `[lessons] window ${index + 1}/${windows.length} transcription failed for ${row.id} (kind=${row.kind}, status=${status ?? "unknown"}):`,
       err instanceof Error ? err.message : err
     );
-    if (row.kind === "youtube" && (status === 400 || status === 403 || status === 404)) {
-      throw new LessonStepError("Gemini לא הצליח לגשת לסרטון. ודא שהוא ציבורי ולא מוגבל.", true);
+    if (source.kind === "youtube" && (status === 400 || status === 403 || status === 404)) {
+      // Gemini can't reach the video directly (source.kind is only "youtube"
+      // when no geminiFile exists yet, so this fallback is naturally
+      // one-shot per lesson) — try downloading its audio ourselves and
+      // handing that to Gemini instead. A failure here means the video truly
+      // isn't fetchable from this worker, any more than it was for Gemini,
+      // and is permanent: no standard retry loop, straight to the manual
+      // "upload audio" fallback in the UI (LessonProcessing.tsx).
+      try {
+        const fallbackFile = await uploadYoutubeAudioFallback(row);
+        return {
+          patch: { progress: { ...progress, geminiFile: fallbackFile, source: "gemini-audio-fallback" } as unknown as Json },
+        };
+      } catch (fallbackErr) {
+        console.error(`[lessons] youtube audio fallback failed for ${row.id}:`, fallbackErr);
+        throw new LessonStepError(
+          "Gemini לא הצליח לגשת לסרטון, וגם חילוץ השמע ממנו נכשל. אפשר להעלות קובץ שמע של השיעור כדי להשלים את התמלול.",
+          true
+        );
+      }
     }
     throw new LessonStepError("תמלול קטע מהשיעור נכשל.");
   }
@@ -380,7 +422,7 @@ async function transcribeNextWindow(row: LessonRow, progress: LessonProgress): P
   const merged = appendWindowLines(existing, lines);
   // Saved after EVERY window: this is the resumable part, and it is also what
   // lets the lesson page show the transcript growing while it is processed.
-  await saveTranscript(row, merged, "gemini");
+  await saveTranscript(row, merged, row.kind === "youtube" && source.kind === "file" ? "gemini-audio-fallback" : "gemini");
 
   const emptyWindows = lines.length === 0 ? (progress.emptyWindows ?? 0) + 1 : 0;
   const nextWindow = index + 1;

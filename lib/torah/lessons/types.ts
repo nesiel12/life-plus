@@ -21,7 +21,7 @@ export interface LessonProgressView {
   pausedUntil?: string;
   pauseReason?: string;
   lastError?: string;
-  source?: "captions" | "gemini";
+  source?: "captions" | "gemini" | "gemini-audio-fallback";
 }
 
 export interface LessonSummary {

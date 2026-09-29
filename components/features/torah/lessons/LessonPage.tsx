@@ -192,7 +192,7 @@ export function LessonPage({ lessonId }: { lessonId: string }) {
 
       {!ready && (
         <div className="mt-5">
-          <LessonProcessing lesson={lesson} onRetry={() => void retry()} retrying={retrying} />
+          <LessonProcessing lesson={lesson} onRetry={() => void retry()} retrying={retrying} onUploaded={() => void reload()} />
         </div>
       )}
 

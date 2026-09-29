@@ -6,46 +6,12 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { AudioLines, FileAudio, Link2, Loader2, MonitorPlay, UploadCloud, X } from "lucide-react";
 import { useAtlasStore } from "@/store/useAtlasStore";
 import { AUDIO_ACCEPT, MAX_AUDIO_BYTES, audioMimeType } from "@/lib/torah/lessons/media";
+import { readAudioDuration, uploadWithProgress } from "@/lib/torah/lessons/clientUpload";
 import { youtubeThumbnailUrl, youtubeVideoId } from "@/lib/learning/youtube";
 import { durationLabel } from "@/lib/torah/lessons/timecode";
 import { cn } from "@/lib/utils";
 
 type Mode = "audio" | "youtube";
-
-/** Reads a local audio file's duration from its own metadata, without uploading it. */
-function readAudioDuration(file: File): Promise<number | undefined> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const audio = new Audio();
-    const done = (value: number | undefined) => {
-      URL.revokeObjectURL(url);
-      resolve(value);
-    };
-    audio.preload = "metadata";
-    audio.onloadedmetadata = () => done(Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : undefined);
-    audio.onerror = () => done(undefined);
-    setTimeout(() => done(undefined), 8000);
-    audio.src = url;
-  });
-}
-
-/** PUTs the file to the signed upload URL with real progress events. */
-function uploadWithProgress(url: string, file: File, mimeType: string, onProgress: (fraction: number) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", url);
-    xhr.setRequestHeader("x-upsert", "true");
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress(event.loaded / event.total);
-    };
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`upload ${xhr.status}`)));
-    xhr.onerror = () => reject(new Error("upload network error"));
-    const form = new FormData();
-    form.append("cacheControl", "3600");
-    form.append("", new File([file], file.name, { type: mimeType }));
-    xhr.send(form);
-  });
-}
 
 /**
  * "העלאת שיעור": an audio recording or a YouTube link, optionally tied to a

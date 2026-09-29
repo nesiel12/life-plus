@@ -24,6 +24,7 @@
   "dependencies": {
     "@ai-sdk/google": "^4.0.22",
     "@ai-sdk/openai": "^4.0.16",
+    "@distube/ytdl-core": "^4.16.12",
     "@google/generative-ai": "^0.24.1",
     "@hebcal/core": "^5.10.1",
     "@mozilla/readability": "^0.6.0",

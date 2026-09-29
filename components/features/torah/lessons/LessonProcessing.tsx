@@ -5,11 +5,13 @@ import { AlertTriangle, AudioLines, Check, Clock3, FileSearch, Loader2, RotateCc
 import type { LessonDetail } from "@/lib/torah/lessons/types";
 import { formatTimecode } from "@/lib/torah/lessons/timecode";
 import { cn } from "@/lib/utils";
+import { LessonAudioFallback } from "@/components/features/torah/lessons/LessonAudioFallback";
 
 interface LessonProcessingProps {
   lesson: LessonDetail;
   onRetry: () => void;
   retrying: boolean;
+  onUploaded: () => void;
 }
 
 const STEPS = [
@@ -32,7 +34,7 @@ function stepIndex(lesson: LessonDetail): number {
  * is, how far along, and — as windows finish — the transcript itself, growing.
  * Failure and quota pauses say exactly what happened and what happens next.
  */
-export function LessonProcessing({ lesson, onRetry, retrying }: LessonProcessingProps) {
+export function LessonProcessing({ lesson, onRetry, retrying, onUploaded }: LessonProcessingProps) {
   const reduceMotion = useReducedMotion();
   const current = stepIndex(lesson);
   const { progress } = lesson;
@@ -117,6 +119,7 @@ export function LessonProcessing({ lesson, onRetry, retrying }: LessonProcessing
             {retrying ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <RotateCcw size={13} aria-hidden />}
             נסה שוב מהנקודה שבה נעצר
           </button>
+          {lesson.kind === "youtube" && <LessonAudioFallback lesson={lesson} onUploaded={onUploaded} />}
         </div>
       )}
 
